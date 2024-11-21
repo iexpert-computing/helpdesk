@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql8_container
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: D32txyU190R
+      MYSQL_DATABASE: ocomon
+      MYSQL_USER: user_ocomon
+      MYSQL_PASSWORD: user_ocomon_D32txyU190R
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init-scripts:/docker-entrypoint-initdb.d
+
+  ocomon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ocomon_container
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - mysql
+    environment:
+      DB_HOST: mysql
+      DB_NAME: ocomon
+      DB_USER: user_ocomon
+      DB_PASSWORD: user_ocomon_D32txyU190R
+
+volumes:
+  mysql_data:
