@@ -34,3 +34,7 @@ services:
 
 volumes:
   mysql_data:
+
+
+# Depois de testado remover o volume de teste
+# docker volume rm ocomon-50_mysql_data  
