@@ -31,10 +31,7 @@ services:
       DB_NAME: ocomon
       DB_USER: user_ocomon
       DB_PASSWORD: user_ocomon_D32txyU190R
+      DB_ROOT_PASSWORD: D32txyU190R
 
 volumes:
   mysql_data:
-
-
-# Depois de testado remover o volume de teste
-# docker volume rm ocomon-50_mysql_data  
