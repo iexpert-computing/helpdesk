@@ -36,7 +36,9 @@ RUN sed -i '/CREATE DATABASE .*!32312 IF NOT EXISTS.*ocomon_5.*utf8/d' /var/www/
 #   docker exec -it ocomon_container /bin/bash
 # Executar
 #   mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql
-# Depois de testado, container e imagens removidos, remover o volume de teste
+# Excluíndo resíduos
+#   docker container rm ocomon_container
+#   docker container rm mysql8_container
 #   docker volume rm ocomon5_mysql_data
 
 RUN mkdir -p /var/www/html/api/ocomon_api/storage
