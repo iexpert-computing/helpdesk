@@ -32,6 +32,9 @@ services:
       DB_USER: user_ocomon
       DB_PASSWORD: user_ocomon_D32txyU190R
       DB_ROOT_PASSWORD: D32txyU190R
+    volumes:
+      - ocomon_storage:/var/www/html/api/ocomon_api/storage
 
 volumes:
   mysql_data:
+  ocomon_storage:
