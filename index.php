@@ -267,8 +267,8 @@ $admAreaHome = $adminPath . "users.php";
                 <!-- w3-card  -->
                 <div class="footer-text">
 
-                    <a href="https://ocomonphp.sourceforge.io/" target="_blank">
-                        OcoMon
+                    <a href="https://iexpert.net.br/" target="_blank">
+                      HelpDesk
                     </a>&nbsp;-&nbsp;
                     <?= TRANS('OCOMON_ABSTRACT'); ?><br />
                     <?= TRANS('COL_VERSION') . ": " . VERSAO . " - " . TRANS('MNS_MSG_LIC') . " GPL"; ?>

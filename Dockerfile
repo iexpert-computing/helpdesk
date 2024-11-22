@@ -1,51 +1,70 @@
 FROM php:8.1-apache
 
-# Apenas o cliente MySQL
-RUN apt-get update && \
+# Habilitar depuração detalhada
+RUN set -e && echo "Iniciando o processo de construção da imagem"
+
+# Atualização de pacotes e instalação de dependências
+RUN set -e && \
+    echo "Atualizando pacotes" && apt-get update && \
+    echo "Instalando dependências essenciais" && \
     apt-get install -y --no-install-recommends mariadb-client vim libzip-dev zip unzip && \
-    docker-php-ext-install zip && \
-    rm -rf /var/lib/apt/lists/*
+    echo "Instalando extensão ZIP para PHP" && docker-php-ext-install zip && \
+    echo "Limpando cache do apt" && rm -rf /var/lib/apt/lists/*
 
-RUN docker-php-ext-install mysqli pdo pdo_mysql
+# Instalar extensões PHP necessárias
+RUN set -e && \
+    echo "Instalando extensões PHP (mysqli, pdo, pdo_mysql)" && \
+    docker-php-ext-install mysqli pdo pdo_mysql
 
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+# Instalar o Composer
+RUN set -e && \
+    echo "Baixando o Composer" && \
+    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer && \
+    echo "Composer instalado com sucesso"
 
-COPY . /var/www/html
+# Copiar arquivos do projeto para o contêiner
+COPY set -e && \
+    echo "Iniciando o processo de construção da imagem"
+ . /var/www/html
 
-RUN cd /var/www/html/api/ocomon_api && \
-    composer install
+# Executar instalação de dependências do Composer
+RUN set -e && \
+    echo "Executando instalação de dependências do Composer" && \
+    cd /var/www/html/api/ocomon_api && \
+    composer install --verbose
 
-# Substituindo a configuração pela variável ambiente
-RUN mv /var/www/html/includes/config.inc.php-dist /var/www/html/includes/config.inc.php
-RUN sed -i "s/define(\"SQL_USER\", \".*\"/define(\"SQL_USER\", getenv('DB_USER')/" /var/www/html/includes/config.inc.php
-RUN sed -i "s/define(\"SQL_PASSWD\", \".*\"/define(\"SQL_PASSWD\", getenv('DB_PASSWORD')/" /var/www/html/includes/config.inc.php
-RUN sed -i "s/define(\"SQL_SERVER\", \".*\"/define(\"SQL_SERVER\", getenv('DB_HOST'));/" /var/www/html/includes/config.inc.php
-RUN sed -i "s/define(\"SQL_DB\", \".*\"/define(\"SQL_DB\", getenv('DB_NAME')/" /var/www/html/includes/config.inc.php
-RUN sed -i 's#define("LOG_PATH", ".*")#define("LOG_PATH", "/var/www/html/includes/logs/logs.txt")#' /var/www/html/includes/config.inc.php
+# Substituir configurações pela variável de ambiente
+RUN set -e && \
+    echo "Configurando variáveis de ambiente no config.inc.php" && \
+    mv /var/www/html/includes/config.inc.php-dist /var/www/html/includes/config.inc.php && \
+    sed -i "s/define(\"SQL_USER\", \".*\"/define(\"SQL_USER\", getenv('DB_USER')/" /var/www/html/includes/config.inc.php && \
+    sed -i "s/define(\"SQL_PASSWD\", \".*\"/define(\"SQL_PASSWD\", getenv('DB_PASSWORD')/" /var/www/html/includes/config.inc.php && \
+    sed -i "s/define(\"SQL_SERVER\", \".*\"/define(\"SQL_SERVER\", getenv('DB_HOST'));/" /var/www/html/includes/config.inc.php && \
+    sed -i "s/define(\"SQL_DB\", \".*\"/define(\"SQL_DB\", getenv('DB_NAME')/" /var/www/html/includes/config.inc.php && \
+    sed -i 's#define(\"LOG_PATH\", \".*\")#define(\"LOG_PATH\", \"/var/www/html/includes/logs/logs.txt\")#' /var/www/html/includes/config.inc.php
 
-# O ocomon usa definições do banco de forma fixa no script de instalação inicial, aqui estou removendo eles, já que o banco está criado no composer
-RUN sed -i '/CREATE DATABASE .*!32312 IF NOT EXISTS.*ocomon_5.*utf8/d' /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql && \
+# Remover scripts desnecessários do banco de dados
+RUN set -e && \
+    echo "Removendo definições fixas de banco de dados nos scripts de instalação" && \
+    sed -i '/CREATE DATABASE .*!32312 IF NOT EXISTS.*ocomon_5.*utf8/d' /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql && \
     sed -i '/CREATE USER.*ocomon_5.*localhost.*senha_ocomon_mysql/d' /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql && \
     sed -i '/GRANT SELECT .*INSERT .*UPDATE .*DELETE ON .*ocomon_5.*localhost/d' /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql && \
     sed -i '/GRANT Drop ON .*ocomon_5.*localhost/d' /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql && \
     sed -i '/FLUSH PRIVILEGES;/d' /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql && \
     sed -i '/USE .*ocomon_5.*;/d' /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql
 
-# Com o container executado, logar nele a primeira vez:
-#   docker compose up
-#   docker exec -it ocomon_container /bin/bash
-# Executar
-#   mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql
-# Excluíndo resíduos
-#   docker container rm ocomon_container
-#   docker container rm mysql8_container
-#   docker volume rm ocomon5_mysql_data
-
-RUN mkdir -p /var/www/html/api/ocomon_api/storage
-RUN chown -R www-data:www-data /var/www && \
+# Garantir que os diretórios necessários existam e tenham as permissões corretas
+RUN set -e && \
+    echo "Criando diretórios necessários e ajustando permissões" && \
+    mkdir -p /var/www/html/api/ocomon_api/storage && \
+    chown -R www-data:www-data /var/www && \
     chmod -R 775 /var/www/html/api/ocomon_api/storage && \
     chmod -R 775 /var/www/html/includes/logs
 
-RUN a2enmod rewrite
+# Habilitar o módulo rewrite no Apache
+RUN set -e && \
+    echo "Habilitando módulo rewrite no Apache" && \
+    a2enmod rewrite
 
+# Expor a porta padrão
 EXPOSE 80

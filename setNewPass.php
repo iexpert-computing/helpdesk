@@ -155,8 +155,8 @@ $conn = ConnectPDO::getInstance();
 					<!-- FOOTER -->
 					<div class="footer bg-light border-top text-center p-2 d-none d-sm-block">
 						<div class="txt1">
-							<a href="https://ocomonphp.sourceforge.io/" target="_blank">
-								OcoMon
+							<a href="https://iexpert.net.br/" target="_blank">
+								HelpDesk
 							</a>&nbsp;-&nbsp;
 							<?= TRANS('OCOMON_ABSTRACT'); ?> -
 							<?= TRANS('COL_VERSION') . ": " . VERSAO . " - " . TRANS('MNS_MSG_LIC') . " GPL"; ?>

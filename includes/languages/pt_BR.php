@@ -476,11 +476,11 @@
     $TRANS["FILL_LOCATION"] = "O departamento deve ser preenchido!";
     $TRANS["MSG_ALERT_PERIOD"] = "O período deve ser informado!";
     $TRANS["COL_OBS"] = "Obs";
-    $TRANS["MENU_TTL_MOD_ADMIN"] = "OcoMon - Módulo de Administração";
-    $TRANS["MENU_TTL_MOD_INV"] = "OcoMon - Módulo de Inventário";
-    $TRANS["MENU_TTL_MOD_OCCO"] = "OcoMon - Módulo de Ocorrências";
-    $TRANS["PRINT_TO_TREATING"] = "OcoMon - Impressão para atendimento";
-    $TRANS["TTL_OCOMON"] = "OcoMon - Sistema Completo para Gestão de demandas de Suporte Técnico e Controle de ativos";
+    $TRANS["MENU_TTL_MOD_ADMIN"] = "Módulo de Administração";
+    $TRANS["MENU_TTL_MOD_INV"] = "Módulo de Inventário";
+    $TRANS["MENU_TTL_MOD_OCCO"] = "Módulo de Ocorrências";
+    $TRANS["PRINT_TO_TREATING"] = "Impressão para atendimento";
+    $TRANS["TTL_OCOMON"] = "Sistema Completo para Gestão de demandas de Suporte Técnico e Controle de ativos";
     $TRANS["TICKET_SCHEDULED_SUCCESS"] = "Ocorrência agendada com sucesso!";
     $TRANS["TICKET_SCHEDULED_IN_EDIT"] = "Ocorrência agendada na edição";
     $TRANS["TICKET_GOTTEN_IN"] = "Ocorrência em atendimento por você";
@@ -831,7 +831,7 @@
     $TRANS["SMART_IN_SLA"] = "Dentro do SLA";
     $TRANS["SMART_OUT_SLA"] = "Fora do SLA";
     $TRANS["SMART_IN_SLA_TOLERANCE"] = "Dentro da tolerância excedente";
-    $TRANS["SMART_CUSTOM_REPORT_TITLE"] = "OcoMon - Relatório customizado";
+    $TRANS["SMART_CUSTOM_REPORT_TITLE"] = "Relatório customizado";
     $TRANS["SMART_CUSTOM_REPORT_FILE_NAME"] = "OcoMon-Relatorio-customizado";
     $TRANS["SMART_BUTTON_PRINT"] = "Imprimir";
     $TRANS["SMART_BUTTON_COPY"] = "Copiar";
