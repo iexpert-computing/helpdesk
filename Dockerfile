@@ -2,12 +2,18 @@ FROM php:8.1-apache
 
 # Apenas o cliente MySQL
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends mariadb-client vim && \
+    apt-get install -y --no-install-recommends mariadb-client vim libzip-dev zip unzip && \
+    docker-php-ext-install zip && \
     rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-install mysqli pdo pdo_mysql
 
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
 COPY . /var/www/html
+
+RUN cd /var/www/html/api/ocomon_api && \
+    composer install
 
 # Substituindo a configuração pela variável ambiente
 RUN mv /var/www/html/includes/config.inc.php-dist /var/www/html/includes/config.inc.php
