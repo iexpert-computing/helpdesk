@@ -2,7 +2,7 @@ FROM php:8.1-apache
 
 # Apenas o cliente MySQL
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends mariadb-client && \
+    apt-get install -y --no-install-recommends mariadb-client vim && \
     rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-install mysqli pdo pdo_mysql
@@ -15,6 +15,7 @@ RUN sed -i "s/define(\"SQL_USER\", \".*\"/define(\"SQL_USER\", getenv('DB_USER')
 RUN sed -i "s/define(\"SQL_PASSWD\", \".*\"/define(\"SQL_PASSWD\", getenv('DB_PASSWORD')/" /var/www/html/includes/config.inc.php
 RUN sed -i "s/define(\"SQL_SERVER\", \".*\"/define(\"SQL_SERVER\", getenv('DB_HOST'));/" /var/www/html/includes/config.inc.php
 RUN sed -i "s/define(\"SQL_DB\", \".*\"/define(\"SQL_DB\", getenv('DB_NAME')/" /var/www/html/includes/config.inc.php
+RUN sed -i 's#define("LOG_PATH", ".*")#define("LOG_PATH", "/var/www/html/includes/logs/logs.txt")#' /var/www/html/includes/config.inc.php
 
 # O ocomon usa definições do banco de forma fixa no script de instalação inicial, aqui estou removendo eles, já que o banco está criado no composer
 RUN sed -i '/CREATE DATABASE .*!32312 IF NOT EXISTS.*ocomon_5.*utf8/d' /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql && \
@@ -25,12 +26,17 @@ RUN sed -i '/CREATE DATABASE .*!32312 IF NOT EXISTS.*ocomon_5.*utf8/d' /var/www/
     sed -i '/USE .*ocomon_5.*;/d' /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql
 
 # Com o container executado, logar nele a primeira vez:
-#   docker compose run --rm --service-ports ocomon bash
-# E executar
+#   docker compose up
+#   docker exec -it ocomon_container /bin/bash
+# Executar
 #   mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql
+# Depois de testado, container e imagens removidos, remover o volume de teste
+#   docker volume rm ocomon5_mysql_data
 
-RUN chown -R www-data:www-data /var/www/html
-RUN chmod -R 775 /var/www/html/api/ocomon_api/storage
+RUN mkdir -p /var/www/html/api/ocomon_api/storage
+RUN chown -R www-data:www-data /var/www && \
+    chmod -R 775 /var/www/html/api/ocomon_api/storage && \
+    chmod -R 775 /var/www/html/includes/logs
 
 RUN a2enmod rewrite
 
