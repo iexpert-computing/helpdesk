@@ -652,7 +652,7 @@
     $TRANS["TTL_CURRENT_PASS"] = "Current password";
     $TRANS["OPT_PASS_TO_AUTH"] = "Password for authentication";
     $TRANS["YES"] = "Yes";
-    $TRANS["OCOMON_ABSTRACT"] = "Complete System for Management of Technical Support demands and IT assets";
+    $TRANS["OCOMON_ABSTRACT"] = "Management of Technical Support demands and IT assets";
     $TRANS["OPT_SITE"] = "SITE TO ACCESS OCOMON";
     $TRANS["HELP_SITE"] = "The URL for users to access the system";
     $TRANS["STATE"] = "Operational state";

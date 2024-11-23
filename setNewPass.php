@@ -118,7 +118,7 @@ $conn = ConnectPDO::getInstance();
 						<span class="login100-form-title ">
 							<!-- p-b-43 -->
 							<!-- topo-color -->
-							<img src="./MAIN_LOGO.svg" alt="OcoMon">
+							<img src="./MAIN_LOGO.svg" alt="logomarca iexpert">
 						</span>
 						<span class="login100-form-title mt-5 text-secondary">
 							<?= TRANS('TTL_ALTER_PASS'); ?>
@@ -158,7 +158,7 @@ $conn = ConnectPDO::getInstance();
 							<a href="https://iexpert.net.br/" target="_blank">
 								HelpDesk
 							</a>&nbsp;-&nbsp;
-							<?= TRANS('OCOMON_ABSTRACT'); ?> -
+							<?= TRANS('OCOMON_ABSTRACT'); ?><br />
 							<?= TRANS('COL_VERSION') . ": " . VERSAO . " - " . TRANS('MNS_MSG_LIC') . " GPL"; ?>
 						</div>
 					</div>

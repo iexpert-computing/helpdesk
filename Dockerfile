@@ -23,9 +23,9 @@ RUN set -e && \
     echo "Composer instalado com sucesso"
 
 # Copiar arquivos do projeto para o contêiner
-COPY set -e && \
-    echo "Iniciando o processo de construção da imagem"
- . /var/www/html
+RUN set -e && \
+    echo "Copiando arquivos do projeto para o contêiner"
+COPY . /var/www/html
 
 # Executar instalação de dependências do Composer
 RUN set -e && \
@@ -53,6 +53,17 @@ RUN set -e && \
     sed -i '/FLUSH PRIVILEGES;/d' /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql && \
     sed -i '/USE .*ocomon_5.*;/d' /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql
 
+# Com o container executado, logar nele a primeira vez:
+#   docker compose up
+#   docker exec -it ocomon_container /bin/bash
+# Executar
+#   mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql
+# Excluíndo resíduos
+#   docker stop ocomon_container
+#   docker container rm ocomon_container
+#   docker container rm mysql8_container
+#   docker volume rm ocomon5_mysql_data
+    
 # Garantir que os diretórios necessários existam e tenham as permissões corretas
 RUN set -e && \
     echo "Criando diretórios necessários e ajustando permissões" && \

@@ -1,4 +1,5 @@
-#Comando para rodar: docker compose build --progress=plain --no-cache
+#Comando para rodar: docker compose build --progress=plain --no-cache | docker compose build --no-cache
+
 version: '3.8'
 
 services:

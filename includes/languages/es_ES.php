@@ -652,7 +652,7 @@
     $TRANS["TTL_CURRENT_PASS"] = "Contraseña Actual";
     $TRANS["OPT_PASS_TO_AUTH"] = "Contraseña para Autenticación";
     $TRANS["YES"] = "Si";
-    $TRANS["OCOMON_ABSTRACT"] = "Sistema Completo para la Gestión de Demandas de Soporte Técnico y Activos de TI";
+    $TRANS["OCOMON_ABSTRACT"] = "Gestión de Demandas de Soporte Técnico y Activos de TI";
     $TRANS["OPT_SITE"] = "SITIO DE ACCESO HELPDESK";
     $TRANS["HELP_SITE"] = "La URL para que los usuarios accedan al sistema.";
     $TRANS["STATE"] = "Situación";

@@ -109,7 +109,7 @@ $login_cookie = filter_input(INPUT_COOKIE, "oc_login");
 <html lang="pt-BR">
 
 <head>
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title>Helpdesk&nbsp;<?= VERSAO; ?></title>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="description" content="<?= TRANS('TTL_OCOMON'); ?>">
@@ -167,117 +167,111 @@ $login_cookie = filter_input(INPUT_COOKIE, "oc_login");
 
 
 
-				<form class="login100-form">
+				<form class="login100-form d-flex flex-column justify-content-between min-vh-100">
+					<div>
+						<?php
+						if (isset($_SESSION['flash']) && !empty($_SESSION['flash'])) {
+						?>
+							<div class="h5"><?= $_SESSION['flash']; ?></div>
+						<?php
+							$_SESSION['flash'] = '';
+						}
+						?>
+						<div id="divResult"></div>
 
-					<?php
-					if (isset($_SESSION['flash']) && !empty($_SESSION['flash'])) {
-					?>
-						<div class="h5"><?= $_SESSION['flash']; ?></div>
-					<?php
-						$_SESSION['flash'] = '';
-					}
-					?>
-					<div id="divResult"></div>
-
-					<div class="  ">
-						<!-- login-logo -->
-						<span class="login100-form-title ">
-							<!-- p-b-43 -->
-							<!-- topo-color -->
-							<img src="./MAIN_LOGO.svg" alt="OcoMon" width="280">
-						</span>
-					</div>
-
-
-
-					<div class="wrap-input100 m-t-50">
-						<input class="input100" type="text" name="user" id="user" value="<?= $login_cookie ?? null; ?>" autocomplete="off" tabindex="1">
-						<span class="focus-input100"></span>
-						<span class="label-input100"><?= TRANS('FIELD_USER'); ?></span>
-					</div>
-
-
-					<div class="wrap-input100 ">
-						<input class="input100" type="password" name="pass" id="pass" tabindex="2">
-						<span class="focus-input100"></span>
-						<span class="label-input100"><?= TRANS('PASSWORD'); ?></span>
-					</div>
-
-					<div class="flex-sb-m w-full p-t-3 p-b-32">
-						<div class="contact100-form-checkbox">
-							<input class="input-checkbox100" id="remember_user" type="checkbox" <?= ($login_cookie ? "checked" : ""); ?> name="remember_user">
-							<label class="label-checkbox100" for="remember_user">
-								<?= TRANS('REMEMBER_MY_USERNAME'); ?>
-							</label>
+						<div class="  ">
+							<!-- login-logo -->
+							<span class="login100-form-title">
+								<!-- p-b-43 -->
+								<!-- topo-color -->
+								<img src="./MAIN_LOGO.svg" alt="logomarca iexpert" width="450">
+							</span>
 						</div>
 
-						<?php
-						if ($authType == "SYSTEM" && $showForgetPass) {
-						?>
-							<div>
-								<a href="#" class="txt1" id="forgot_pass">
-									<?= TRANS('FORGOT_PASSWORD'); ?>
-								</a>
+
+
+						<div class="wrap-input100 m-t-100">
+							<input class="input100" type="text" name="user" id="user" value="<?= $login_cookie ?? null; ?>" autocomplete="off" tabindex="1">
+							<span class="focus-input100"></span>
+							<span class="label-input100"><?= TRANS('FIELD_USER'); ?></span>
+						</div>
+
+
+						<div class="wrap-input100 ">
+							<input class="input100" type="password" name="pass" id="pass" tabindex="2">
+							<span class="focus-input100"></span>
+							<span class="label-input100"><?= TRANS('PASSWORD'); ?></span>
+						</div>
+
+						<div class="flex-sb-m w-full p-t-3 p-b-32">
+							<div class="contact100-form-checkbox">
+								<input class="input-checkbox100" id="remember_user" type="checkbox" <?= ($login_cookie ? "checked" : ""); ?> name="remember_user">
+								<label class="label-checkbox100" for="remember_user">
+									<?= TRANS('REMEMBER_MY_USERNAME'); ?>
+								</label>
 							</div>
+
+							<?php
+							if ($authType == "SYSTEM" && $showForgetPass) {
+							?>
+								<div>
+									<a href="#" class="txt1" id="forgot_pass">
+										<?= TRANS('FORGOT_PASSWORD'); ?>
+									</a>
+								</div>
+							<?php
+							}
+							?>
+						</div>
+
+						<input type="hidden" name="auth_type" id="auth_type" value="<?= $authType; ?>">
+						<div class="container-login100-form-btn">
+							<button class="login100-form-btn bg-primary" id="bt_login" tabindex="3">
+								<?= TRANS('ENTER_IN'); ?>
+							</button>
+						</div>
+
+						<!-- Links para auto-cadastro e abertura de chamados sem cadastro -->
+						<?php
+						if ($showSelfRegister || $showOpenTicket) {
+						?>
+							<div class="text-center p-t-15 p-b-8">
+								<span class="txt1">
+									<?= TRANS('UNREGISTERED'); ?>
+								</span>
+							</div>
+
+							<div class="login100-form-social flex-c-m">
+								<?php
+								if ($showSelfRegister) {
+								?>
+									<a href="#" id="registerToOpen" class="login100-form-social-item flex-c-m bg-info m-r-5" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('MNS_MSG_CAD_ABERTURA_1'); ?>">
+										<i class="fas fa-user-plus btlogin-actions" aria-hidden="true"></i>
+									</a>
+								<?php
+								}
+
+								if ($showOpenTicket) {
+								?>
+									<a href="#" id="openBlindTicket" class="login100-form-social-item flex-c-m bg-info m-r-5" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('OPEN_BLIND_TICKET'); ?>">
+										<i class="fas fa-headset btlogin-actions" aria-hidden="true"></i>
+									</a>
+								<?php
+								}
+								?>
+							</div>
+
 						<?php
 						}
 						?>
 					</div>
-
-					<input type="hidden" name="auth_type" id="auth_type" value="<?= $authType; ?>">
-					<div class="container-login100-form-btn">
-						<button class="login100-form-btn bg-primary" id="bt_login" tabindex="3">
-							<?= TRANS('ENTER_IN'); ?>
-						</button>
-					</div>
-
-					<!-- Links para auto-cadastro e abertura de chamados sem cadastro -->
-					<?php
-					if ($showSelfRegister || $showOpenTicket) {
-					?>
-						<div class="text-center p-t-15 p-b-8">
-							<span class="txt1">
-								<?= TRANS('UNREGISTERED'); ?>
-							</span>
-						</div>
-
-						<div class="login100-form-social flex-c-m">
-							<?php
-							if ($showSelfRegister) {
-							?>
-								<a href="#" id="registerToOpen" class="login100-form-social-item flex-c-m bg-info m-r-5" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('MNS_MSG_CAD_ABERTURA_1'); ?>">
-									<i class="fas fa-user-plus btlogin-actions" aria-hidden="true"></i>
-								</a>
-							<?php
-							}
-
-							if ($showOpenTicket) {
-							?>
-								<a href="#" id="openBlindTicket" class="login100-form-social-item flex-c-m bg-info m-r-5" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('OPEN_BLIND_TICKET'); ?>">
-									<i class="fas fa-headset btlogin-actions" aria-hidden="true"></i>
-								</a>
-							<?php
-							}
-							?>
-						</div>
-
-					<?php
-					}
-					?>
-
-
 					<!-- FOOTER -->
-					<div class="footer bg-light border-top text-center p-2 d-none d-sm-block">
-						<div class="txt1">
-							<a href="https://iexpert.net.br/" target="_blank">
-								HelpDesk
-							</a>&nbsp;-&nbsp;
-							<?= TRANS('OCOMON_ABSTRACT'); ?> -
+					<div class="border-top text-center py-2 d-flex p-4">
+						<div class="txt1 w-100">
+							<?= TRANS('OCOMON_ABSTRACT'); ?> </br>
 							<?= TRANS('COL_VERSION') . ": " . VERSAO . " - " . TRANS('MNS_MSG_LIC') . " GPL"; ?>
 						</div>
 					</div>
-
-
 				</form>
 				<div class="login100-more login-screen">
 				</div>

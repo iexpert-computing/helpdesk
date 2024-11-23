@@ -112,7 +112,7 @@ $admAreaHome = $adminPath . "users.php";
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="<?= TRANS('TTL_OCOMON'); ?>">
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title>Helpdesk&nbsp;<?= VERSAO; ?></title>
 
     <!-- using local links -->
     <link rel="stylesheet" href="./includes/components/bootstrap/custom.css">
@@ -176,7 +176,7 @@ $admAreaHome = $adminPath . "users.php";
             <div class="topo topo-color fixed-top " style="z-index:4;">
 
                 <div id="header_logo">
-                    <span class="logo"><img src="MAIN_LOGO.svg" width="240" class=""></span>
+                    <span class="logo"><img src="MAIN_LOGO.svg" width="120" class=""></span>
                 </div>
                 <div id="header_elements" class=" fs-14">
                     <span class=" d-none d-sm-block align-items-center"> <?=  $userName . $profile . "&nbsp;&nbsp;|&nbsp;&nbsp;"; ?>
@@ -263,7 +263,7 @@ $admAreaHome = $adminPath . "users.php";
         <!-- FOOTER -->
         <div class="fixed-bottom toggle-footer cursor_to_down" id="footer_fixed">
             <!-- style="margin-top:50px;" -->
-            <div class=" fixed-bottom border-top bg-light text-center footer-content p-2" style="z-index:4; ">
+            <div class=" fixed-bottom border-top bg-light text-center footer-content p-2">
                 <!-- w3-card  -->
                 <div class="footer-text">
 
