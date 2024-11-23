@@ -8,12 +8,14 @@ services:
     container_name: mysql8_container
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: D32txyU190R
+      MYSQL_ROOT_PASSWORD: "#Comerci@l"
       MYSQL_DATABASE: ocomon
-      MYSQL_USER: user_ocomon
-      MYSQL_PASSWORD: user_ocomon_D32txyU190R
-    ports:
-      - "3306:3306"
+      MYSQL_USER: ocomon_user
+      MYSQL_PASSWORD: user_ocomon_#Comerci@l
+    # ports:
+    #   - "3306:3306"
+    networks:
+      - ocomon_network
     volumes:
       - mysql_data:/var/lib/mysql
       - ./init-scripts:/docker-entrypoint-initdb.d
@@ -25,18 +27,22 @@ services:
     container_name: ocomon_container
     restart: always
     ports:
-      - "80:80"
+      - "8001:80"
     depends_on:
       - mysql
     environment:
       DB_HOST: mysql
       DB_NAME: ocomon
       DB_USER: user_ocomon
-      DB_PASSWORD: user_ocomon_D32txyU190R
-      DB_ROOT_PASSWORD: D32txyU190R
+      DB_PASSWORD: user_ocomon_#Comerci@l
+      DB_ROOT_PASSWORD: "#Comerci@l"
     volumes:
       - ocomon_storage:/var/www/html/api/ocomon_api/storage
 
 volumes:
   mysql_data:
   ocomon_storage:
+
+networks:
+  ocomon_network:
+    external: true
