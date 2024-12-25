@@ -57,48 +57,38 @@ try {
     <table id="table_script_type_of_issues" class="stripe hover order-column row-border" border="0" cellspacing="0" width="100%">
         <thead>
             <tr class="header">
-                <td class='line area'><?= TRANS('AREA'); ?></td>
                 <td class='line problema'><?= TRANS('ISSUE_TYPE'); ?></td>
                 <td class='line aberto_por'><?= $config['conf_prob_tipo_1']; ?></td>
                 <td class='line aberto_por'><?= $config['conf_prob_tipo_2']; ?></td>
                 <td class='line aberto_por'><?= $config['conf_prob_tipo_3']; ?></td>
+                <td class='line aberto_por'><?= $config['conf_prob_tipo_4']; ?></td>
+                <td class='line aberto_por'><?= $config['conf_prob_tipo_5']; ?></td>
+                <td class='line aberto_por'><?= $config['conf_prob_tipo_6']; ?></td>
             </tr>
         </thead>
     <?php
     foreach ($res->fetchall() as $row) {
 
-        $sql = "SELECT * FROM problemas AS p 
-                    LEFT JOIN sla_solucao AS sl ON sl.slas_cod = p.prob_sla 
-                    LEFT JOIN prob_tipo_1 AS pt1 ON pt1.probt1_cod = p.prob_tipo_1 
-                    LEFT JOIN prob_tipo_2 AS pt2 ON pt2.probt2_cod = p.prob_tipo_2 
-                    LEFT JOIN prob_tipo_3 AS pt3 ON pt3.probt3_cod = p.prob_tipo_3 
-                WHERE prob_id = '".$row['prob_id']."'  
-                ORDER BY p.problema";
-        
-        $resCat = $conn->query($sql);
-        $rowCat = $resCat->fetch();
-
-        $area = TRANS('OCO_SEL_ANY');
-        if (!empty($rowCat['sistema'])){
-            $area = $rowCat['sistema'];
-        }
+        $issueDetails = (!empty($row['prob_id']) ? getIssueDetailed($conn, $row['prob_id'])[0] : []);
         ?>
         <tr>
-            <td class="line"><?= $area; ?></td>
             <?php
             if (!empty($data['disabled'])) {
                 ?>
-                <td class="line"><?= $rowCat['problema']; ?></td>
+                <td class="line"><?= $issueDetails['problema']; ?></td>
                 <?php
             } else {
                 ?>
-                <td class="line"><span class="align-top"><i class="fas fa-trash-alt text-danger"></i></span><input type="checkbox" name="delProb[<?= $row['prscpt_id']; ?>]" value="<?= $row['prscpt_id']; ?>"/>&nbsp;<?= $rowCat['problema']; ?></td>
+                <td class="line"><span class="align-top"><i class="fas fa-trash-alt text-danger"></i></span><input type="checkbox" name="delProb[<?= $row['prscpt_id']; ?>]" value="<?= $row['prscpt_id']; ?>"/>&nbsp;<?= $issueDetails['problema']; ?></td>
                 <?php
             }
             ?>
-            <td class="line"><?= $rowCat['probt1_desc']; ?></td>
-            <td class="line"><?= $rowCat['probt2_desc']; ?></td>
-            <td class="line"><?= $rowCat['probt3_desc']; ?></td>
+            <td class="line"><?= $issueDetails['probt1_desc']; ?></td>
+            <td class="line"><?= $issueDetails['probt2_desc']; ?></td>
+            <td class="line"><?= $issueDetails['probt3_desc']; ?></td>
+            <td class="line"><?= $issueDetails['probt4_desc']; ?></td>
+            <td class="line"><?= $issueDetails['probt5_desc']; ?></td>
+            <td class="line"><?= $issueDetails['probt6_desc']; ?></td>
         </tr>
         <?php
     }

@@ -32,6 +32,8 @@ $conn = ConnectPDO::getInstance();
 
 $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 1);
 
+$_SESSION['s_page_ocomon'] = $_SERVER['PHP_SELF'];
+
 /* Variáveis de sessão para a atualização dos gráficos de acordo com o filtro */
 $_SESSION['dash_filter_areas'] = "";
 $_SESSION['dash_filter_clients'] = "";
@@ -66,8 +68,9 @@ $array_uareas = explode(",", $u_areas);
     <link rel="stylesheet" href="../../includes/components/jquery/dynamic-seo-tag-cloud/jquery.tagcloud.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <style>
         canvas {
@@ -241,6 +244,7 @@ $array_uareas = explode(",", $u_areas);
 
     <div class="container">
         <div id="idLoad" class="loading" style="display:none"></div>
+        <div id="idLoadSideCardsData" class="loading" style="display:none"></div>
     </div>
 
     <div class="container-fluid">
@@ -318,8 +322,8 @@ $array_uareas = explode(",", $u_areas);
                     <label class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_RENDER_CUSTOM_FIELDS'); ?>"><?= TRANS('RENDER_CUSTOM_FIELDS'); ?></label>
                     <div class="form-group col-md-4 switch-field">
                         <?php
-                        $yesChecked = "";
-                        $noChecked = "checked"
+                        $yesChecked = (isset($_SESSION['render_custom_fields']) && $_SESSION['render_custom_fields'] == "1" ? "checked" : "");
+                        $noChecked = ((isset($_SESSION['render_custom_fields']) && $_SESSION['render_custom_fields'] == "0") || !isset($_SESSION['render_custom_fields']) ? "checked" : "");
                         ?>
                         <input type="radio" id="render_custom_fields" name="render_custom_fields" value="yes" <?= $yesChecked; ?> />
                         <label for="render_custom_fields"><?= TRANS('YES'); ?></label>
@@ -333,7 +337,7 @@ $array_uareas = explode(",", $u_areas);
 
                     <input type="hidden" name="app_from" value="dashboard" id="app_from"/>
                     <div class="form-group col-12 col-md-2 ">
-                        <button type="submit" id="idSearch" class="btn btn-primary btn-block"><?= TRANS('BT_FILTER'); ?></button>
+                        <button type="submit" id="idSearch" class="btn btn-primary btn-block"><i class="fas fa-sync-alt"></i>&nbsp;<?= TRANS('BT_FILTER'); ?></button>
                     </div>
                     <div class="form-group col-12 col-md-2">
                         <button type="reset" id="idReset" class="btn btn-secondary btn-block text-nowrap"><?= TRANS('COL_DEFAULT'); ?></button>
@@ -356,6 +360,18 @@ $array_uareas = explode(",", $u_areas);
             <div class="filter-handler btn btn-oc-teal btn-block" id="filter-handler"></div>
         </div>
 
+
+        <div class="modal" id="modal" tabindex="-1" style="z-index:9001!important">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div id="divDetails" style="position:relative">
+                    <!-- <div id="divDetails"> -->
+                        <iframe id="iframeTicketList"  frameborder="1" style="position:absolute;top:0px;width:100%;height:100vh;"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="modal" tabindex="-1" id="modalDefault">
             <!-- <div class="modal-dialog modal-xl"> -->
             <div class="modal-dialog modal-1000">
@@ -369,7 +385,7 @@ $array_uareas = explode(",", $u_areas);
 
 
         <!-- Cards do topo -->
-        <div id="top-cards" class="mt-2">
+        <div id="top-cards" class="top-cards mt-2">
 
             <div class="row no-gutters">
                 <div class="col-md-2">
@@ -921,7 +937,11 @@ $array_uareas = explode(",", $u_areas);
         <script>
             $(function() {
 
-
+                $('#idLoad').show();
+                $( document ).ready(function() {
+                    $('#idLoad').hide();
+                });
+                
                 /* Para simular o comportamento responsivo da nuvem de tags */
                 $(window).resize(function() {
                     tagsCloud('tag_cloud');
@@ -969,85 +989,12 @@ $array_uareas = explode(",", $u_areas);
                     }
                 });
 
-
+                loadDashboardData();
 
                 /* Filtro de pesquisa */
-                $('#idSearch').on('click', function() {
-                    getTopCardsData();
-                    getSideCardsData();
-
-                    var loading = $(".loading");
-                    $(document).ajaxStart(function() {
-                        loading.show();
-                    });
-                    $(document).ajaxStop(function() {
-                        loading.hide();
-                    });
-                    $.ajax({
-                        url: 'update_dashboard_session.php',
-                        method: 'POST',
-                        data: $('#form').serialize(),
-                    }).done(function(data) {
-
-                        let canvas01 = '<canvas id="graph_01"></canvas>'
-                        $('#container01').empty().append(canvas01);
-                        tickets_x_status('graph_01');
-
-                        let canvas02 = '<canvas id="graph_02"></canvas>'
-                        $('#container02').empty().append(canvas02);
-                        scheduled_tickets_x_workers('graph_02'); //tickets_x_area_months
-
-                        let canvas03 = '<canvas id="graph_03"></canvas>'
-                        $('#container03').empty().append(canvas03);
-                        tickets_x_area_months('graph_03'); //scheduled_tickets_x_workers
-
-                        let canvas04 = '<canvas id="graph_04"></canvas>'
-                        $('#container04').empty().append(canvas04);
-                        tickets_x_area_curr_month('graph_04');
-
-                        let canvas05 = '<canvas id="graph_05"></canvas>'
-                        $('#container05').empty().append(canvas05);
-                        tickets_x_area('graph_05');
-
-                        let canvas06 = '<canvas id="graph_06"></canvas>'
-                        $('#container06').empty().append(canvas06);
-                        tickets_area_close_months('graph_06');
-
-                        let canvas07 = '<canvas id="graph_07"></canvas>'
-                        $('#container07').empty().append(canvas07);
-                        tickets_open_close_months('graph_07');
-
-                        let canvas08 = '<canvas id="graph_08"></canvas>'
-                        $('#container08').empty().append(canvas08);
-                        tickets_operadores_close_months('graph_08');
-
-                        let canvas09 = '<canvas id="graph_09"></canvas>'
-                        $('#container09').empty().append(canvas09);
-                        tickets_x_clients('graph_09');
-
-                        let canvas10 = '<canvas id="graph_10"></canvas>'
-                        $('#container10').empty().append(canvas10);
-                        tickets_x_client_curr_month('graph_10');
-
-                        let canvas11 = '<canvas id="graph_11"></canvas>'
-                        $('#container11').empty().append(canvas11);
-                        tickets_x_clients_months('graph_11');
-
-                        let canvas12 = '<canvas id="graph_12"></canvas>'
-                        $('#container12').empty().append(canvas12);
-                        tickets_client_close_months('graph_12');
-
-                        let canvas13 = '<canvas id="graph_13"></canvas>'
-                        $('#container13').empty().append(canvas13);
-                        top_ten_type_of_issues('graph_13');
-                        
-                        let canvas14 = '<canvas id="graph_14"></canvas>'
-                        $('#container14').empty().append(canvas14);
-                        tickets_x_rates('graph_14');
-
-                        tagsCloud('tag_cloud');
-
-                    });
+                $('#idSearch').on('click', function(e) {
+                    e.preventDefault();
+                    loadDashboardData();
                 });
 
                 $("#idReset").click(function(e) {
@@ -1058,22 +1005,6 @@ $array_uareas = explode(",", $u_areas);
                     $('.sel2').selectpicker('render');
                     $('.bs-select').selectpicker('render');
                 });
-
-
-                tickets_x_status('graph_01');
-                scheduled_tickets_x_workers('graph_02');
-                tickets_x_area_months('graph_03');
-                tickets_x_area_curr_month('graph_04');
-                tickets_x_area('graph_05');
-                tickets_area_close_months('graph_06');
-                tickets_open_close_months('graph_07');
-                tickets_operadores_close_months('graph_08');
-                tickets_x_clients('graph_09');
-                tickets_x_client_curr_month('graph_10');
-                tickets_x_clients_months('graph_11');
-                tickets_client_close_months('graph_12');
-                top_ten_type_of_issues('graph_13');
-                tickets_x_rates('graph_14');
 
 
                 $(".flip").flip({
@@ -1171,22 +1102,8 @@ $array_uareas = explode(",", $u_areas);
                 });
 
 
-                tagsCloud('tag_cloud');
-                updateScheduled();
-                getTopCardsData();
-                getSideCardsData();
-                // updateApproval();
-
                 setInterval(function() {
-                    updateScheduled();
-                    getTopCardsData();
-                    tagsCloud('tag_cloud');
-                    
-                }, 60000); //a cada 1 minuto
-
-                setInterval(function() {
-                    getSideCardsData();
-                    // updateApproval();
+                    loadDashboardData();
                 }, 120000); //a cada 2 minutos
 
             });
@@ -1292,6 +1209,10 @@ $array_uareas = explode(",", $u_areas);
 
 
             function getSideCardsData() {
+                
+                $('#idSearch').prop('disabled', true);
+                $('#idLoadSideCardsData').show();
+
                 $.ajax({
                     url: 'get_side_cards_data.php',
                     method: 'POST',
@@ -1300,7 +1221,8 @@ $array_uareas = explode(",", $u_areas);
 
                 }).done(function(data) {
 
-                    // console.log(data);
+                    $('#idSearch').prop('disabled', false);
+                    $('#idLoadSideCardsData').hide();
 
                     $('#badgeAgendados').empty();
                     $('#badgeAgendados').html(data.agendados);
@@ -1463,7 +1385,86 @@ $array_uareas = explode(",", $u_areas);
                 });
 
                 popup_alerta_wide('./get_card_tickets.php?' + $.param(data));
+                // openTicketList($.param(data));
             }
+
+
+            function loadDashboardData() {
+                
+                getTopCardsData();
+                getSideCardsData();
+
+                $.ajax({
+                    url: 'update_dashboard_session.php',
+                    method: 'POST',
+                    data: $('#form').serialize(),
+                }).done(function(data) {
+
+                    let canvas01 = '<canvas id="graph_01"></canvas>'
+                    $('#container01').empty().append(canvas01);
+                    tickets_x_status('graph_01');
+
+                    let canvas02 = '<canvas id="graph_02"></canvas>'
+                    $('#container02').empty().append(canvas02);
+                    scheduled_tickets_x_workers('graph_02');
+
+                    let canvas03 = '<canvas id="graph_03"></canvas>'
+                    $('#container03').empty().append(canvas03);
+                    tickets_x_area_months('graph_03'); 
+
+                    let canvas04 = '<canvas id="graph_04"></canvas>'
+                    $('#container04').empty().append(canvas04);
+                    tickets_x_area_curr_month('graph_04');
+
+                    let canvas05 = '<canvas id="graph_05"></canvas>'
+                    $('#container05').empty().append(canvas05);
+                    tickets_x_area('graph_05');
+
+                    let canvas06 = '<canvas id="graph_06"></canvas>'
+                    $('#container06').empty().append(canvas06);
+                    tickets_area_close_months('graph_06');
+
+                    let canvas07 = '<canvas id="graph_07"></canvas>'
+                    $('#container07').empty().append(canvas07);
+                    tickets_open_close_months('graph_07');
+
+                    let canvas08 = '<canvas id="graph_08"></canvas>'
+                    $('#container08').empty().append(canvas08);
+                    tickets_operadores_close_months('graph_08');
+
+                    let canvas09 = '<canvas id="graph_09"></canvas>'
+                    $('#container09').empty().append(canvas09);
+                    tickets_x_clients('graph_09');
+
+                    let canvas10 = '<canvas id="graph_10"></canvas>'
+                    $('#container10').empty().append(canvas10);
+                    tickets_x_client_curr_month('graph_10');
+
+                    let canvas11 = '<canvas id="graph_11"></canvas>'
+                    $('#container11').empty().append(canvas11);
+                    tickets_x_clients_months('graph_11');
+
+                    let canvas12 = '<canvas id="graph_12"></canvas>'
+                    $('#container12').empty().append(canvas12);
+                    tickets_client_close_months('graph_12');
+
+                    let canvas13 = '<canvas id="graph_13"></canvas>'
+                    $('#container13').empty().append(canvas13);
+                    top_ten_type_of_issues('graph_13');
+                    
+                    let canvas14 = '<canvas id="graph_14"></canvas>'
+                    $('#container14').empty().append(canvas14);
+                    tickets_x_rates('graph_14');
+
+                    tagsCloud('tag_cloud');
+                }).fail(function() {
+                    console.log(data);
+                });
+                return false;
+            }
+
+
+
 
 
             /* Roda a checagem de data para chamados agendados entrarem na fila geral de atendimento */
@@ -1477,15 +1478,6 @@ $array_uareas = explode(",", $u_areas);
                 });
                 return false;
             }
-
-            /* Roda a aprovação automática para chamados que não foram avaliados dentro do prazo configurado */
-            // function updateApproval() {
-            //     $.ajax({
-            //         url: 'update_auto_approval.php',
-            //         method: 'POST'
-            //     });
-            //     return false;
-            // }
 
 
             /* Função para habilitar a seleção de todos os itens de um optgroup ao clicar no label */
@@ -1526,6 +1518,19 @@ $array_uareas = explode(",", $u_areas);
                     that.$element.triggerNative('change');
                 });
             }
+
+
+            function openTicketList(param) {
+
+                $("#iframeTicketList").attr('src','');
+
+                let location = './get_card_tickets.php?' + param;
+                $("#iframeTicketList").attr('src',location);
+                $('#modal').modal();
+
+            }
+
+
         </script>
 </body>
 

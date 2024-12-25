@@ -38,6 +38,7 @@ if (!isset($_POST['numero'])) {
 
 $config = getConfig($conn);
 $status_to_worker_queue = (!empty($config['conf_status_in_worker_queue']) ? $config['conf_status_in_worker_queue'] : 2);
+$now = date("Y-m-d H:i:s");
 
 
 $erro = false;
@@ -46,11 +47,11 @@ $assent = TRANS('TICKET_AUTO_GET_IN_QUEUE');
 
 // $sqlTicket = "SELECT numero, oco_scheduled_to FROM ocorrencias WHERE oco_scheduled = 1 AND oco_scheduled_to <= '". date('Y-m-d H:i:s') ."' ";
 $sqlTicket = "SELECT 
-                o.numero, o.oco_scheduled_to, te.main_worker 
+                o.numero, o.operador, o.oco_scheduled_to, o.aberto_por, te.main_worker 
             FROM 
                 ocorrencias o 
             LEFT JOIN tickets_extended te ON te.ticket = o.numero   
-            WHERE o.oco_scheduled = 1 AND o.oco_scheduled_to <= '" . date('Y-m-d H:i:s') . "' ";
+            WHERE o.oco_scheduled = 1 AND o.oco_scheduled_to <= '{$now}' ";
 
 try {
     $resultTicket = $conn->query($sqlTicket);
@@ -74,6 +75,7 @@ foreach ($resultTicket->fetchAll() as $row) {
                         WHERE 
                             numero = " . $row['numero'] . " ";
     } else {
+        $worker = $row['operador'];
         $sqlUpdTicket = "UPDATE ocorrencias SET status = 1, oco_scheduled = 0 WHERE numero = " . $row['numero'] . " ";
     }
 
@@ -87,15 +89,19 @@ foreach ($resultTicket->fetchAll() as $row) {
 
     if (!$erro) {
         /* Tipo de assentamento: 6 - Caiu na fila de atendimento de forma automática após atingir a data de agendamento */
-        $sqlAssent = "INSERT INTO assentamentos (ocorrencia, assentamento, `data`, responsavel, tipo_assentamento) values (" . $row['numero'] . ", '{$assent}', '" . $row['oco_scheduled_to'] . "', 0 , 6 )"; //tratar usuario 0 (zero) para ser do sistema
+        $sqlAssent = "INSERT INTO assentamentos (ocorrencia, assentamento, created_at, responsavel, tipo_assentamento) values (" . $row['numero'] . ", '{$assent}', '" . $row['oco_scheduled_to'] . "', 0 , 6 )"; //tratar usuario 0 (zero) para ser do sistema
 
         $resultAssent = $conn->exec($sqlAssent);
+        $notice_id = $conn->lastInsertId();
+        // if ($_SESSION['s_uid'] != $row['aberto_por']) {
+        setUserTicketNotice($conn, 'assentamentos', $notice_id);
+        // }
     }
 
     if (!$erro) {
         /* Gravação da data na tabela tickets_stages */
-        $stopTimeStage = insert_ticket_stage($conn, $row['numero'], 'stop', 1, $row['oco_scheduled_to']);
-        $startTimeStage = insert_ticket_stage($conn, $row['numero'], 'start', 1, $row['oco_scheduled_to']);
+        $stopTimeStage = insert_ticket_stage($conn, $row['numero'], 'stop', 1, $worker, $row['oco_scheduled_to']);
+        $startTimeStage = insert_ticket_stage($conn, $row['numero'], 'start', 1, $worker, $row['oco_scheduled_to']);
     }
 }
 

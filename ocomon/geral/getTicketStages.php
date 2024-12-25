@@ -38,10 +38,9 @@ if (!isset($_POST['numero'])) {
     exit();
 }
 
-$numero = (int)$_POST['numero'];
+$ticket = (int)$_POST['numero'];
 
-
-/* $sqlStatusNow = "SELECT s.stat_id, s.status FROM ocorrencias o, status s WHERE o.numero = {$numero} AND o.status = s.stat_id ";
+/* $sqlStatusNow = "SELECT s.stat_id, s.status FROM ocorrencias o, status s WHERE o.numero = {$ticket} AND o.status = s.stat_id ";
 $resultStatusNow = $conn->query($sqlStatusNow);
 $rowStatusNow = $resultStatusNow->fetch();
 $statusNow = $rowStatusNow['status'];
@@ -50,14 +49,14 @@ $idStatusNow = $rowStatusNow['stat_id']; */
 
 /* MÉTODOS PARA O CÁLCULO DE TEMPO VÁLIDO DE RESPOSTA E SOLUÇÃO */
 $holidays = getHolidays($conn);
-$profileCod = getProfileCod($conn, $_SESSION['s_wt_areas'], $numero);
+$profileCod = getProfileCod($conn, $_SESSION['s_wt_areas'], $ticket);
 $worktimeProfile = getWorktimeProfile($conn, $profileCod);
 
 
 
-// $sql = $QRY["ocorrencias_full_ini"]. "WHERE o.numero = {$numero}";
-// $sql = "SELECT ts.* , s.* FROM tickets_stages ts, status s WHERE ts.ticket = " . $numero . " AND ts.status_id = s.stat_id ORDER BY ts.id";
-$sql = "SELECT * FROM tickets_stages WHERE ticket = " . $numero . " ORDER BY id";
+// $sql = $QRY["ocorrencias_full_ini"]. "WHERE o.numero = {$ticket}";
+// $sql = "SELECT ts.* , s.* FROM tickets_stages ts, status s WHERE ts.ticket = " . $ticket . " AND ts.status_id = s.stat_id ORDER BY ts.id";
+$sql = "SELECT * FROM tickets_stages WHERE ticket = " . $ticket . " ORDER BY id";
 try {
     $resultSQL = $conn->query($sql);
 }
@@ -112,7 +111,7 @@ if ($resultSQL->rowCount()) {
         $loopData['status'] = $status;
         $loopData['freeze'] = transbool($freeze);
 
-        $data[] = $loopData;
+        $data['stages'][] = $loopData;
     }
 } else {
     /* Nesse caso, o chamado é anterior a implementação do ticket_stages - não tenho as informações */
@@ -120,8 +119,40 @@ if ($resultSQL->rowCount()) {
     $loopData['date_stop'] = '';
     $loopData['status'] = 'Indisponível';
     $loopData['freeze'] = '';
-    $data[] = $loopData;
+    $data['stages'][] = $loopData;
 }
 
+
+/* Dados sobre os operadores envolvidos no atendimento - apenas para os casos de fila direta */
+/* Válidos apenas para novos chamados após a implementação do controle de operadores no ticket_stages */
+/* Operadores envolvidos */
+$ticketTreaters = getTicketTreaters($conn, $ticket);
+
+$ticketTreatersStages = [];
+foreach ($ticketTreaters as $treater) {
+    $data['treaters'][] = $treater;
+    $ticketTreatersStages[$treater['user_id']] = getStagesFromTicket($conn, $ticket, ['treater' => $treater['user_id'], 'panel' => '1']);
+}
+
+$arrayObj = [];
+$treaterAbsoluteSecondsSliced = [];
+foreach ($ticketTreatersStages as $key => $arrayValues) {
+    // $key = treater id
+    // $arrayValues = array de stages
+    $arrayObj[$key] = new WorkTime( $worktimeProfile, $holidays );
+
+    foreach ($arrayValues as $row) {
+        $arrayObj[$key]->startTimer($row['date_start']);
+        $arrayObj[$key]->stopTimer($row['date_stop'] ?? date('Y-m-d H:i:s'));
+
+        $treaterAbsoluteSecondsSliced[$key][] = absoluteTime($row['date_start'], $row['date_stop'] ?? date('Y-m-d H:i:s'))['inSeconds'];
+    }
+
+    $totalAbsSecondsSliced[$key] = array_sum($treaterAbsoluteSecondsSliced[$key]);
+    $totalAbsTimeSliced[$key] = secToTime($totalAbsSecondsSliced[$key])['verbose'];
+    
+    $data[$key]['fulltime'] = $arrayObj[$key]->getTime() ?? '0';
+    $data[$key]['absolutetime'] = $totalAbsTimeSliced[$key];
+}
 
 echo json_encode($data);

@@ -27,6 +27,7 @@ require_once __DIR__ . "/" . "../../includes/include_geral_new.inc.php";
 require_once __DIR__ . "/" . "../../includes/classes/ConnectPDO.php";
 require_once __DIR__ . "/" . "../../includes/components/html2text-master/vendor/autoload.php";
 
+
 use includes\classes\ConnectPDO;
 
 $conn = ConnectPDO::getInstance();
@@ -41,6 +42,8 @@ $isAdmin = $_SESSION['s_nivel'] == 1;
 
 $version4 = $sysConfig['conf_updated_issues'];
 
+$allowAddTreatersTimes = true;
+
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -48,7 +51,7 @@ $version4 = $sysConfig['conf_updated_issues'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <link rel="stylesheet" type="text/css" href="../../includes/css/estilos.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/jquery/datetimepicker/jquery.datetimepicker.css" />
@@ -58,6 +61,7 @@ $version4 = $sysConfig['conf_updated_issues'];
     <link rel="stylesheet" type="text/css" href="../../includes/components/jquery/jquery.amsify.suggestags-master/css/amsify.suggestags.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
     <style>
         .oc-cursor {
@@ -71,6 +75,10 @@ $version4 = $sysConfig['conf_updated_issues'];
         #iframeLoad {
             border: 1px solid lightgray !important;
             overflow: scroll !important;
+        }
+
+        .add_button_new_treater {
+            cursor: pointer;
         }
 
     </style>
@@ -105,13 +113,14 @@ if (!isset($_POST['submit'])) {
     }
     $numero = (int)$_GET['numero'];
 
-    $query = "select o.*, u.* from ocorrencias as o, usuarios as u where o.operador = u.user_id and numero=" . $numero . "";
-
     $row = getTicketData($conn, $numero);
     $issue_selected_data = [];
     $issue_selected = "";
 
-
+    /* Posicionamento do campo de descrição do chamado: default | top | bottom */
+    $fieldDescriptionPosition = getConfigValue($conn, 'TICKET_DESCRIPTION_POS') ?? 'default';
+    $description = trim(noHtml($row['descricao']));
+    $description = (new \Html2Text\Html2Text($description))->getText();
 
     $isRequester = false;
     if ($_SESSION['s_uid'] == $row['aberto_por']) {
@@ -204,12 +213,11 @@ if (!isset($_POST['submit'])) {
             <div class="modal-dialog modal-xl">
                 <div class="modal-content">
                     <div id="divDetails" style="position:relative">
-                        <iframe id="iframeLoad"  frameborder="0" style="position:absolute;top:0px;width:95%;height:100vh;"></iframe>
+                        <iframe id="iframeLoad"  frameborder="0" style="position:absolute;top:0px;width:100%;height:100vh;"></iframe>
                     </div>
                 </div>
             </div>
         </div>
-
         <!-- Mensagens de retorno -->
         <div id="divResult"></div>
 
@@ -221,10 +229,22 @@ if (!isset($_POST['submit'])) {
             <?= csrf_input(); ?>
 
             <input type="hidden" name="MAX_FILE_SIZE" value="<?= $sysConfig['conf_upld_size']; ?>" />
-
+            <input type="hidden" name="ticket" id="ticket" value="<?= $numero; ?>" />
 
             <div class="form-group row my-4">
 
+
+                <?php
+                    if ($fieldDescriptionPosition == "top") {
+                        ?>
+                        <!-- Descrição posição top -->
+                        <label for="idDescricao" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('DESCRIPTION'); ?></label>
+                        <div class="form-group col-md-10">
+                            <textarea class="form-control " id="idDescricao" name="descricao" rows="4" disabled><?= $description; ?></textarea>
+                        </div>
+                        <?php
+                    }
+                ?>
 
                 <!-- Cliente -->
                 <label for="client" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CLIENT'); ?></label>
@@ -301,14 +321,17 @@ if (!isset($_POST['submit'])) {
 
                 <!-- Descrição -->
                 <?php
-                    $description = trim(noHtml($row['descricao']));
-                    $description = (new \Html2Text\Html2Text($description))->getText();
+                    if ($fieldDescriptionPosition == "default") {
+                        ?>
+                        <!-- Descrição posição default -->
+                        <div class="w-100"></div>
+                        <label for="idDescricao" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('DESCRIPTION'); ?></label>
+                        <div class="form-group col-md-10">
+                            <textarea class="form-control " id="idDescricao" name="descricao" rows="4" disabled><?= $description; ?></textarea>
+                        </div>
+                        <?php
+                    }
                 ?>
-                <label for="idDescricao" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('DESCRIPTION'); ?></label>
-                <div class="form-group col-md-10">
-                    <textarea class="form-control " id="idDescricao" name="descricao" rows="4" disabled><?= $description; ?></textarea>
-                </div>
-
 
                 <!-- Tags/Labels -->
                 <label for="input_tags" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('INPUT_TAGS'); ?></label>
@@ -463,7 +486,7 @@ if (!isset($_POST['submit'])) {
                     <label class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('OCO_FIELD_SEND_MAIL_TO'); ?></label>
                     <div class="form-group col-md-4">
                         <div class="form-check form-check-inline">
-                            <input class="form-check-input " type="checkbox" name="mailAR" value="ok" id="defaultCheck1" checked>
+                            <input class="form-check-input " type="checkbox" name="mailAR" value="ok" id="defaultCheck1">
                             <legend class="col-form-label col-form-label-sm"><?= TRANS('RESPONSIBLE_AREA'); ?></legend>
                         </div>
                         <div class="form-check form-check-inline">
@@ -483,7 +506,7 @@ if (!isset($_POST['submit'])) {
 
                 <label for="data_abertura" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('OPENING_DATE'); ?></label>
                 <div class="form-group col-md-4">
-                    <input type="text" class="form-control  " readonly id="data_abertura" name="data_abertura" value="<?= $referenceDate; ?>" />
+                    <input type="text" class="form-control  " readonly id="data_abertura" name="data_abertura" value="<?= dateScreen($referenceDate); ?>" />
                 </div>
 
 
@@ -532,8 +555,18 @@ if (!isset($_POST['submit'])) {
                     </select>
                 </div>
 
-            
                 <?php
+                    if ($fieldDescriptionPosition == "bottom") {
+                        ?>
+                        <!-- Descrição posição bottom -->
+                        <div class="w-100"></div>
+                        <label for="idDescricao" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('DESCRIPTION'); ?></label>
+                        <div class="form-group col-md-10">
+                            <textarea class="form-control " id="idDescricao" name="descricao" rows="4" disabled><?= $description; ?></textarea>
+                        </div>
+                        <?php
+                    }
+                
 
                 /* Campos personalizados */
                 $labelColSize = 2;
@@ -548,6 +581,7 @@ if (!isset($_POST['submit'])) {
                 <?php
                 }
                 
+                $disabled = "disabled";
                 foreach ($custom_fields as $cfield) {
                     $inlineAttributes = keyPairsToHtmlAttrs($cfield['field_attributes']);
                     $field_value = getTicketCustomFields($conn, $row['numero'], $cfield['id']);
@@ -563,7 +597,7 @@ if (!isset($_POST['submit'])) {
                             <?php
                             if ($cfield['field_type'] == 'select') {
                                 ?>
-                                <select class="form-control custom_field_select" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" <?= $inlineAttributes; ?>>
+                                <select class="form-control custom_field_select custom_field" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" <?= $inlineAttributes; ?> <?= $disabled; ?>>
                                 <?php
                                 
                                 $options = [];
@@ -583,7 +617,7 @@ if (!isset($_POST['submit'])) {
                                 <?php
                             } elseif ($cfield['field_type'] == 'select_multi') {
                                 ?>
-                                <select class="form-control custom_field_select_multi" name="<?= $cfield['field_name']; ?>[]" id="<?= $cfield['field_name']; ?>" multiple="multiple" <?= $inlineAttributes; ?>>
+                                <select class="form-control custom_field_select_multi custom_field" name="<?= $cfield['field_name']; ?>[]" id="<?= $cfield['field_name']; ?>" multiple="multiple" <?= $inlineAttributes; ?> <?= $disabled; ?>>
                                 <?php
                                 
                                 $options = [];
@@ -606,35 +640,35 @@ if (!isset($_POST['submit'])) {
                                 <?php
                             } elseif ($cfield['field_type'] == 'number') {
                                 ?>
-                                <input class="form-control custom_field_number" type="number" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" value="<?= $field_value['field_value']; ?>" placeholder="<?= $cfield['field_placeholder']; ?>" <?= $inlineAttributes; ?>>
+                                <input class="form-control custom_field_number custom_field" type="number" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" value="<?= $field_value['field_value']; ?>" placeholder="<?= $cfield['field_placeholder']; ?>" <?= $inlineAttributes; ?> <?= $disabled; ?>>
                                 <?php
                             } elseif($cfield['field_type'] == 'checkbox') {
                                 $checked_checkbox = ($field_value['field_value'] == "on" ? " checked" : "");
                                 ?>
                                 <div class="form-check form-check-inline">
-                                    <input class="form-check-input custom_field_checkbox" type="checkbox" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" <?= $checked_checkbox; ?> placeholder="<?= $cfield['field_placeholder']; ?>" <?= $inlineAttributes; ?>>
+                                    <input class="form-check-input custom_field_checkbox custom_field" type="checkbox" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" <?= $checked_checkbox; ?> placeholder="<?= $cfield['field_placeholder']; ?>" <?= $inlineAttributes; ?> <?= $disabled; ?>>
                                     <legend class="col-form-label col-form-label-sm"><?= $cfield['field_placeholder']; ?></legend>
                                 </div>
                                 <?php
                             } elseif ($cfield['field_type'] == 'textarea') {
                                 ?>
-                                <textarea class="form-control custom_field_textarea" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" placeholder="<?= $cfield['field_placeholder']; ?>" <?= $inlineAttributes; ?>><?= $field_value['field_value']; ?></textarea>
+                                <textarea class="form-control custom_field_textarea custom_field" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" placeholder="<?= $cfield['field_placeholder']; ?>" <?= $inlineAttributes; ?> <?= $disabled; ?>><?= $field_value['field_value']; ?></textarea>
                                 <?php
                             } elseif ($cfield['field_type'] == 'date') {
                                 ?>
-                                    <input class="form-control custom_field_date" type="text" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" value="<?= dateScreen($field_value['field_value'],1); ?>" placeholder="<?= $cfield['field_placeholder']; ?>" <?= $inlineAttributes; ?> autocomplete="off">
+                                    <input class="form-control custom_field_date custom_field" type="text" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" value="<?= dateScreen($field_value['field_value'],1); ?>" placeholder="<?= $cfield['field_placeholder']; ?>" <?= $inlineAttributes; ?> autocomplete="off" <?= $disabled; ?>>
                                 <?php
                             } elseif ($cfield['field_type'] == 'time') {
                                 ?>
-                                    <input class="form-control custom_field_time" type="text" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" value="<?= $field_value['field_value']; ?>" placeholder="<?= $cfield['field_placeholder']; ?>" <?= $inlineAttributes; ?> autocomplete="off">
+                                    <input class="form-control custom_field_time custom_field" type="text" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" value="<?= $field_value['field_value']; ?>" placeholder="<?= $cfield['field_placeholder']; ?>" <?= $inlineAttributes; ?> autocomplete="off" <?= $disabled; ?>>
                                 <?php
                             } elseif ($cfield['field_type'] == 'datetime') {
                                 ?>
-                                    <input class="form-control custom_field_datetime" type="text" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" value="<?= dateScreen($field_value['field_value'], 0, 'd/m/Y H:i'); ?>" placeholder="<?= $cfield['field_placeholder']; ?>" <?= $inlineAttributes; ?> autocomplete="off">
+                                    <input class="form-control custom_field_datetime custom_field" type="text" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" value="<?= dateScreen($field_value['field_value'], 0, 'd/m/Y H:i'); ?>" placeholder="<?= $cfield['field_placeholder']; ?>" <?= $inlineAttributes; ?> autocomplete="off" <?= $disabled; ?>>
                                 <?php
                             } else {
                                 ?>
-                                    <input class="form-control custom_field_text" type="text" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" value="<?= $field_value['field_value']; ?>" placeholder="<?= $cfield['field_placeholder']; ?>" <?= $fieldMask; ?> <?= $inlineAttributes; ?> autocomplete="off">
+                                    <input class="form-control custom_field_text custom_field" type="text" name="<?= $cfield['field_name']; ?>" id="<?= $cfield['field_name']; ?>" value="<?= $field_value['field_value']; ?>" placeholder="<?= $cfield['field_placeholder']; ?>" <?= $fieldMask; ?> <?= $inlineAttributes; ?> autocomplete="off" <?= $disabled; ?>>
                                 <?php
                             }
                         ?>
@@ -699,6 +733,71 @@ if (!isset($_POST['submit'])) {
                 <?php
                 // }
 
+                /* Inserir possibilidade de adicionar, manualmente, períodos de atendimento por operadores */
+                if ($allowAddTreatersTimes) {
+
+                    /* Caso o chamado já tenha sido concluído em outra ocasião - exibir dados, caso existam, 
+                    dos operadores e períodos de atendimento informados para o chamado */
+                    $treaters = [];
+                    $treaters = getTreatersManualStagesByTicket($conn, $row['numero']);
+                    ?>
+                        <div class="w-100"></div>
+                        <!-- Link para adicionar operadores -->
+                        <label class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right add_button_new_treater"></label>
+                        <div class="form-group col-md-10">
+                            <button type="button" class="btn btn-primary btn-sm add_button_new_treater" id="add_button_new_treater" title="<?= TRANS('ADD_TREATERS_AND_TREATING_STAGES'); ?>"><i class="fa fa-user-plus"></i>&nbsp;<?= TRANS('ADD_TREATERS_AND_TREATING_STAGES'); ?></button>
+                        </div>
+                
+                <?php
+                    foreach ($treaters as $treat) {
+                        $rand = randomChars(5);
+                        ?>
+                        <label class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right <?= $rand; ?>" ><?= TRANS('WORKER'); ?></label>
+                        <div class="form-group col-md-4 <?= $rand; ?>" >
+                            <div class="field_wrapper_specs" >
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <div class="input-group-text">
+                                            <a href="javascript:void(0);" class="remove_button_treaters" data-random="<?= $rand; ?>" title="<?= TRANS('REMOVE'); ?>"><i class="fa fa-minus"></i></a>
+                                        </div>
+                                    </div>
+                                    <select class="form-control  sel-control " name="treater_extra[]" id="" >
+                                        <option value="<?= $treat['user_id']; ?>"><?= $treat['nome']; ?></option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group col-md-3 <?= $rand; ?>" >
+                            <div class="input-group">
+                                <input type="text" class="form-control datetime-treater date-start " name="treating_start_date[]" id="_date_start" value="<?= dateScreen($treat['date_start'], false, 'd/m/Y H:i'); ?>" placeholder="dd/mm/aaaa hh:mm" required />
+                            </div>
+                            <small class="form-text text-muted"><?= TRANS('TREATING_START_DATE'); ?></small>
+                        </div>
+
+                        <div class="form-group col-md-3 <?= $rand; ?>" >
+                            <div class="input-group">
+                                <input type="text" class="form-control datetime-treater date-stop" name="treating_stop_date[]" id="_date_stop" value="<?= dateScreen($treat['date_stop'], false, 'd/m/Y H:i'); ?>" placeholder="dd/mm/aaaa hh:mm" required />
+                            </div>
+                            <small class="form-text text-muted"><?= TRANS('TREATING_STOP_DATE'); ?></small>
+                        </div>
+                        <?php
+                    }
+                    
+
+
+                ?>
+                </div>
+                    
+                        <!-- Receberá as entradas de operadores e períodos de atendimento -->
+                        <div class="form-group row my-4 new_treaters" id="new_treaters"></div>
+                        
+                <div class="form-group row my-4">
+
+                <?php
+                }
+
+
 
                 /* $colLabel = "col-sm-2 text-md-right font-weight-bold p-2";
                 $colsDefault = "small text-break border-bottom rounded p-2 bg-white"; */ /* border-secondary */
@@ -729,7 +828,7 @@ if (!isset($_POST['submit'])) {
                                 <a class="nav-link <?= $classDisabledFiles; ?>" id="divFiles-tab" data-toggle="pill" href="#divFiles" role="tab" aria-controls="divFiles" aria-selected="true" aria-disabled="<?= $ariaDisabledFiles; ?>"><i class="fas fa-paperclip"></i>&nbsp;<?= TRANS('FILES'); ?>&nbsp;<span class="badge badge-light"><?= $hasFiles; ?></span></a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link <?= $classDisabledSubs; ?>" id="divSubs-tab" data-toggle="pill" href="#divSubs" role="tab" aria-controls="divSubs" aria-selected="true" aria-disabled="<?= $ariaDisabledSubs; ?>"><i class="fas fa-stream"></i>&nbsp;<?= TRANS('TICKETS_REFERENCED'); ?>&nbsp;<span class="badge badge-light"><?= $hasRelatives; ?></span></a>
+                                <a class="nav-link <?= $classDisabledSubs; ?>" id="divSubs-tab" data-toggle="pill" href="#divSubs" role="tab" aria-controls="divSubs" aria-selected="true" aria-disabled="<?= $ariaDisabledSubs; ?>"><i class="fas fa-stream"></i>&nbsp;<?= TRANS('TICKETS_DIRECTLY_REFERENCED'); ?>&nbsp;<span class="badge badge-light"><?= $hasRelatives; ?></span></a>
                             </li>
                         </ul>
                     </div>
@@ -779,7 +878,7 @@ if (!isset($_POST['submit'])) {
                                                         <!-- <th scope="row"><?= $i; ?></th> -->
                                                         <th><input type="checkbox" name="asset<?= $printCont; ?>" value="<?= $rowAsset['numero']; ?>" <?= $checked; ?>></th>
                                                         <td><?= $author; ?></td>
-                                                        <td><?= formatDate($rowAsset['data']); ?></td>
+                                                        <td><?= formatDate($rowAsset['created_at']); ?></td>
                                                         <td><?= getEntryType($rowAsset['tipo_assentamento']); ?></td>
                                                         <td><?= nl2br($rowAsset['assentamento']); ?></td>
                                                     </tr>
@@ -1085,6 +1184,56 @@ if (!isset($_POST['submit'])) {
             x--; //Decrement field counter
         });
 
+
+        /* Inicialização dos Calendários de início e fim do período */
+        $('.date-start').datetimepicker({format: 'd/m/Y H:i'});
+        $('.date-stop').datetimepicker({format: 'd/m/Y H:i'});
+        
+        $('.date-start').on('change focus', function() {
+            var next_group_parent = $($(this).parents().eq(1).next()); //object
+            var next_select_input_id = next_group_parent.find(':text').attr('id');
+
+            $(this).datetimepicker({
+                format: 'd/m/Y H:i',
+                maxDate: 0,
+                onShow: function(ct) {
+                    if ($('#' + next_select_input_id).val() != '') {
+                        this.setOptions({
+                            maxDate: $('#' + next_select_input_id).datetimepicker('getValue')
+                        })
+                    } else {
+                        this.setOptions({
+                            maxDate: 0
+                        });
+                    }
+                },
+                timepicker: true,
+                step: 10
+            });
+        });
+
+        $('.date-stop').on('change focus', function() {
+
+            var prev_group_parent = $($(this).parents().eq(1).prev()); //object
+            var prev_select_input_id = prev_group_parent.find(':text').attr('id');
+
+            $(this).datetimepicker({
+                format: 'd/m/Y H:i',
+                onShow: function(ct) {
+                    if ($('#' + prev_select_input_id).val() != '') {
+                        this.setOptions({
+                            minDate: $('#' + prev_select_input_id).datetimepicker('getValue')
+                        })
+                    }
+                },
+                timepicker: true,
+                maxDate: 0,
+                step: 10
+            });
+        });
+
+
+
         loadUnits();
 
         $("#client").on('change', function() {
@@ -1178,6 +1327,112 @@ if (!isset($_POST['submit'])) {
             });
         }
 
+
+        $('.add_button_new_treater').on('click', function() {
+            console.log('clicado no botão de inserir operadores');
+            loadNewTreaterRow();
+        });
+
+        $('.new_treaters, #form').on('click', '.remove_button_treaters', function(e) {
+            e.preventDefault();
+            dataRandom = $(this).attr('data-random');
+            $("." + dataRandom).remove();
+            // availablesMeasureTypesControl();
+        });
+
+        if ($('#new_treaters').length > 0) {
+            /* Adicionei o mutation observer em função dos elementos que são adicionados após o carregamento do DOM */
+            var afterDom1 = $.initialize(".after-dom-ready", function() {
+                
+                $('.bs-select').selectpicker({
+                    /* placeholder */
+                    title: "<?= TRANS('SEL_SELECT', '', 1); ?>",
+                    showSubtext: true,
+                    liveSearch: true,
+                    liveSearchNormalize: true,
+                    liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
+                    noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
+                    
+                    style: "",
+                    styleBase: "form-control input-select-multi",
+                });
+
+                /* Idioma global para os calendários */
+                $.datetimepicker.setLocale('pt-BR');
+
+                /* Inicialização dos Calendários de início e fim do período */
+                $('.date-start').datetimepicker({format: 'd/m/Y H:i'});
+                $('.date-stop').datetimepicker({format: 'd/m/Y H:i'});
+
+                $('.date-start').on('change focus', function() {
+                    var next_group_parent = $($(this).parents().eq(1).next()); //object
+                    var next_select_input_id = next_group_parent.find(':text').attr('id');
+
+                    $(this).datetimepicker({
+                        format: 'd/m/Y H:i',
+                        maxDate: 0,
+                        onShow: function(ct) {
+                            if ($('#' + next_select_input_id).val() != '') {
+                                this.setOptions({
+                                    maxDate: $('#' + next_select_input_id).datetimepicker('getValue')
+                                })
+                            } else {
+                                this.setOptions({
+                                    maxDate: 0
+                                });
+                            }
+                        },
+                        timepicker: true,
+                        step: 10
+                    });
+                });
+
+                $('.date-stop').on('change focus', function() {
+
+                    var prev_group_parent = $($(this).parents().eq(1).prev()); //object
+                    var prev_select_input_id = prev_group_parent.find(':text').attr('id');
+
+                    $(this).datetimepicker({
+                        format: 'd/m/Y H:i',
+                        onShow: function(ct) {
+                            if ($('#' + prev_select_input_id).val() != '') {
+                                this.setOptions({
+                                    minDate: $('#' + prev_select_input_id).datetimepicker('getValue')
+                                })
+                            }
+                        },
+                        timepicker: true,
+                        maxDate: 0,
+                        step: 10
+                    });
+                });
+
+
+                $('.after-dom-ready').off().on('change', function() {
+                    var myId = $(this).attr('id');
+                    
+                    if ($(this).hasClass('bs-select')) {
+                        $(this).selectpicker('refresh');
+
+                        if ($(this).val() == '') {
+                            $('#' + myId + '_date_start').prop('disabled', true);
+                            $('#' + myId + '_date_stop').prop('disabled', true);
+                        } else {
+                            $('#' + myId + '_date_start').prop('disabled', false);
+                            $('#' + myId + '_date_stop').prop('disabled', false);
+                        }
+                    }
+                });
+
+            }, {
+                target: document.getElementById('new_treaters')
+            }); /* o target limita o scopo do observer */
+        }
+
+
+
+
+
         $('input, select, textarea').on('blur', function () {
             if ($(this).val() != '') {
                 $(this).removeClass('is-invalid');
@@ -1197,6 +1452,10 @@ if (!isset($_POST['submit'])) {
             // for (instance in CKEDITOR.instances) {
             // 	CKEDITOR.instances[instance].updateElement();
             // }
+
+            $(".custom_field").each(function() {
+                $(this).prop('disabled', false);
+            });
 
             var form = $('form').get(0);
             // disabled the submit button
@@ -1430,6 +1689,9 @@ if (!isset($_POST['submit'])) {
 						html += '<td><?= $sysConfig['conf_prob_tipo_1']; ?></td>';
 						html += '<td><?= $sysConfig['conf_prob_tipo_2']; ?></td>';
 						html += '<td><?= $sysConfig['conf_prob_tipo_3']; ?></td>';
+						html += '<td><?= $sysConfig['conf_prob_tipo_4']; ?></td>';
+						html += '<td><?= $sysConfig['conf_prob_tipo_5']; ?></td>';
+						html += '<td><?= $sysConfig['conf_prob_tipo_6']; ?></td>';
 						html += '</tr>';
 						html += '</thead>';
 						for (var i in response) {
@@ -1448,6 +1710,9 @@ if (!isset($_POST['submit'])) {
 							html += '<td>' + (response[i].probt1_desc ?? '') + '</td>';
 							html += '<td>' + (response[i].probt2_desc  ?? '') + '</td>';
 							html += '<td>' + (response[i].probt3_desc  ?? '') + '</td>';
+							html += '<td>' + (response[i].probt4_desc  ?? '') + '</td>';
+							html += '<td>' + (response[i].probt5_desc  ?? '') + '</td>';
+							html += '<td>' + (response[i].probt6_desc  ?? '') + '</td>';
 							html += '</tr>';
 						}
 						html += '</table>';
@@ -1635,6 +1900,33 @@ if (!isset($_POST['submit'])) {
 				}
 			});
 		}
+
+        
+
+
+        function loadNewTreaterRow() {
+            var loading = $(".loading");
+            $(document).ajaxStart(function() {
+                loading.show();
+            });
+            $(document).ajaxStop(function() {
+                loading.hide();
+            });
+
+            $.ajax({
+                url: './render_new_treater_row.php',
+                method: 'POST',
+                data: {
+                    ticket: $('#ticket').val(),
+                    random: Math.random().toString(16).substr(2, 8)
+                },
+                // dataType: 'json',
+            }).done(function(data) {
+                $('#new_treaters').append(data);
+            });
+            return false;
+		}
+
 
 
 

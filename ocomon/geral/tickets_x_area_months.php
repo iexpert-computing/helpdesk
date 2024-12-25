@@ -17,30 +17,6 @@ $filtered_clients = $_SESSION['dash_filter_clients'];
 
 $qry_filter_areas = "";
 
-// $u_areas = (!empty($filtered_areas) ? $filtered_areas : $_SESSION['s_uareas']);
-
-
-// $allAreasInfo = getAreas($conn, 0, 1, null);
-// $arrayAllAreas = [];
-// foreach ($allAreasInfo as $sigleArea) {
-//     $arrayAllAreas[] = $sigleArea['sis_id'];
-// }
-// $allAreas = implode(",", $arrayAllAreas);
-
-// if ($isAdmin) {
-//     $u_areas = (!empty($filtered_areas) ? $filtered_areas : $allAreas);
-
-//     if (empty($filtered_areas) && !$_SESSION['requester_areas']) {
-//         /* Padrão, não precisa filtrar por área - todas as áreas de destino */
-//         $qry_filter_areas = "";
-
-//     } else {
-//         $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$u_areas}) ";
-//     } 
-// } else {
-//     $u_areas = (!empty($filtered_areas) ? $filtered_areas : $_SESSION['s_uareas']);
-//     $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$u_areas}) ";
-// }
 
 /* Controle para limitar os resultados com base nos clientes selecionados */
 $qry_filter_clients = "";
@@ -54,7 +30,7 @@ if (empty($filtered_areas)) {
     if ($isAdmin) {
         $qry_filter_areas = "";
     } else {
-        $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$_SESSION['s_uareas']}) OR " . $aliasAreasFilter . " = '-1')";
+        $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$_SESSION['s_uareas']})";
     }
 } else {
     $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$filtered_areas}))";
@@ -102,8 +78,6 @@ foreach ($result->fetchAll() as $row) {
         $sqlEach = "SELECT count(*) AS total, s.sistema 
                     FROM ocorrencias o, sistemas s, usuarios ua, `status` st
                     WHERE 
-                        -- s.sis_id = o.sistema 
-                        -- AND s.sis_id = " . $row['sis_id'] . " 
                         s.sis_id = " . $aliasAreasFilter . " 
                         AND o.aberto_por = ua.user_id 
                         AND o.status = st.stat_id 
@@ -124,9 +98,7 @@ foreach ($result->fetchAll() as $row) {
 
                 if ($rowEach['sistema']) {
                     $areas[] = $rowEach['sistema'];
-                    // $totais[] = (int)$rowEach['total'];
                     $meses[] = $months[$i];
-                    // $areasDados[$rowEach['sistema']][] = intval($rowEach['total']);
                     $areasDados[$rowEach['sistema']][] = $rowEach['total'];
                 } else {
                     $areas[] = $row['sistema'];
@@ -149,6 +121,18 @@ foreach ($result->fetchAll() as $row) {
 /* Ajusto os arrays de labels para não ter repetidos */
 $meses = array_unique($meses);
 $areas = array_unique($areas);
+
+
+/* Trecho para remover as areas que não tiveram registros no período */
+foreach ($areasDados as $key => $value) {
+    if (array_sum($value) == 0) {
+        unset($areas[array_search($key, $areas)]);
+        unset($areasDados[$key]);
+    }
+}
+
+
+
 
 /* Separo o conteúdo para organizar o JSON */
 $data['areas'] = $areas;

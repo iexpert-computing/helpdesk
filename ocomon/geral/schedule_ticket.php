@@ -37,6 +37,7 @@ $return['success'] = true;
 $erro = false;
 $exception = "";
 $now = date('Y-m-d H:i:s');
+$data = [];
 
 
 $post = $_POST;
@@ -44,6 +45,9 @@ $post = $_POST;
 if (!isset($post['numero']) || empty($post['numero'])) {
     exit;
 }
+
+
+$data['is_scheduled'] = (isset($post['is_scheduled']) ? $post['is_scheduled'] : 0);
 
 $ticketWorkers = getTicketWorkers($conn, $post['numero']);
 $hasWorker = (empty($ticketWorkers) ? false : true);
@@ -144,13 +148,17 @@ if (!empty($data['main_worker'])) {
     
 
 
-$sqlTicket = "SELECT * FROM ocorrencias WHERE numero = {$numero} ";
-$resultTicket = $conn->query($sqlTicket);
-$row = $resultTicket->fetch();
+
+// $sqlTicket = "SELECT * FROM ocorrencias WHERE numero = {$numero} ";
+// $resultTicket = $conn->query($sqlTicket);
+// $row = $resultTicket->fetch();
+$row = getTicketData($conn, $numero);
 
 /* Informações sobre a área destino */
 $rowAreaTo = getAreaInfo($conn, $row['sistema']);
 
+/* Para ser utilizado na notificação para operadores auxiliares */
+$ticketNumberSeparator = "%tkt%{$numero}";
 
 /* Array para a funcao recordLog */
 $arrayBeforePost = [];
@@ -241,6 +249,11 @@ if (!empty($data['main_worker'])) {
                     
                     try {
                         $res = $conn->exec($sql);
+
+                        if ($aux != $_SESSION['s_uid']) {
+                            setUserNotification($conn, $aux, 1, TRANS('YOU_WERE_ADDED_AS_AUXILIAR') . ': ' . $ticketNumberSeparator, $_SESSION['s_uid']);
+                        }
+
                     }
                     catch (Exception $e) {
                         $exception .= "<hr>" . $e->getMessage();
@@ -253,34 +266,14 @@ if (!empty($data['main_worker'])) {
 
         /* Inserção dos dados estendidos da ocorrência */
         if (!empty($data['main_worker'])) {
-            $sql = "INSERT INTO `tickets_extended`
-                        (ticket, main_worker) 
-                    VALUES 
-                        (
-                            {$numero}, 
-                            {$data['main_worker']} 
-                        )";
 
-            try {
-                $res = $conn->exec($sql);
-            } catch (Exception $e) {
-                $exception .= "<hr>" . $e->getMessage();
-            }
+            setOrUpdateTicketExtendedInfoByCols($conn, $numero, ['main_worker'], [$data['main_worker']]);
                         
         }
     } elseif ($isUpdate) {
         
-        /* Atualização dos dados estendidos */
-        $sql = "UPDATE 
-                    `tickets_extended` 
-                SET 
-                    main_worker = {$data['main_worker']}
-                WHERE ticket = {$numero} ";
-
-        try {
-            $res = $conn->exec($sql);
-        } catch (Exception $e) {
-            $exception .= "<hr>" . $e->getMessage();
+        if (!empty($data['main_worker'])) {
+            setOrUpdateTicketExtendedInfoByCols($conn, $numero, ['main_worker'], [$data['main_worker']]);
         }
     
         /* Atualização dos operadors auxiliares - Parte 1 */
@@ -313,6 +306,11 @@ if (!empty($data['main_worker'])) {
                             ({$numero}, {$aux}, 0, '{$now}')";
                 try {
                     $res = $conn->exec($sql);
+
+                    if ($aux != $_SESSION['s_uid']) {
+                        setUserNotification($conn, $aux, 1, TRANS('YOU_WERE_ADDED_AS_AUXILIAR') . ': ' . $ticketNumberSeparator, $_SESSION['s_uid']);
+                    }
+
                 } catch (Exception $e) {
                     $exception .= "<hr>" . $e->getMessage();
                 }
@@ -325,27 +323,12 @@ if (!empty($data['main_worker'])) {
 $user = (int)$_SESSION['s_uid'];
 
 if (!empty($data['main_worker']) || !empty($post['scheduleDate'])) {
-    // /**
-    //  * Opção de configuração para definir se o encaminhamento será marcado como primeira resposta
-    //  */
-    // $set_response = $config['set_response_at_routing'];
 
-    // /* Demanda para marcar como primeira resposta */
-    // if (!empty($data['main_worker']) && empty($row['data_atendimento']) && ($set_response == 'always' || $set_response == 'choice')) {
-        
-    //     if (($set_response == 'choice' && $data['first_response']) || ($set_response == 'always')) {
-    //         $sql = "UPDATE ocorrencias SET data_atendimento = '{$now}' WHERE numero = {$numero}";
-    //         try {
-    //             $res = $conn->exec($sql);
-    //         } catch (Exception $e) {
-    //             $exception .= "<hr>" . $e->getMessage();
-    //         }
-    //     }
-    // }
+    $treater = (!empty($data['main_worker'])) ? $data['main_worker'] : $user;
 
     /* Gravação da data na tabela tickets_stages */
-    $stopTimeStage = insert_ticket_stage($conn, $numero, 'stop', $newStatus);
-    $startTimeStage = insert_ticket_stage($conn, $numero, 'start', $newStatus);
+    $stopTimeStage = insert_ticket_stage($conn, $numero, 'stop', $newStatus, $treater);
+    $startTimeStage = insert_ticket_stage($conn, $numero, 'start', $newStatus, $treater);
 
     if (!empty($post['scheduleDate'])) {
         $entryType = 7;
@@ -358,7 +341,7 @@ if (!empty($data['main_worker']) || !empty($post['scheduleDate'])) {
             (
                 ocorrencia, 
                 assentamento, 
-                `data`, 
+                created_at, 
                 responsavel, 
                 tipo_assentamento
             ) 
@@ -366,12 +349,16 @@ if (!empty($data['main_worker']) || !empty($post['scheduleDate'])) {
             (
                 ".$numero.", 
                 '" . $data['entry_schedule'] . "', 
-                '".date('Y-m-d H:i:s')."', 
+                '{$now}', 
                 {$user}, {$entryType} 
             )";
 
     try {
         $result = $conn->exec($sql);
+        $notice_id = $conn->lastInsertId();
+        if ($_SESSION['s_uid'] != $row['aberto_por']) {
+            setUserTicketNotice($conn, 'assentamentos', $notice_id);
+        }
     }
     catch (Exception $e) {
         $erro = true;
@@ -445,7 +432,7 @@ if (isset($post['sendEmailToArea']) && $post['sendEmailToArea'] == 'true' && $da
 }
 
 
-if (isset($post['sendEmailToUser']) && $post['sendEmailToUser'] == 'true') {
+if (isset($post['sendEmailToUser']) && $post['sendEmailToUser'] == 'true' && $data['is_scheduled']) {
     $event = "agendamento-para-usuario";
     $eventTemplate = getEventMailConfig($conn, $event);
 

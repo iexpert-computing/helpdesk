@@ -68,7 +68,7 @@ foreach ($uareas as $uarea) {
             }
         }
         catch (Exception $e) {
-            $exceptions .= "<br/>" . $e->getMessage . "<br/>" . $sql;
+            $exceptions .= "<br/>" . $e->getMessage() . "<br/>" . $sql;
             echo $exceptions;
         }
     }

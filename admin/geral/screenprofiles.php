@@ -42,7 +42,7 @@ $fields = [
 	'conf_scr_prob' => TRANS('ISSUE_TYPE'),
 	'conf_scr_desc' => TRANS('DESCRIPTION'),
 	'conf_scr_unit' => TRANS('COL_UNIT'),
-	'conf_scr_tag' => TRANS('ASSET_TAG'),
+	'conf_scr_tag' => TRANS('ASSET_TAG_TAG'),
 	'conf_scr_contact' => TRANS('CONTACT'),
 	'conf_scr_contact_email' => TRANS('CONTACT_EMAIL'),
 	'conf_scr_fone' => TRANS('COL_PHONE'),
@@ -72,8 +72,9 @@ $fields = [
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 	<style>
 		li.list_areas {
 			line-height: 1.5em;

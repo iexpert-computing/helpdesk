@@ -45,6 +45,12 @@ session_start();
 		$data = $result->fetch();
 
 		if (!empty($data["img_bin"])) {
+			
+			// Certifique-se de limpar os buffers de saída
+			if (ob_get_length()) {
+				ob_end_clean(); // Limpa o buffer de saída se houver
+			}
+			
 			// Saída MIME header
 			header("Content-Type: {$data["img_tipo"]}");
 			// Saída da imagen

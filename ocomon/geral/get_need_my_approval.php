@@ -65,43 +65,27 @@ $doneStatus = $config['conf_status_done'];
 $daysToApprove = $config['conf_time_to_close_after_done'];
 $onlyBusinessDays = ($config['conf_only_weekdays_to_count_after_done'] ? true : false);
 
-/* Data base para o filtro de chamados que precisam de aprovação e avaliação */
-// $dateFrom = ($onlyBusinessDays ? subDaysFromDate(date('Y-m-d H:i:s'), $daysToApprove, true) : subDaysFromDate(date('Y-m-d H:i:s'), $daysToApprove));
-$dateFrom = subDaysFromDate(date('Y-m-d H:i:s'), $daysToApprove, $onlyBusinessDays);
-
-$sql = "SELECT 
-            o.numero
-        FROM 
-            ocorrencias o, 
-            tickets_rated tr
-        WHERE
-            o.numero = tr.ticket AND
-            o.`aberto_por` = {$_SESSION['s_uid']} AND
-            o.`operador` <> o.`aberto_por` AND
-            o.`status` = {$doneStatus} AND
-            o.`data_fechamento` IS NOT NULL AND
-            o.`data_fechamento` > '{$dateFrom}' AND
-            tr.rate IS NULL";
-
-$res = $conn->query($sql);
+// /* Data base para o filtro de chamados que precisam de aprovação e avaliação */
+/* Ignrando o código acima - aparentemente possui um bug */
 $tickets = [];
-if ($res->rowCount()) {
-    foreach ($res->fetchAll() as $rowTicket) {
-        $tickets[] = $rowTicket['numero'];
-    }
-}
+$tickets = userHasTicketWaitingToBeRated($conn, $_SESSION['s_uid']);
 
 $searchIn = (!empty($tickets) ? implode(",", $tickets) : "-1");
 
 
 // getting total number records without any search
-$sql = $QRY["ocorrencias_full_ini"] . " WHERE stat_ignored <> 1 AND o.numero IN ({$searchIn}) ORDER BY numero";
+$sql = $QRY["tickets_in_queues_count"] . " AND 
+            stat_ignored <> 1 AND 
+            o.numero IN ({$searchIn}) 
+";
 $sqlResult = $conn->query($sql);
-$totalData = $sqlResult->rowCount();
+$totalData = $sqlResult->fetch()['total'];
 $totalFiltered = $totalData;  // when there is no search parameter then total number rows = total number filtered rows.
 
 
-$sql = $QRY["ocorrencias_full_ini"] . " WHERE stat_ignored <> 1 AND o.numero IN ({$searchIn}) ";
+$sql = $QRY["tickets_in_queues"] . " AND 
+            stat_ignored <> 1 AND 
+            o.numero IN ({$searchIn}) ";
 
 if( !empty($requestData['search']['value']) ) {   // if there is a search parameter, $requestData['search']['value'] contains search parameter
 
@@ -178,6 +162,8 @@ foreach ($sqlResult->fetchAll() as $row){
     if (isset($row['cor_fonte']) && !empty($row['cor_fonte'])) {
         $cor_font = $row['cor_fonte'];
     }
+
+    $renderTicketStatus = "<span class='btn btn-sm text-wrap' style='color: " . $row['textcolor'] . "; background-color: " . ($row['bgcolor'] ?? '#FFFFFF') . "'>" . $row['chamado_status'] . "</span>";
 
     $referenceDate = (!empty($row['oco_real_open_date']) ? $row['oco_real_open_date'] : $row['data_abertura']);
     $dataAtendimento = $row['data_atendimento']; //data da primeira resposta ao chamado
@@ -256,12 +242,12 @@ foreach ($sqlResult->fetchAll() as $row){
 	$nestedData[] = $linkImg."&nbsp;".$row['problema'] . $tags;
     $nestedData[] = "<b>" . $row['contato'] . "</br><br/>" . $row['telefone'];
     $nestedData[] = "<b>" . $row['setor'] . "</b><br/>" . $texto;
-    $nestedData[] = "<b>" . $row['chamado_status'] . "</b>";
+    $nestedData[] = $renderTicketStatus;
     $nestedData[] = $colTVNew;
     $nestedData[] = $deadlineToApprove;
     // $nestedData[] = $remainingDays . '&nbsp;' . ($remainingDays > 1 ? TRANS('DAYS') : TRANS('DAY'));
     // $nestedData[] = "<i class='fas fa-calendar-alt text-oc-teal fa-lg mb-1'></i>&nbsp;" . dateScreen($row['oco_scheduled_to']);
-    // $nestedData[] = "<span class='badge p-2' style='color: " . $cor_font . "; background-color: " . $COR . "'>" . $row['pr_descricao'] . "</span>";
+    // $nestedData[] = "<span class='btn btn-sm ' style='color: " . $cor_font . "; background-color: " . $COR . "'>" . $row['pr_descricao'] . "</span>";
     $nestedData[] = "<img height='20' src='" . $imgsPath . "" . $ledSlaResposta . "' title='" . TRANS('HNT_RESPONSE_LED') . "'>&nbsp;<img height='20' src='" . $imgsPath . "" . $ledSlaSolucao . "' title='" . TRANS('HNT_SOLUTION_LED') . "'>";
     $nestedData['DT_RowId'] = 'id_' . $row['numero']; //DT_RowId é reservado
     

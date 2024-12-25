@@ -51,8 +51,9 @@ $_SESSION['s_page_ocomon'] = $_SERVER['PHP_SELF'];
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
 	<style>
 		.table_lines {
@@ -118,6 +119,14 @@ $_SESSION['s_page_ocomon'] = $_SERVER['PHP_SELF'];
 					</small>
 				</div>
 
+				<label for="not_having" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('EXCLUDE_TERMS'); ?></label>
+				<div class="form-group col-md-10">
+					<textarea class="form-control " id="not_having" name="not_having" rows="4" required placeholder="<?= TRANS('HELPER_EXCLUDE_TERMS'); ?>"></textarea>
+					<small class="form-text text-muted">
+						<?= TRANS('HELPER_EXCLUDE_TERMS'); ?>.
+					</small>
+				</div>
+
 
 				<label for="operador" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('TECHNICIAN'); ?></label>
 				<div class="form-group col-md-4">
@@ -128,7 +137,7 @@ $_SESSION['s_page_ocomon'] = $_SERVER['PHP_SELF'];
 						$users = getUsers($conn, null, [1,2]);
 						foreach ($users as $user) {
 							?>
-								<option value="<?= $user['user_id']; ?>"><?= $user['nome']; ?></option>
+								<option data-subtext="<?= $user['email']; ?>" value="<?= $user['user_id']; ?>"><?= $user['nome']; ?></option>
 							<?php
 						}
 						?>
@@ -149,6 +158,10 @@ $_SESSION['s_page_ocomon'] = $_SERVER['PHP_SELF'];
 					<div class="form-check form-check-inline">
 						<input class="form-check-input " type="checkbox" name="onlyImgs">
 						<legend class="col-form-label col-form-label-sm"><?= TRANS('ONLY_TICKETS_WITH_ATTACHMENTS'); ?></legend>
+					</div>
+					<div class="form-check form-check-inline">
+						<input class="form-check-input " type="checkbox" name="search_in_progress_tickets">
+						<legend class="col-form-label col-form-label-sm"><?= TRANS('CONSIDER_IN_PROGRESS'); ?></legend>
 					</div>
 
 				</div>
@@ -245,6 +258,7 @@ $_SESSION['s_page_ocomon'] = $_SERVER['PHP_SELF'];
 				/* placeholder */
 				title: "<?= TRANS('SEL_SELECT', '', 1); ?>",
 				liveSearch: true,
+				showSubtext: true,
 				liveSearchNormalize: true,
 				liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
 				noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",

@@ -84,6 +84,35 @@ class Email
         $this->data->recipient_name = $recipientName;
 
         $this->data->ticket = ($ticket ? $ticket : null);
+
+        if (!empty($this->data->ticket)) {
+            $stmt = Connect::getInstance()->prepare(
+                "SELECT 
+                    `references_to`, 
+                    `started_from`, 
+                    `original_subject` 
+                FROM 
+                    tickets_email_references 
+                WHERE 
+                    ticket = :ticket"
+            );
+
+            try {
+                $stmt->bindValue(":ticket", $this->data->ticket, \PDO::PARAM_INT);
+                $stmt->execute();
+                if ($stmt->rowCount() > 0) {
+                    $row = $stmt->fetch();
+                    $this->data->references = $row->references_to;
+                    $this->data->started_from = $row->started_from;
+                    $this->data->original_subject = $row->original_subject;
+                }
+            } catch (\PDOException $e) {
+                $this->data->references = null;
+                $this->data->started_from = null;
+                $this->data->original_subject = null;
+            }
+        }
+
         return $this;
     }
 
@@ -135,13 +164,25 @@ class Email
             $this->mail->addAddress($this->data->recipient_email, $this->data->recipient_name);
             $this->mail->setFrom($from, $fromName);
 
+            if (!empty($this->data->references) && $this->data->recipient_email == htmlspecialchars_decode($this->data->started_from, ENT_QUOTES)) {
+                $this->mail->Subject = "Re: " . htmlspecialchars_decode($this->data->original_subject, ENT_QUOTES);
+                $this->data->references = htmlspecialchars_decode($this->data->references, ENT_QUOTES);
+
+                $this->mail->addCustomHeader('In-Reply-To', $this->data->references);
+                $this->mail->addCustomHeader('References', $this->data->references);
+            }
+
             if (!empty($this->data->attach)) {
                 foreach ($this->data->attach as $path => $name) {
                     $this->mail->addAttachment($path, $name);
                 }
             }
 
+            // var_dump($this->data); exit;
             $this->mail->send();
+            // $messageID = $this->mail->getLastMessageID();
+            $this->setTicketMessageIdIfNotExists($this->mail->getLastMessageID());
+
             return true;
         } catch (Exception $e) {
             $this->message->error($e->getMessage());
@@ -183,6 +224,7 @@ class Email
             );
 
             $stmt->bindValue(":ticket", $this->data->ticket, \PDO::PARAM_INT);
+            // $stmt->bindValue(":references_to", $this->data->references, \PDO::PARAM_STR);
             $stmt->bindValue(":subject", $this->data->subject, \PDO::PARAM_STR);
             $stmt->bindValue(":body", $this->data->body, \PDO::PARAM_STR);
             $stmt->bindValue(":from_email", $from, \PDO::PARAM_STR);
@@ -210,7 +252,14 @@ class Email
     public function sendQueue(int $perSecond = 5): void
     {
         $stmt = Connect::getInstance()->query(
-            "SELECT * FROM mail_queue WHERE sent_at IS NULL"
+            "SELECT 
+                m.*, 
+                t.references_to as `references`
+            FROM
+                mail_queue m
+                LEFT JOIN tickets_email_references t ON
+                m.ticket = t.ticket
+                WHERE sent_at IS NULL"
         );
         if ($stmt->rowCount()) {
             foreach ($stmt->fetchAll() as $send) {
@@ -218,7 +267,8 @@ class Email
                     $send->subject,
                     $send->body,
                     $send->recipient_email,
-                    $send->recipient_name
+                    $send->recipient_name,
+                    $send->ticket
                 );
 
                 if ($email->send($send->from_email, $send->from_name)) {
@@ -278,6 +328,95 @@ class Email
     }
 
 
+
+    private function ticketHasMessageId(): bool
+    {
+        // echo "ticketHasMessageId" . PHP_EOL;
+        // var_dump($this->data);
+        
+        if (empty($this->data->ticket)) {
+            return false;
+        }
+        
+        $stmt = Connect::getInstance()->prepare(
+            "SELECT 
+                ticket
+            FROM
+                tickets_email_references
+            WHERE
+                ticket = :ticket
+            "
+        );
+
+        $stmt->bindValue(":ticket", $this->data->ticket, \PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->rowCount() > 0;
+    }
+
+    private function setTicketMessageIdIfNotExists(string $messageId): bool
+    {
+        // echo "setTicketMessageIdIfNotExists" . PHP_EOL;
+        // var_dump(['messageId' => $messageId]);
+        // var_dump($this->data);
+        
+        if (empty($this->data->ticket)) {
+            return false;
+        }
+
+        if (empty($messageId)) {
+            return false;
+        }
+        
+        if (!$this->ticketHasMessageId()) {
+            $contactEmail = $this->getTicketContactEmail();
+
+            if (empty($contactEmail)) {
+                return false;
+            }
+            
+            $stmt = Connect::getInstance()->prepare(
+                "INSERT INTO
+                    tickets_email_references
+                        (ticket, references_to, started_from, original_subject)
+                VALUES
+                    (:ticket, :references_to, :started_from, :subject)
+                "
+            );
+
+            $stmt->bindValue(":ticket", $this->data->ticket, \PDO::PARAM_INT);
+            $stmt->bindValue(":references_to", htmlspecialchars($messageId, ENT_QUOTES), \PDO::PARAM_STR);
+            $stmt->bindValue(":started_from", $contactEmail, \PDO::PARAM_STR);
+            $stmt->bindValue(":subject", $this->data->subject, \PDO::PARAM_STR);
+            return $stmt->execute();
+        }
+        return false;
+    }
+
+
+
+    private function getTicketContactEmail(): string
+    {
+        // echo "getTicketContactEmail" . PHP_EOL;
+        // var_dump($this->data);
+        
+        if (empty($this->data->ticket)) {
+            return "";
+        }
+
+        $stmt = Connect::getInstance()->prepare(
+            "SELECT 
+                contato_email
+            FROM
+                ocorrencias
+            WHERE
+                numero = :ticket
+            "
+        );
+
+        $stmt->bindValue(":ticket", $this->data->ticket, \PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchColumn();
+    }
 
 
     /**

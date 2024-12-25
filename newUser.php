@@ -46,7 +46,7 @@ if (!$rowconf['conf_user_opencall']) {
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -55,7 +55,8 @@ if (!$rowconf['conf_user_opencall']) {
 	</div>
 
 	<div class=" p-2 topo-color"><br />
-		<span><img src="./MAIN_LOGO.svg" width="220" style="padding-bottom: 12px;"></span> 
+		<!-- <span><img src="./MAIN_LOGO.svg" width="220" style="padding-bottom: 12px;"></span>  -->
+		<span class="logo header-mainlogo"></span>
 	</div>
 
 	<div id="divResultNewUser"></div>

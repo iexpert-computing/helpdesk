@@ -16,30 +16,6 @@ $filtered_areas = $_SESSION['dash_filter_areas'];
 $filtered_clients = $_SESSION['dash_filter_clients'];
 $qry_filter_areas = "";
 
-// $u_areas = (!empty($filtered_areas) ? $filtered_areas : $_SESSION['s_uareas']);
-
-// $allAreasInfo = getAreas($conn, 0, 1, null);
-// $arrayAllAreas = [];
-// foreach ($allAreasInfo as $sigleArea) {
-//     $arrayAllAreas[] = $sigleArea['sis_id'];
-// }
-// $allAreas = implode(",", $arrayAllAreas);
-
-// if ($isAdmin) {
-//     $u_areas = (!empty($filtered_areas) ? $filtered_areas : $allAreas);
-
-//     if (empty($filtered_areas) && !$_SESSION['requester_areas']) {
-//         /* Padrão, não precisa filtrar por área - todas as áreas de destino */
-//         $qry_filter_areas = "";
-
-//     } else {
-//         $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$u_areas}) ";
-//     } 
-// } else {
-//     $u_areas = (!empty($filtered_areas) ? $filtered_areas : $_SESSION['s_uareas']);
-//     $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$u_areas}) ";
-// }
-
 
 /* Controle para limitar os resultados com base nos clientes selecionados */
 $qry_filter_clients = "";
@@ -53,7 +29,7 @@ if (empty($filtered_areas)) {
     if ($isAdmin) {
         $qry_filter_areas = "";
     } else {
-        $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$_SESSION['s_uareas']}) OR " . $aliasAreasFilter . " = '-1')";
+        $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$_SESSION['s_uareas']})";
     }
 } else {
     $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$filtered_areas}))";
@@ -69,12 +45,6 @@ $i = 0;
 
 $data = array();
 
-
-// if ($_SESSION['requester_areas']) {
-//     $query_areas = "SELECT sis_id, sistema FROM sistemas WHERE sis_status NOT IN (0) AND sis_id IN ({$u_areas}) ORDER BY sistema";
-// } else {
-//     $query_areas = "SELECT sis_id, sistema FROM sistemas WHERE sis_status NOT IN (0) AND sis_atende = 1 AND sis_id IN ({$u_areas}) ORDER BY sistema";
-// }
 
 if ($_SESSION['requester_areas']) {
     
@@ -101,8 +71,6 @@ foreach ($query_areas->fetchAll(PDO::FETCH_ASSOC) as $row) {
                     FROM 
                         ocorrencias AS o, sistemas AS s, usuarios ua, `status` st 
                     WHERE 
-                        -- o.sistema = s.sis_id 
-                        -- AND s.sis_id in (" . $row['sis_id'] . ") 
                         " . $aliasAreasFilter . "  = s.sis_id AND 
                         o.aberto_por = ua.user_id AND 
                         o.status = st.stat_id AND
@@ -123,8 +91,6 @@ foreach ($query_areas->fetchAll(PDO::FETCH_ASSOC) as $row) {
                     FROM 
                         ocorrencias AS o, sistemas AS s, usuarios ua, `status` st
                     WHERE 
-                        -- o.sistema = s.sis_id 
-                        -- AND s.sis_id in (" . $row['sis_id'] . ")  
                         " . $aliasAreasFilter . " = s.sis_id AND 
                         o.aberto_por = ua.user_id AND 
                         o.status = st.stat_id AND
@@ -143,8 +109,6 @@ foreach ($query_areas->fetchAll(PDO::FETCH_ASSOC) as $row) {
                     FROM 
                         ocorrencias AS o, sistemas AS s, usuarios ua, `status` st
                     WHERE 
-                        -- o.sistema = s.sis_id 
-                        -- s.sis_id in (" . $row['sis_id'] . ") and
                         " . $aliasAreasFilter . " = s.sis_id AND 
                         o.aberto_por = ua.user_id AND 
                         o.status = st.stat_id AND
@@ -171,6 +135,14 @@ foreach ($query_areas->fetchAll(PDO::FETCH_ASSOC) as $row) {
 
     $i++;
 }
+
+/* Trecho para remover as areas que não tiveram registros no período */
+foreach ($data as $key => $areaValues) {
+    if (array_sum($areaValues) == 0) {
+        unset($data[$key]);
+    };
+}
+
 
 //TICKETS_BY_REQUESTER_AREA_CURRENT_MONTH
 $data[]['chart_title'] = ($_SESSION['requester_areas'] ? TRANS('TICKETS_BY_REQUESTER_AREA_CURRENT_MONTH', '', 1) : TRANS('TICKETS_BY_AREA_CURRENT_MONTH', '', 1));

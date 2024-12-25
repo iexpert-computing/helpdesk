@@ -67,6 +67,7 @@ $type = "";
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
     <style>
         .input-group-append, .input-group-prepend {
@@ -75,7 +76,7 @@ $type = "";
 
     </style>
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>

@@ -2,7 +2,6 @@
 
 namespace OcomonApi\Models;
 
-use OcomonApi\Models\Area;
 use CoffeeCode\DataLayer\DataLayer;
 
 /**
@@ -21,15 +20,6 @@ class Client extends DataLayer
         parent::__construct("clients", ["fullname", "is_active"], "id", false);
     }
 
-    /**
-     * area
-     *
-     * @return Area|null
-     */
-    public function area(): ?Area
-    {
-        return (new Area())->findById($this->data()->area);
-    }
 
 
 }

@@ -1,4 +1,4 @@
-<?php /*                        Copyright 2005 Flávio Ribeiro
+<?php /*                        Copyright 2023 Flávio Ribeiro
 
          This file is part of OCOMON.
 
@@ -44,7 +44,9 @@ $isAdmin = $_SESSION['s_nivel'] == 1;
     <link rel="stylesheet" type="text/css" href="../../includes/css/estilos.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
+
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
     <style>
         #spanTktNumber {
             cursor: pointer;
@@ -65,10 +67,10 @@ $isAdmin = $_SESSION['s_nivel'] == 1;
 
         if (isset($_GET['numero'])) {
 
+
             $rowTicketData = getTicketData($conn, (int)$_GET['numero']);
 
             $isRequester = $rowTicketData['aberto_por'] == $_SESSION['s_uid'];
-
             $managebleAreas = getManagedAreasByUser($conn, $_SESSION['s_uid']);
             $managebleAreas = array_column($managebleAreas, 'sis_id');
             
@@ -112,6 +114,14 @@ $isAdmin = $_SESSION['s_nivel'] == 1;
 
                     $log[$i]['IDX_QUEM'] = $row['nome'] ?? TRANS('AUTOMATIC_PROCESS');
                     $log[$i]['FLAGGED'] = 0;
+
+                    if ($row_log['log_requester'] != "") {
+
+                        $requester = getUserInfo($conn, $row_log['log_requester']);
+
+                        $log[$i]['IDX_REQUESTER'] = $requester['nome'];
+                        $log[$i]['FLAGGED'] = 1;
+                    }
 
 
 
@@ -229,6 +239,19 @@ $isAdmin = $_SESSION['s_nivel'] == 1;
                         $log[$i]['FLAGGED'] = 1;
                     }
 
+                    if ($row_log['log_authorization_status'] != "" && $row_log['log_authorization_status'] != "-1") {
+                    
+                        $authorizationTypes = [
+                            0 => TRANS('WITHOUT_DEFINITION'),
+                            1 => TRANS('STATUS_WAITING_AUTHORIZATION'),
+                            2 => TRANS('STATUS_AUTHORIZED'),
+                            3 => TRANS('STATUS_REFUSED')
+                        ];
+                    
+                        $log[$i]['IDX_AUTHORIZATION_STATUS'] = $authorizationTypes[$row_log['log_authorization_status']];
+                        $log[$i]['FLAGGED'] = 1;
+                    }
+                    
                     if ($row_log['log_tipo_edicao'] != "") {
 
                         // if ($row_log['log_tipo_edicao'] == 0) $operation_type = TRANS('OPT_OPERATION_TYPE_OPEN');

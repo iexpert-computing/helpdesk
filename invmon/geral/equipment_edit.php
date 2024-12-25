@@ -64,7 +64,7 @@ if (empty($asset_tag) || empty($asset_unit)) {
 
 $query = $QRY["full_detail_ini"];
 $query.= " AND (c.comp_inv = '{$asset_tag}') AND (inst.inst_cod = '{$asset_unit}') ";
-$query.= $QRY["full_detail_fim"];
+// $query.= $QRY["full_detail_fim"];
 
 
 try {
@@ -102,7 +102,9 @@ $hasFiles = $resultFiles->rowCount();
 
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
+
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>

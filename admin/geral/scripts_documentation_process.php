@@ -52,8 +52,7 @@ $data['area'] = (isset($post['area']) && $post['area'] != '-1' ? noHtml($post['a
 $data['problema'] = (isset($post['problema']) && $post['problema'] != '-1' ? noHtml($post['problema']) : "");
 $data['radio_prob'] = (isset($post['radio_prob']) && $post['radio_prob'] != '-1' ? noHtml($post['radio_prob']) : $data['problema']);
 
-$data['delProb'] = (isset($post['delProb']) ? $post['delProb'] : "");
-
+$data['delProb'] = (isset($post['delProb']) ? $post['delProb'] : []);
 
 
 
@@ -74,7 +73,10 @@ if ($data['action'] == "new" || $data['action'] == "edit") {
         $data['success'] = false; 
         $data['field_id'] = 'idProblema';
     } 
-
+    /* elseif (empty($data['radio_prob'])) {
+        $data['success'] = false; 
+        $data['field_id'] = 'idProblema';
+    }  */
 
     if ($data['success'] == false) {
         $data['message'] = message('warning', 'Ooops!', TRANS('MSG_EMPTY_DATA'),'');
@@ -84,8 +86,19 @@ if ($data['action'] == "new" || $data['action'] == "edit") {
 
 }
 
+if (!empty($data['cod'])) {
+    $countCurrentIssues = count(getIssuesByScript($conn, $data['cod']));
+    $countFilledIssues = (!empty($data['radio_prob']) ? 1 : 0);
+    $countDeletedIssues = count($data['delProb']);
 
-
+    if (($countCurrentIssues + $countFilledIssues) <= $countDeletedIssues) {
+        $data['success'] = false; 
+        $data['field_id'] = 'idProblema';
+        $data['message'] = message('warning', 'Ooops!', TRANS('MSG_EMPTY_DATA'),'');
+        echo json_encode($data);
+        return false;
+    }
+}
 
 if ($data['action'] == 'new') {
 

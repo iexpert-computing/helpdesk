@@ -42,6 +42,9 @@ $sess_d_fim = (isset($_SESSION['s_rep_filters']['d_fim']) ? $_SESSION['s_rep_fil
 $sess_cat1 = (isset($_SESSION['s_rep_filters']['cat1']) ? $_SESSION['s_rep_filters']['cat1'] : -1);
 $sess_cat2 = (isset($_SESSION['s_rep_filters']['cat2']) ? $_SESSION['s_rep_filters']['cat2'] : -1);
 $sess_cat3 = (isset($_SESSION['s_rep_filters']['cat3']) ? $_SESSION['s_rep_filters']['cat3'] : -1);
+$sess_cat4 = (isset($_SESSION['s_rep_filters']['cat4']) ? $_SESSION['s_rep_filters']['cat4'] : -1);
+$sess_cat5 = (isset($_SESSION['s_rep_filters']['cat5']) ? $_SESSION['s_rep_filters']['cat5'] : -1);
+$sess_cat6 = (isset($_SESSION['s_rep_filters']['cat6']) ? $_SESSION['s_rep_filters']['cat6'] : -1);
 
 
 
@@ -61,9 +64,13 @@ if (isAreasIsolated($conn) && $_SESSION['s_nivel'] != 1) {
     }
 }
 
+
 $json = 0;
 $json2 = 0;
 $json3 = 0;
+$json4 = 0;
+$json5 = 0;
+$json6 = 0;
 
 ?>
 <!DOCTYPE html>
@@ -78,6 +85,9 @@ $json3 = 0;
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+    <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
     <style>
         .chart-container {
@@ -88,9 +98,13 @@ $json3 = 0;
             margin-right: 10px;
             margin-bottom: 30px;
         }
+
+        tr {
+            height: 40px;
+        }
     </style>
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -110,7 +124,8 @@ $json3 = 0;
                 </div>
             </div>
         </div>
-
+        <input type="hidden" name="report-mainlogo" class="report-mainlogo" id="report-mainlogo"/>
+        <input type="hidden" name="logo-base64" id="logo-base64"/>
         <?php
         if (isset($_SESSION['flash']) && !empty($_SESSION['flash'])) {
             echo $_SESSION['flash'];
@@ -214,6 +229,55 @@ $json3 = 0;
                     </div>
 
 
+                    <label for="cat4" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= $row_config['conf_prob_tipo_4']; ?></label>
+                    <div class="form-group col-md-10">
+                        <select class="form-control sel2" id="cat4" name="cat4">
+                            <option value="-1"><?= TRANS('ALL'); ?></option>
+                            <?php
+                            $sql = "SELECT * FROM prob_tipo_4 ORDER BY probt4_desc";
+                            $resultado = $conn->query($sql);
+                            foreach ($resultado->fetchAll() as $rowCat4) {
+                                print "<option value='" . $rowCat4['probt4_cod'] . "'";
+                                echo ($rowCat4['probt4_cod'] == $sess_cat4 ? ' selected' : '');
+                                print ">" . $rowCat4['probt4_desc'] . "</option>";
+                            }
+                            ?>
+                        </select>
+                    </div>
+
+                    <label for="cat5" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= $row_config['conf_prob_tipo_5']; ?></label>
+                    <div class="form-group col-md-10">
+                        <select class="form-control sel2" id="cat5" name="cat5">
+                            <option value="-1"><?= TRANS('ALL'); ?></option>
+                            <?php
+                            $sql = "SELECT * FROM prob_tipo_5 ORDER BY probt5_desc";
+                            $resultado = $conn->query($sql);
+                            foreach ($resultado->fetchAll() as $rowCat5) {
+                                print "<option value='" . $rowCat5['probt5_cod'] . "'";
+                                echo ($rowCat5['probt5_cod'] == $sess_cat5 ? ' selected' : '');
+                                print ">" . $rowCat5['probt5_desc'] . "</option>";
+                            }
+                            ?>
+                        </select>
+                    </div>
+
+                    <label for="cat6" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= $row_config['conf_prob_tipo_6']; ?></label>
+                    <div class="form-group col-md-10">
+                        <select class="form-control sel2" id="cat6" name="cat6">
+                            <option value="-1"><?= TRANS('ALL'); ?></option>
+                            <?php
+                            $sql = "SELECT * FROM prob_tipo_6 ORDER BY probt6_desc";
+                            $resultado = $conn->query($sql);
+                            foreach ($resultado->fetchAll() as $rowCat6) {
+                                print "<option value='" . $rowCat6['probt6_cod'] . "'";
+                                echo ($rowCat6['probt6_cod'] == $sess_cat6 ? ' selected' : '');
+                                print ">" . $rowCat6['probt6_desc'] . "</option>";
+                            }
+                            ?>
+                        </select>
+                    </div>
+
+
                     <label for="d_ini" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('START_DATE'); ?></label>
                     <div class="form-group col-md-10">
                         <input type="text" class="form-control " id="d_ini" name="d_ini" value="<?= $sess_d_ini; ?>" autocomplete="off" required />
@@ -253,17 +317,24 @@ $json3 = 0;
             $_SESSION['s_rep_filters']['cat1'] = $_POST['cat1'];
             $_SESSION['s_rep_filters']['cat2'] = $_POST['cat2'];
             $_SESSION['s_rep_filters']['cat3'] = $_POST['cat3'];
+            $_SESSION['s_rep_filters']['cat4'] = $_POST['cat4'];
+            $_SESSION['s_rep_filters']['cat5'] = $_POST['cat5'];
+            $_SESSION['s_rep_filters']['cat6'] = $_POST['cat6'];
             $clientName = (!empty($client) ? getClients($conn, $client)['nickname']: "");
             $clausule = (!empty($client) ? " AND o.client IN ({$client}) " : "");
             $noneClient = TRANS('FILTERED_CLIENT') . ": " . TRANS('NONE_FILTER') . "&nbsp;&nbsp;";
             $criterio = (!empty($client) ? TRANS('FILTERED_CLIENT') . ": {$clientName}&nbsp;&nbsp;" : $noneClient );
 
             $typeFields = "";
-            $query = "SELECT count(*)  AS quantidade, s.sistema AS area, s.sis_id,  p.problema as problema, pt1.*, pt2.*, pt3.* 
+            $query = "SELECT count(*)  AS quantidade, s.sistema AS area, s.sis_id,  
+                        p.problema as problema, pt1.*, pt2.*, pt3.*, pt4.*, pt5.*, pt6.*  
                         FROM ocorrencias AS o, status AS st, sistemas AS s, problemas as p 
                         LEFT JOIN prob_tipo_1 as pt1 on pt1.probt1_cod = p.prob_tipo_1 
                         LEFT JOIN prob_tipo_2 as pt2 on pt2.probt2_cod = p.prob_tipo_2 
                         LEFT JOIN prob_tipo_3 as pt3 on pt3.probt3_cod = p.prob_tipo_3 
+                        LEFT JOIN prob_tipo_4 as pt4 on pt4.probt4_cod = p.prob_tipo_4 
+                        LEFT JOIN prob_tipo_5 as pt5 on pt5.probt5_cod = p.prob_tipo_5
+                        LEFT JOIN prob_tipo_6 as pt6 on pt6.probt6_cod = p.prob_tipo_6
                         WHERE 
                             o.status = st.stat_id AND 
                             st.stat_ignored <> 1 AND 
@@ -275,6 +346,9 @@ $json3 = 0;
             LEFT JOIN prob_tipo_1 as pt1 on pt1.probt1_cod = p.prob_tipo_1 
             LEFT JOIN prob_tipo_2 as pt2 on pt2.probt2_cod = p.prob_tipo_2 
             LEFT JOIN prob_tipo_3 as pt3 on pt3.probt3_cod = p.prob_tipo_3 
+            LEFT JOIN prob_tipo_4 as pt4 on pt4.probt4_cod = p.prob_tipo_4 
+            LEFT JOIN prob_tipo_5 as pt5 on pt5.probt5_cod = p.prob_tipo_5
+            LEFT JOIN prob_tipo_6 as pt6 on pt6.probt6_cod = p.prob_tipo_6
             WHERE o.status = st.stat_id AND st.stat_ignored <> 1 AND o.sistema = s.sis_id AND o.problema = p.prob_id ";
             $queryGroups = "";
 
@@ -334,7 +408,34 @@ $json3 = 0;
                 $criterio .= " " . $row_config['conf_prob_tipo_3'] . ": " . $row_criterio['probt3_desc'] . ",";
             }
 
-            if (strlen((string)$criterio) == 0) {
+            if (isset($_POST['cat4']) && ($_POST['cat4'] != -1)) {
+                $query .= " AND pt4.probt4_cod = '" . $_POST['cat4'] . "' ";
+                $queryRules .= " AND pt4.probt4_cod = '" . $_POST['cat4'] . "' ";
+                $qry_criterio = "SELECT probt4_desc FROM prob_tipo_4 WHERE probt4_cod = " . $_POST['cat4'] . " ";
+                $exec_criterio = $conn->query($qry_criterio);
+                $row_criterio = $exec_criterio->fetch();
+                $criterio .= " " . $row_config['conf_prob_tipo_4'] . ": " . $row_criterio['probt4_desc'] . ",";
+            }
+
+            if (isset($_POST['cat5']) && ($_POST['cat5'] != -1)) {
+                $query .= " AND pt5.probt5_cod = '" . $_POST['cat5'] . "' ";
+                $queryRules .= " AND pt5.probt5_cod = '" . $_POST['cat5'] . "' ";
+                $qry_criterio = "SELECT probt5_desc FROM prob_tipo_5 WHERE probt5_cod = " . $_POST['cat5'] . " ";
+                $exec_criterio = $conn->query($qry_criterio);
+                $row_criterio = $exec_criterio->fetch();
+                $criterio .= " " . $row_config['conf_prob_tipo_5'] . ": " . $row_criterio['probt5_desc'] . ",";
+            }
+
+            if (isset($_POST['cat6']) && ($_POST['cat6'] != -1)) {
+                $query .= " AND pt6.probt6_cod = '" . $_POST['cat6'] . "' ";
+                $queryRules .= " AND pt6.probt6_cod = '" . $_POST['cat6'] . "' ";
+                $qry_criterio = "SELECT probt6_desc FROM prob_tipo_6 WHERE probt6_cod = " . $_POST['cat6'] . " ";
+                $exec_criterio = $conn->query($qry_criterio);
+                $row_criterio = $exec_criterio->fetch();
+                $criterio .= " " . $row_config['conf_prob_tipo_6'] . ": " . $row_criterio['probt6_desc'] . ",";
+            }
+
+            if (strlen($criterio) == 0) {
                 $criterio = TRANS('NONE_FILTER');
             } else {
                 $criterio = substr($criterio, 0, -1);
@@ -392,6 +493,41 @@ $json3 = 0;
                     ORDER BY pt3.probt3_desc, quantidade desc ";
                     $resultadoChart3 = $conn->query($queryChart3);
 
+
+                    /* Query apenas para retornar os dados para o gráfico 4 - o agrupamento é diferente para a listagem */
+                    $queryFields = "SELECT count(*)  AS quantidade, pt4.* ";
+                    $queryChart4 = $queryFields.$queryRules . " AND o.data_fechamento >= '" . $d_ini . "' AND o.data_fechamento <= '" . $d_fim . "' AND o.data_atendimento IS NOT NULL 
+                    {$clausule}
+                    GROUP  BY 
+                    pt4.probt4_cod, pt4.probt4_desc 
+
+                    ORDER BY pt4.probt4_desc, quantidade desc ";
+                    $resultadoChart4 = $conn->query($queryChart4);
+
+                    
+                    /* Query apenas para retornar os dados para o gráfico 5 - o agrupamento é diferente para a listagem */
+                    $queryFields = "SELECT count(*)  AS quantidade, pt5.* ";
+                    $queryChart5 = $queryFields.$queryRules . " AND o.data_fechamento >= '" . $d_ini . "' AND o.data_fechamento <= '" . $d_fim . "' AND o.data_atendimento IS NOT NULL 
+                    {$clausule}
+                    GROUP  BY 
+                    pt5.probt5_cod, pt5.probt5_desc 
+
+                    ORDER BY pt5.probt5_desc, quantidade desc ";
+                    $resultadoChart5 = $conn->query($queryChart5);
+                    
+                    /* Query apenas para retornar os dados para o gráfico 6 - o agrupamento é diferente para a listagem */
+                    $queryFields = "SELECT count(*)  AS quantidade, pt6.* ";
+                    $queryChart6 = $queryFields.$queryRules . " AND o.data_fechamento >= '" . $d_ini . "' AND o.data_fechamento <= '" . $d_fim . "' AND o.data_atendimento IS NOT NULL 
+                    {$clausule}
+                    GROUP  BY 
+                    pt6.probt6_cod, pt6.probt6_desc 
+
+                    ORDER BY pt6.probt6_desc, quantidade desc ";
+                    $resultadoChart6 = $conn->query($queryChart6);
+                    
+                    
+                    
+                    
                     $query .= " AND o.data_fechamento >= '" . $d_ini . "' AND o.data_fechamento <= '" . $d_fim . "' 
                                 AND o.data_atendimento IS NOT NULL 
                                 {$clausule}
@@ -399,8 +535,12 @@ $json3 = 0;
                                 s.sistema, s.sis_id, p.problema, 
                                 pt1.probt1_cod, pt1.probt1_desc, 
                                 pt2.probt2_cod, pt2.probt2_desc, 
-                                pt3.probt3_cod, pt3.probt3_desc 
-                                ORDER BY pt1.probt1_desc, pt2.probt2_desc, pt3.probt3_desc, quantidade desc, area ";
+                                pt3.probt3_cod, pt3.probt3_desc, 
+                                pt4.probt4_cod, pt4.probt4_desc, 
+                                pt5.probt5_cod, pt5.probt5_desc, 
+                                pt6.probt6_cod, pt6.probt6_desc 
+                                ORDER BY 
+                                pt1.probt1_desc, pt2.probt2_desc, pt3.probt3_desc, pt4.probt4_desc, pt5.probt5_desc, pt6.probt6_desc, quantidade desc, area ";
                     $resultado = $conn->query($query);
                     $linhas = $resultado->rowCount();
 
@@ -419,7 +559,9 @@ $json3 = 0;
                         ?>
                         <p><?= TRANS('TTL_PERIOD_FROM') . "&nbsp;" . dateScreen($d_ini, 1) . "&nbsp;" . TRANS('DATE_TO') . "&nbsp;" . dateScreen($d_fim, 1); ?></p>
                         <div class="table-responsive">
-                            <table class="table table-striped table-bordered">
+                            <div class="display-buttons"></div>
+            				<table id="table_lists" class="stripe hover order-column row-border" border="0" cellspacing="0" width="100%">
+                            <!-- <table class="table table-striped table-bordered">'' -->
                                 <!-- table-hover -->
                                 <caption><?= $criterio; ?><span class="px-2" style="float:right" id="new_search"><?= TRANS('NEW_SEARCH'); ?></span></caption>
                                 <thead>
@@ -427,6 +569,9 @@ $json3 = 0;
                                         <td class="line"><?= mb_strtoupper($row_config['conf_prob_tipo_1']); ?></td>
                                         <td class="line"><?= mb_strtoupper($row_config['conf_prob_tipo_2']); ?></td>
                                         <td class="line"><?= mb_strtoupper($row_config['conf_prob_tipo_3']); ?></td>
+                                        <td class="line"><?= mb_strtoupper($row_config['conf_prob_tipo_4']); ?></td>
+                                        <td class="line"><?= mb_strtoupper($row_config['conf_prob_tipo_5']); ?></td>
+                                        <td class="line"><?= mb_strtoupper($row_config['conf_prob_tipo_6']); ?></td>
                                         <td class="line"><?= mb_strtoupper(TRANS('COL_QTD')); ?></td>
                                         <td class="line"><?= mb_strtoupper(TRANS('SERVICE_AREA')); ?></td>
                                     </tr>
@@ -436,8 +581,12 @@ $json3 = 0;
                                     $data = [];
                                     $data2 = [];
                                     $data3 = [];
+                                    $data4 = [];
+                                    $data5 = [];
+                                    $data6 = [];
                                     
                                     $total = 0;
+                                    
                                     foreach ($resultado->fetchall() as $row) {
                                         // $data[] = $row;
                                         ?>
@@ -445,6 +594,9 @@ $json3 = 0;
                                             <td class="line"><?= $row['probt1_desc']; ?></td>
                                             <td class="line"><?= $row['probt2_desc']; ?></td>
                                             <td class="line"><?= $row['probt3_desc']; ?></td>
+                                            <td class="line"><?= $row['probt4_desc']; ?></td>
+                                            <td class="line"><?= $row['probt5_desc']; ?></td>
+                                            <td class="line"><?= $row['probt6_desc']; ?></td>
                                             <td class="line"><?= $row['quantidade']; ?></td>
                                             <td class="line"><?= $row['area']; ?></td>
                                         </tr>
@@ -462,14 +614,29 @@ $json3 = 0;
                                         $data3[] = $rowDataChart3;
                                     }
                                     
+                                    foreach ($resultadoChart4->fetchall() as $rowDataChart4) {
+                                        $data4[] = $rowDataChart4;
+                                    }
+                                    
+                                    foreach ($resultadoChart5->fetchall() as $rowDataChart5) {
+                                        $data5[] = $rowDataChart5;
+                                    }
+
+                                    foreach ($resultadoChart6->fetchall() as $rowDataChart6) {
+                                        $data6[] = $rowDataChart6;
+                                    }
+                                    
                                     $json = json_encode($data);
                                     $json2 = json_encode($data2);
                                     $json3 = json_encode($data3);
+                                    $json4 = json_encode($data4);
+                                    $json5 = json_encode($data5);
+                                    $json6 = json_encode($data6);
                                     ?>
                                 </tbody>
                                 <tfoot>
                                     <tr class="header table-borderless">
-                                        <td colspan="3"><?= TRANS('TOTAL'); ?></td>
+                                        <td colspan="6"><?= TRANS('TOTAL'); ?></td>
                                         <td colspan="2"><?= $total; ?></td>
                                     </tr>
                                 </tfoot>
@@ -483,6 +650,15 @@ $json3 = 0;
                         </div>
                         <div class="chart-container">
                             <canvas id="canvasChart3"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="canvasChart4"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="canvasChart5"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="canvasChart6"></canvas>
                         </div>
                         <?php
                         // var_dump([
@@ -507,10 +683,199 @@ $json3 = 0;
     <script type="text/javascript" src="../../includes/components/chartjs/dist/Chart.min.js"></script>
     <script type="text/javascript" src="../../includes/components/chartjs/chartjs-plugin-colorschemes/dist/chartjs-plugin-colorschemes.js"></script>
     <script type="text/javascript" src="../../includes/components/chartjs/chartjs-plugin-datalabels/chartjs-plugin-datalabels.min.js"></script>
+	<script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables.js"></script>
     <script src="../../includes/components/bootstrap-select/dist/js/bootstrap-select.min.js"></script>
     <script type='text/javascript'>
         $(function() {
             
+
+            if ($('#table_lists').length > 0) {
+
+                setLogoSrc();
+
+                var table = $('#table_lists').DataTable({
+                    language: {
+                        url: "../../includes/components/datatables/datatables.pt-br.json",
+                    },
+                    paging: true,
+                    deferRender: true,
+                    "pageLength": 50,
+                    // order: [0, 'DESC'],
+                    // columnDefs: [{
+                    // 	searchable: false,
+                    // 	orderable: false,
+                    // 	targets: ['editar', 'remover']
+                    // }],
+
+                    // buttons: [
+                    //     'copy', 'excel', 'pdf'
+                    // ]
+                    
+                });
+
+
+                new $.fn.dataTable.Buttons(table, {
+
+                    buttons: [
+                        {
+                            extend: 'print',
+                            text: '<?= TRANS('SMART_BUTTON_PRINT', '', 1) ?>',
+                            title: '<?= TRANS('PROBLEM_TYPES_CATEGORIES', '', 1) ?>',
+                            message: $('#print-info').html(),
+                            autoPrint: true,
+
+                            customize: function(win) {
+                                $(win.document.body).find('table').addClass('display').css('font-size', '10px');
+                                $(win.document.body).find('tr:nth-child(odd) td').each(function(index) {
+                                    $(this).css('background-color', '#f9f9f9');
+                                });
+                                $(win.document.body).find('h1').css('text-align', 'center');
+                            },
+                            exportOptions: {
+                                columns: ':visible'
+                            },
+                        },
+                        {
+                            extend: 'copyHtml5',
+                            text: '<?= TRANS('SMART_BUTTON_COPY', '', 1) ?>',
+                            exportOptions: {
+                                columns: ':visible'
+                            }
+                        },
+                        {
+                            extend: 'excel',
+                            text: "Excel",
+                            exportOptions: {
+                                columns: ':visible'
+                            },
+                            filename: '<?= TRANS('PROBLEM_TYPES_CATEGORIES', '', 1); ?>-<?= date('d-m-Y-H:i:s'); ?>',
+                        },
+                        {
+                            extend: 'csvHtml5',
+                            text: "CSV",
+                            exportOptions: {
+                                columns: ':visible'
+                            },
+
+                            filename: '<?= TRANS('PROBLEM_TYPES_CATEGORIES', '', 1); ?>-<?= date('d-m-Y-H:i:s'); ?>',
+                        },
+                        {
+                            extend: 'pdfHtml5',
+                            text: "PDF",
+
+                            exportOptions: {
+                                columns: ':visible',
+                            },
+                            title: '<?= TRANS('PROBLEM_TYPES_CATEGORIES', '', 1); ?>',
+                            filename: '<?= TRANS('PROBLEM_TYPES_CATEGORIES', '', 1); ?>-<?= date('d-m-Y-H:i:s'); ?>',
+                            orientation: 'landscape',
+                            // orientation: 'portrait',
+                            pageSize: 'A4',
+
+                            customize: function(doc) {
+                                var criterios = $('#table_caption').text()
+                                var rdoc = doc;
+                                
+                                // var rcout = doc.content[doc.content.length - 1].table.body.length - 1;
+                                // doc.content.splice(0, 1);
+                                
+                                // console.log(doc.content)
+                                var rcout = doc.content[1].table.body.length - 1;
+                                doc.content.splice(0, 1);
+                                var now = new Date();
+                                var jsDate = now.getDate() + '/' + (now.getMonth() + 1) + '/' + now.getFullYear() + ' ' + now.getHours() + ':' + now.getMinutes() + ':' + now.getSeconds();
+                                doc.pageMargins = [30, 70, 30, 30];
+                                doc.defaultStyle.fontSize = 8;
+                                doc.styles.tableHeader.fontSize = 9;
+
+                                doc['header'] = (function(page, pages) {
+                                    return {
+                                        columns: [
+                                            {
+                                                margin: [20, 10, 0, 0],
+                                                image: getLogoSrc(),
+                                                width: getLogoWidth()
+                                            } ,
+                                            {
+                                                table: {
+                                                    widths: ['100%'],
+                                                    headerRows: 0,
+                                                    body: [
+                                                        [{
+                                                            text: '<?= TRANS('PROBLEM_TYPES_CATEGORIES', '', 1); ?>',
+                                                            alignment: 'center',
+                                                            
+                                                            fontSize: 14,
+                                                            bold: true,
+                                                            margin: [0, 20, 0, 0]
+                                                            
+                                                        }],
+                                                    ]
+                                                },
+                                                layout: 'noBorders',
+                                                margin: 10,
+                                            }
+                                        ],
+                                    }
+                                });
+
+                                doc['footer'] = (function(page, pages) {
+                                    return {
+                                        columns: [{
+                                                alignment: 'left',
+                                                text: ['Criado em: ', {
+                                                    text: jsDate.toString()
+                                                }]
+                                            },
+                                            {
+                                                alignment: 'center',
+                                                text: 'Total ' + rcout.toString() + ' linhas'
+                                            },
+                                            {
+                                                alignment: 'right',
+                                                text: ['página ', {
+                                                    text: page.toString()
+                                                }, ' de ', {
+                                                    text: pages.toString()
+                                                }]
+                                            }
+                                        ],
+                                        margin: 10
+                                    }
+                                });
+
+                                var objLayout = {};
+                                objLayout['hLineWidth'] = function(i) {
+                                    return .8;
+                                };
+                                objLayout['vLineWidth'] = function(i) {
+                                    return .5;
+                                };
+                                objLayout['hLineColor'] = function(i) {
+                                    return '#aaa';
+                                };
+                                objLayout['vLineColor'] = function(i) {
+                                    return '#aaa';
+                                };
+                                objLayout['paddingLeft'] = function(i) {
+                                    return 5;
+                                };
+                                objLayout['paddingRight'] = function(i) {
+                                    return 35;
+                                };
+                                // doc.content[doc.content.length - 1].layout = objLayout;
+                                doc.content[1].layout = objLayout;
+                                
+                            }
+                        },
+                    ]
+                });
+
+                table.buttons().container()
+                .appendTo($('.display-buttons:eq(0)', table.table().container()));
+                
+            }
+
             $.fn.selectpicker.Constructor.BootstrapVersion = '4';
             $('.bs-select').selectpicker({
                 /* placeholder */
@@ -551,6 +916,7 @@ $json3 = 0;
             });
 
             $('#idSubmit').on('click', function() {
+                // setLogoSrc();
                 $('.loading').show();
             });
 
@@ -558,6 +924,9 @@ $json3 = 0;
                 showChart('canvasChart1');
                 showChart2('canvasChart2');
                 showChart3('canvasChart3');
+                showChart4('canvasChart4');
+                showChart5('canvasChart5');
+                showChart6('canvasChart6');
             }
 
         });
@@ -749,6 +1118,211 @@ $json3 = 0;
             });
         }
 
+        function showChart4(canvasID) {
+            var ctx4 = $('#' + canvasID);
+            var dataFromPHP4 = <?= $json4; ?>;
+
+            var labels = []; // X Axis Label
+            var total = []; // Value and Y Axis basis
+
+            for (var i in dataFromPHP4) {
+                // console.log(dataFromPHP4[i]);
+                // labels.push(dataFromPHP4[i].operador);
+                labels.push(dataFromPHP4[i].probt4_desc);
+                total.push(dataFromPHP4[i].quantidade);
+            }
+
+            var myChart4 = new Chart(ctx4, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '<?= TRANS('total','',1); ?>',
+                        data: total,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    title: {
+                        display: true,
+                        text: '<?= $row_config['conf_prob_tipo_4'] ?>',
+                    },
+                    scales: {
+                        yAxes: [{
+                            display: false,
+                            ticks: {
+                                beginAtZero: true
+                            }
+                        }]
+                    },
+                    plugins: {
+                        colorschemes: {
+                            scheme: 'brewer.Paired12'
+                        },
+                        datalabels: {
+                            display: function(context) {
+                                return context.dataset.data[context.dataIndex] >= 1; // or !== 0 or ...
+                            },
+                            formatter: (value, ctx4) => {
+                                let sum = ctx4.dataset._meta[3].total;
+                                let percentage = (value * 100 / sum).toFixed(2) + "%";
+                                return percentage;
+                            }
+                        },
+                    },
+                }
+            });
+        }
+
+        function showChart5(canvasID) {
+            var ctx5 = $('#' + canvasID);
+            var dataFromPHP5 = <?= $json5; ?>;
+
+            var labels = []; // X Axis Label
+            var total = []; // Value and Y Axis basis
+
+            for (var i in dataFromPHP5) {
+                // console.log(dataFromPHP4[i]);
+                // labels.push(dataFromPHP4[i].operador);
+                labels.push(dataFromPHP5[i].probt5_desc);
+                total.push(dataFromPHP5[i].quantidade);
+            }
+
+            var myChart5 = new Chart(ctx5, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '<?= TRANS('total','',1); ?>',
+                        data: total,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    title: {
+                        display: true,
+                        text: '<?= $row_config['conf_prob_tipo_5'] ?>',
+                    },
+                    scales: {
+                        yAxes: [{
+                            display: false,
+                            ticks: {
+                                beginAtZero: true
+                            }
+                        }]
+                    },
+                    plugins: {
+                        colorschemes: {
+                            scheme: 'brewer.Paired12'
+                        },
+                        datalabels: {
+                            display: function(context) {
+                                return context.dataset.data[context.dataIndex] >= 1; // or !== 0 or ...
+                            },
+                            formatter: (value, ctx4) => {
+                                let sum = ctx4.dataset._meta[4].total;
+                                let percentage = (value * 100 / sum).toFixed(2) + "%";
+                                return percentage;
+                            }
+                        },
+                    },
+                }
+            });
+        }
+
+        function showChart6(canvasID) {
+            var ctx6 = $('#' + canvasID);
+            var dataFromPHP6 = <?= $json6; ?>;
+
+            var labels = []; // X Axis Label
+            var total = []; // Value and Y Axis basis
+
+            for (var i in dataFromPHP6) {
+                // console.log(dataFromPHP4[i]);
+                // labels.push(dataFromPHP4[i].operador);
+                labels.push(dataFromPHP6[i].probt6_desc);
+                total.push(dataFromPHP6[i].quantidade);
+            }
+
+            var myChart5 = new Chart(ctx6, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '<?= TRANS('total','',1); ?>',
+                        data: total,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    title: {
+                        display: true,
+                        text: '<?= $row_config['conf_prob_tipo_6'] ?>',
+                    },
+                    scales: {
+                        yAxes: [{
+                            display: false,
+                            ticks: {
+                                beginAtZero: true
+                            }
+                        }]
+                    },
+                    plugins: {
+                        colorschemes: {
+                            scheme: 'brewer.Paired12'
+                        },
+                        datalabels: {
+                            display: function(context) {
+                                return context.dataset.data[context.dataIndex] >= 1; // or !== 0 or ...
+                            },
+                            formatter: (value, ctx4) => {
+                                let sum = ctx4.dataset._meta[5].total;
+                                let percentage = (value * 100 / sum).toFixed(2) + "%";
+                                return percentage;
+                            }
+                        },
+                    },
+                }
+            });
+        }
+
+        function getLogoSrc() {
+            return $('#logo-base64').val() ?? '';
+        }
+
+        function setLogoSrc() {
+
+            let logoName = $('#report-mainlogo').css('background-image');
+
+            if (logoName == 'none') {
+                return;
+            }
+            logoName = logoName.replace(/.*\s?url\([\'\"]?/, '').replace(/[\'\"]?\).*/, '')
+            logoName = logoName.split('/').pop();
+
+            $.ajax({
+                url: './get_reports_logo.php',
+                method: 'POST',
+                data: {
+                    'logo_name': logoName
+                },
+                dataType: 'json',
+            }).done(function(data) {
+
+                if (!data.success) {
+                    return;
+                }
+                $('#logo-base64').val(data.logo);
+            });
+        }
+
+        function getLogoWidth() {
+            let logoWidth = $('#report-mainlogo').width() ?? 150;
+            return logoWidth;
+        }
     </script>
 </body>
 

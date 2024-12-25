@@ -41,13 +41,15 @@ $sess_d_ini = (isset($_SESSION['s_rep_filters']['d_ini']) ? $_SESSION['s_rep_fil
 $sess_d_fim = (isset($_SESSION['s_rep_filters']['d_fim']) ? $_SESSION['s_rep_filters']['d_fim'] : date('d/m/Y'));
 $sess_state = (isset($_SESSION['s_rep_filters']['state']) ? $_SESSION['s_rep_filters']['state'] : 1);
 
-$filter_areas = "";
-$areas_names = "";
+$areas_list = getAreas($conn, 0, 1, 1);
+
 if (isAreasIsolated($conn) && $_SESSION['s_nivel'] != 1) {
     /* Visibilidade isolada entre áreas para usuários não admin */
-    $u_areas = $_SESSION['s_uareas'];
-    $filter_areas = " AND sis_id IN ({$u_areas}) ";
+    $array_areas = explode(",", $_SESSION['s_uareas']);
+    $areas_list = getAreas($conn, 0, 1, 1, $array_areas);
 }
+
+
 
 $json = 0;
 $json2 = 0;
@@ -61,12 +63,29 @@ $json2 = 0;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" type="text/css" href="../../includes/css/estilos.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/jquery/datetimepicker/jquery.datetimepicker.css" />
+    <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
     <style>
+
+        caption {
+            /* caption-side: top; */
+            line-height: 1.8em;
+        }
+
+        caption.title {
+            caption-side: top;
+            /* font-size: large; */
+        }
+
+        span.title {
+            font-size: large;
+        }
         .chart-container {
             position: relative;
             /* height: 100%; */
@@ -77,7 +96,7 @@ $json2 = 0;
         }
     </style>
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -129,14 +148,18 @@ $json2 = 0;
                         </select>
                     </div>
 
+                    <label for="unit" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('COL_UNIT'); ?></label>
+                    <div class="form-group col-md-10">
+                        <select class="form-control bs-select" id="unit" name="unit[]" multiple="multiple">
+                        </select>
+                    </div>
+
                     <label for="area" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('RESPONSIBLE_AREA'); ?></label>
                     <div class="form-group col-md-10">
                         <select class="form-control bs-select" id="area" name="area">
-                            <option value="-1"><?= TRANS('ALL'); ?></option>
+                            <option value=""><?= TRANS('ALL'); ?></option>
                             <?php
-                            $sql = "SELECT * FROM sistemas WHERE sis_atende = 1 {$filter_areas} AND sis_status NOT IN (0) ORDER BY sistema";
-                            $resultado = $conn->query($sql);
-                            foreach ($resultado->fetchAll() as $rowArea) {
+                            foreach ($areas_list as $rowArea) {
                                 print "<option value='" . $rowArea['sis_id'] . "'";
                                 echo ($rowArea['sis_id'] == $sess_area ? ' selected' : '');
                                 print ">" . $rowArea['sistema'] . "</option>";
@@ -145,31 +168,15 @@ $json2 = 0;
                         </select>
                     </div>
 
-
-                    <label for="field_to_sum" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('FIELD_TO_APPLY_SUM'); ?></label>
+                    <label for="custom_field" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('FIELD_TO_GROUP'); ?></label>
                     <div class="form-group col-md-10">
-                        <select class="form-control bs-select" id="field_to_sum" name="field_to_sum">
+                        <select class="form-control bs-select" id="custom_field" name="custom_field">
                             <option value=""><?= TRANS('SEL_SELECT'); ?></option>
                             <?php
-                            $fieldsToSum = getCustomFields($conn, null, 'ocorrencias', ["text", "number"]);
-                            foreach ($fieldsToSum as $fieldToSum) {
+                            $fieldsToGroup = getCustomFields($conn, null, 'ocorrencias');
+                            foreach ($fieldsToGroup as $fieldToGroup) {
                                 ?>
-                                    <option value="<?= $fieldToSum['id']; ?>"><?= $fieldToSum['field_label']; ?></option>
-                                <?php
-                            }
-                            ?>
-                        </select>
-                    </div>
-
-                    <label for="field_to_group" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('FIELD_TO_GROUP'); ?></label>
-                    <div class="form-group col-md-10">
-                        <select class="form-control bs-select" id="field_to_group" name="field_to_group">
-                            <option value=""><?= TRANS('SEL_SELECT'); ?></option>
-                            <?php
-                            $fieldsToSum = getCustomFields($conn, null, 'ocorrencias');
-                            foreach ($fieldsToSum as $fieldToSum) {
-                                ?>
-                                    <option value="<?= $fieldToSum['id']; ?>"><?= $fieldToSum['field_label']; ?></option>
+                                    <option value="<?= $fieldToGroup['id']; ?>"><?= $fieldToGroup['field_label']; ?></option>
                                 <?php
                             }
                             ?>
@@ -189,6 +196,17 @@ $json2 = 0;
                         <input type="text" class="form-control " id="d_fim" name="d_fim" value="<?= $sess_d_fim; ?>" autocomplete="off" required />
                     </div>
 
+                    <label for="state" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CONTEXT'); ?></label>
+                    <div class="form-group col-md-10">
+                        <select class="form-control sel2" id="state" name="state">
+                            <option value="1" <?= ($sess_state == 1 ? ' selected': ''); ?>><?= TRANS('STATE_OPEN_CLOSE_IN_SEARCH_RANGE'); ?></option>
+                            <option value="2"<?= ($sess_state == 2 ? ' selected': ''); ?>><?= TRANS('STATE_OPEN_IN_SEARCH_RANGE'); ?></option>
+                            <option value="3"<?= ($sess_state == 3 ? ' selected': ''); ?>><?= TRANS('STATE_OPEN_IN_SEARCH_RANGE_CLOSE_ANY_TIME'); ?></option>
+                            <option value="4"<?= ($sess_state == 4 ? ' selected': ''); ?>><?= TRANS('STATE_OPEN_ANY_TIME_CLOSE_IN_SEARCH_RANGE'); ?></option>
+                            <option value="5"<?= ($sess_state == 5 ? ' selected': ''); ?>><?= TRANS('STATE_JUST_OPEN_IN_SEARCH_RANGE'); ?></option>
+                        </select>
+                    </div>
+
 
                     <div class="row w-100"></div>
                     <div class="form-group col-md-8 d-none d-md-block">
@@ -206,195 +224,26 @@ $json2 = 0;
                 </div>
             </form>
             <?php
-        } else {
-
-
-            var_dump($_POST); exit;
-
-            $terms = "";
-            $hora_inicio = ' 00:00:00';
-            $hora_fim = ' 23:59:59';
-
-            $client = (isset($_POST['client']) && !empty($_POST['client']) ? $_POST['client'] : "");
-            $_SESSION['s_rep_filters']['client'] = $client;
-            $_SESSION['s_rep_filters']['area'] = $_POST['area'];
-            $clientName = (!empty($client) ? getClients($conn, $client)['nickname']: "");
-            $clausule = (!empty($client) ? " AND o.client IN ({$client}) " : "");
-            $noneClient = TRANS('FILTERED_CLIENT') . ": " . TRANS('NONE_FILTER') . "&nbsp;&nbsp;";
-            $terms = (!empty($client) ? TRANS('FILTERED_CLIENT') . ": {$clientName}&nbsp;&nbsp;" : $noneClient );
-
-            $query = "SELECT status.status as status, count(o.status) AS quantidade, 
-                        sistemas.sistema as area 
-                        FROM status, ocorrencias o , sistemas 
-                        WHERE 
-                            status.stat_ignored <> 1 AND 
-                            status.stat_id = o.status AND status.stat_painel NOT IN (3) 
-                            AND sistemas.sis_id = o.sistema 
-                            ";
-            
-            $queryToChart = "SELECT status.status as status, count(o.status) AS quantidade 
-            FROM 
-                status, ocorrencias o , sistemas 
-            WHERE 
-                status.stat_ignored <> 1 AND 
-                status.stat_id = o.status AND status.stat_painel NOT IN (3) 
-                AND sistemas.sis_id = o.sistema 
-                ";
-
-            if (!empty($filter_areas)) {
-                /* Nesse caso o usuário só pode filtrar por áreas que faça parte */
-                if (!empty($_POST['area']) && ($_POST['area'] != -1)) {
-                    $query .= " AND o.sistema = " . $_POST['area'] . "";
-                    $queryToChart .= " AND o.sistema = " . $_POST['area'] . "";
-
-                    $getAreaName = "SELECT * from sistemas where sis_id = " . $_POST['area'] . "";
-                    $exec = $conn->query($getAreaName);
-                    $rowAreaName = $exec->fetch();
-                    $nomeArea = $rowAreaName['sistema'];
-                    $terms .= TRANS('FILTERED_AREA') . ": {$nomeArea}";
-                } else {
-                    $query .= " AND o.sistema IN ({$u_areas}) ";
-                    $queryToChart .= " AND o.sistema IN ({$u_areas}) ";
-                    $terms .= TRANS('FILTERED_AREA') . ": [" . $areas_names . "]";
-                }
-            } else
-
-            if (isset($_POST['area']) && (!empty($_POST['area'])) && ($_POST['area'] != -1) && (($_POST['area'] == $_SESSION['s_area']) || ($_SESSION['s_nivel'] == 1))) {
-                $query .= " AND o.sistema = " . $_POST['area'] . "";
-                $queryToChart .= " AND o.sistema = " . $_POST['area'] . "";
-                $getAreaName = "SELECT * from sistemas where sis_id = '" . $_POST['area'] . "'";
-                $exec = $conn->query($getAreaName);
-                $rowAreaName = $exec->fetch();
-                $nomeArea = $rowAreaName['sistema'];
-
-                $terms .= TRANS('FILTERED_AREA') . ": {$nomeArea}";
-            } else
-            if ($_SESSION['s_nivel'] != 1) {
-                $_SESSION['flash'] = message('info', '', TRANS('MSG_CONSULT_FOR_YOU_AREA'), '');
-                redirect($_SERVER['PHP_SELF']);
-            } else {
-                $nomeArea = TRANS('NONE_FILTER');
-                $terms .= TRANS('FILTERED_AREA') . ": {$nomeArea}";
-            }
-
-
-            if ((!isset($_POST['d_ini'])) || (!isset($_POST['d_fim']))) {
-                $_SESSION['flash'] = message('info', '', TRANS('MSG_ALERT_PERIOD'), '');
-                redirect($_SERVER['PHP_SELF']);
-            } else {
-
-                $d_ini = $_POST['d_ini'] . $hora_inicio;
-                $d_ini = dateDB($d_ini);
-
-                $d_fim = $_POST['d_fim'] . $hora_fim;
-                $d_fim = dateDB($d_fim);
-
-                if (isset($_POST['mesAtual'])) {
-                    $d_ini = date("Y-m-01 00:00:00");
-                    $d_fim = date("Y-m-d H:i:s");
-                }
-
-                if ($d_ini <= $d_fim) {
-
-                    $_SESSION['s_rep_filters']['d_ini'] = $_POST['d_ini'];
-                    $_SESSION['s_rep_filters']['d_fim'] = $_POST['d_fim'];
-
-                    /* Query apenas para retornar os dados para o gráfico 1 - o agrupamento é diferente para a listagem */
-                    $queryChart = $queryToChart . " AND o.oco_real_open_date >= '" . $d_ini . "' AND o.oco_real_open_date <= '" . $d_fim . "' {$clausule}
-                    GROUP BY status ORDER BY status, quantidade desc  ";
-                    $resultadoChart = $conn->query($queryChart);
-
-
-                    $query .= " AND o.oco_real_open_date >= '" . $d_ini . "' AND o.oco_real_open_date <= '" . $d_fim . "' 
-                                {$clausule}
-							        GROUP BY status, area ORDER BY status, quantidade desc  ";
-                    $resultado = $conn->query($query);
-                    $linhas = $resultado->rowCount();
-
-                    if ($linhas == 0) {
-                        $_SESSION['flash'] = message('info', '', TRANS('MSG_NO_DATA_IN_PERIOD'), '');
-                        redirect($_SERVER['PHP_SELF']);
-                    } else {
-
-                        ?>
-                        <p><?= TRANS('TTL_PERIOD_FROM') . "&nbsp;" . dateScreen($d_ini, 1) . "&nbsp;" . TRANS('DATE_TO') . "&nbsp;" . dateScreen($d_fim, 1); ?></p>
-                        <div class="table-responsive">
-                            <table class="table table-striped table-bordered">
-                                <!-- table-hover -->
-                                <caption><?= $terms; ?><span class="px-2" style="float:right" id="new_search"><?= TRANS('NEW_SEARCH'); ?></span></caption>
-                                <thead>
-                                    <tr class="header table-borderless">
-                                        <td class="line"><?= mb_strtoupper(TRANS('COL_STATUS')); ?></td>
-                                        <td class="line"><?= mb_strtoupper(TRANS('SERVICE_AREA')); ?></td>
-                                        <td class="line"><?= mb_strtoupper(TRANS('COL_AMOUNT')); ?></td>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    $data = [];
-                                    $data2 = [];
-                                    
-                                    $total = 0;
-                                    foreach ($resultado->fetchall() as $row) {
-                                        // $data[] = $row;
-                                        ?>
-                                        <tr>
-                                            <td class="line"><?= $row['status']; ?></td>
-                                            <td class="line"><?= $row['area']; ?></td>
-                                            <td class="line"><?= $row['quantidade']; ?></td>
-                                        </tr>
-                                        <?php
-                                        $total += $row['quantidade'];
-                                    }
-
-                                    foreach ($resultadoChart->fetchall() as $rowDataChart) {
-                                        $data[] = $rowDataChart;
-                                    }
-                                    // foreach ($resultadoChart2->fetchall() as $rowDataChart2) {
-                                    //     $data2[] = $rowDataChart2;
-                                    // }
-                                    
-                                    $json = json_encode($data);
-                                    // $json2 = json_encode($data2);
-                                    ?>
-                                </tbody>
-                                <tfoot>
-                                    <tr class="header table-borderless">
-                                        <td colspan="2"><?= TRANS('TOTAL'); ?></td>
-                                        <td><?= $total; ?></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                        <div class="chart-container">
-                            <canvas id="canvasChart1"></canvas>
-                        </div>
-                        <!-- <div class="chart-container">
-                            <canvas id="canvasChart2"></canvas>
-                        </div> -->
-                        <?php
-                        // var_dump([
-                        //     'Query' => $query,
-                        //     'Data' => $data,
-                        //     'Json normal' => $json,
-                        // ]);
-                    }
-                } else {
-                    $_SESSION['flash'] = message('info', '', TRANS('MSG_COMPARE_DATE'), '');
-                    redirect($_SERVER['PHP_SELF']);
-                }
-            }
         }
+
         ?>
+        <div id="divResult"></div>
+        <div id="table" class="table-responsive"></div>
+        <div class="chart-container" id="container01">
     </div>
     <script src="../../includes/javascript/funcoes-3.0.js"></script>
     <script src="../../includes/components/jquery/jquery.js"></script>
+    <script src="../../includes/components/jquery/jquery.initialize.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables.js"></script>
     <script src="../../includes/components/jquery/datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
     <script src="../../includes/components/bootstrap/js/bootstrap.bundle.js"></script>
     <script type="text/javascript" src="../../includes/components/chartjs/dist/Chart.min.js"></script>
     <script type="text/javascript" src="../../includes/components/chartjs/chartjs-plugin-colorschemes/dist/chartjs-plugin-colorschemes.js"></script>
     <script type="text/javascript" src="../../includes/components/chartjs/chartjs-plugin-datalabels/chartjs-plugin-datalabels.min.js"></script>
+    
     <script src="../../includes/components/bootstrap-select/dist/js/bootstrap-select.min.js"></script>
+    <script src="./js/default_chart_generate.js"></script>
+
 
     <script type='text/javascript'>
         $(function() {
@@ -439,90 +288,200 @@ $json2 = 0;
                 timepicker: false
             });
 
+            loadUnits();
+            $("#client").on('change', function() {
+				loadUnits();
+			});
+
+            function loadUnits(targetId = 'unit') {
+
+                var loading = $(".loading");
+                $(document).ajaxStart(function() {
+                    loading.show();
+                });
+                $(document).ajaxStop(function() {
+                    loading.hide();
+                });
+
+                $.ajax({
+                    url: './get_units_by_client.php',
+                    method: 'POST',
+                    dataType: 'json',
+                    data: {
+                        client: $("#client").val()
+                    },
+                }).done(function(data) {
+                    $('#' + targetId).empty();
+                    // if (Object.keys(data).length > 1) {
+                    //     $('#' + targetId).append('<option value=""><?= TRANS("SEL_SELECT"); ?></option>');
+                    // }
+                    $.each(data, function(key, data) {
+                        $('#' + targetId).append('<option value="' + data.inst_cod + '">' + data.inst_nome + '</option>');
+                    });
+
+                    $('#' + targetId).selectpicker('refresh');
+                    if ($('#parent_id').val() != '') {
+                        $('#' + targetId).selectpicker('val', $('#parent_unit').val());
+                        $('#' + targetId).selectpicker('refresh');
+                    }
+                });
+            }
+
+
+
 
             $('#idSubmit').on('click', function() {
-                $('.loading').show();
-            });
+                var loading = $(".loading");
+                $(document).ajaxStart(function() {
+                    loading.show();
+                });
+                $(document).ajaxStop(function() {
+                    loading.hide();
+                });
+
+                $.ajax({
+					url: './report_custom_fields_process.php',
+					method: 'POST',
+					data: $('#form').serialize(),
+					dataType: 'json',
+				}).done(function(data) {
+
+					if (!data.success) {
+						$('#divResult').html(data.message);
+						$('input, select, textarea').removeClass('is-invalid');
+						if (data.field_id != "") {
+							$('#' + data.field_id).focus().addClass('is-invalid');
+						}
+                        $('#table').html('');
+                        $('#container01').empty();
+						$("#idSubmit").prop("disabled", false);
+					} else {
+                        /* Aqui ocorrerá as chamadadas para a montagem da tabela e também para os gráficos */
+
+                        let table = '<table id="table_custom_fields" class="table table-striped table-bordered" cellspacing="0" width="100%">';
+                        table += '<caption class="title"><span class="title">' + data['table'].title + '</span><br />' + data.criteria + '</caption>';
+
+                        table += '<thead>';
+                            table += '<tr class="header table-borderless">';
+                                table += '';
+                                table += '<td class="line"><?= mb_strtoupper(TRANS('LABEL')); ?></td>';
+                                table += '<td class="line"><?= mb_strtoupper(TRANS('COL_VALUE')); ?></td>';
+                                table += '<td class="line"><?= mb_strtoupper(TRANS('COL_AMOUNT')); ?></td>';
+                                table += '<td class="line"><?= mb_strtoupper(TRANS('PERCENTAGE')); ?></td>';
+                            table += '</tr>';
+
+                        table += '</thead>';
+                        table += '</tbody>';
+                        let totalRecords = 0;
+                        for (var i in data['table']) {
+
+                            if (data['table'][i].field_label !== undefined) {
+                                table += '<tr>';
+                                table += '<td class="line">' + data['table'][i].field_label + '</td>';
+                                table += '<td class="line">' + data['table'][i].field_value + '</td>';
+                                    table += '<td class="line">' + data['table'][i].total + '</td>';
+                                    
+                                    totalRecords += parseInt(data['table'][i].total);
+
+                                    let percent = parseFloat(data['table'][i].total * 100) / parseFloat(data['totalRecords'])
+                                    
+
+                                    table += '<td class="line">' + percent.toFixed(2) + '%</td>';
+                                table += '</tr>';
+                            }
+                        }
+                        table += '</tbody>';
+                        table += '<tfoot>';
+                            table += '<tr class="header table-borderless">';
+                                table += '<td colspan="2"><?= TRANS('TOTAL'); ?></td>';
+                                table += '<td>' + totalRecords + '</td>';
+                                table += '<td></td>';
+                            table += '</tr>';
+                        table += '</tfoot>';
+                        table += '</table>';
+
+                        $('#table').html(table);
+
+
+                        if (data.generate_chart == 1) {
+                        
+                            /* Aqui ocorrerá a montagem dos gráficos */
+                            let canvas01 = '<canvas id="graph_01" class="mb-5"></canvas>'
+                            // let canvas02 = '<canvas id="graph_02" class="mb-5"></canvas>'
+                            $('#container01').empty().append(canvas01);
+                            // $('#container01').append(canvas02);
+                            
+                            let instances = Object.keys(window.Chart.instances).length;
+
+                            const chart_01 = general_chart(data, 'chart_01', 'field_value', 'total', 'graph_01');
+                            // const chart_02 = report_assets_general(data, 'chart_02', 'categorie', 'graph_02');
+                            
+                            addPercentageLabels(chart_01, (1 + instances));
+                            // addPercentageLabels(chart_02, (2 + instances));
+                            /* Final na montagem dos gráficos */
+                        }
+
+						$('#divResult').html('');
+						$('input, select, textarea').removeClass('is-invalid');
+						$("#idSubmit").prop("disabled", false);
+						return false;
+					}
+				});
+				return false;
+			});
+
+
+        /* Utilizo essa função para conseguir utilizar o datalabels dinamicamente em função das várias instancias do chart */
+        function addPercentageLabels(chart, metaIndex) {
+            chart.options.plugins.datalabels = {
+                display: function(context) {
+                    return context.dataset.data[context.dataIndex] >= 1; // or !== 0 or ...
+                },
+                formatter: (value, ctx) => {
+                    let sum = ctx.dataset._meta[metaIndex-1].total;
+                    let percentage = (value * 100 / sum).toFixed(2) + "%";
+                    return percentage;
+                },
+            };
+            chart.update();
+        }
+
 
             if (<?= $json ?> != 0) {
                 showChart('canvasChart1');
             }
 
+
+            /* Adicionei o mutation observer em função dos elementos que são adicionados após o carregamento do DOM */
+            var obs = $.initialize("#table_custom_fields", function() {
+                
+                $(function() {
+                    $('[data-toggle="popover"]').popover()
+                });
+
+                $('.popover-dismiss').popover({
+                    trigger: 'focus'
+                });
+                
+                var criterios = $('#divCriterios').text();
+
+                var table = $('#table_custom_fields').DataTable({
+                    language: {
+                        url: "../../includes/components/datatables/datatables.pt-br.json",
+                    },
+                    paging: true,
+                    deferRender: true,
+                    "pageLength": 50,
+                });
+
+            }, {
+                target: document.getElementById('table')
+            }); /* o target limita o scopo do mutate observer */
+
+
+
         });
 
-
-        function showChart(canvasID) {
-            var ctx = $('#' + canvasID);
-            var dataFromPHP = <?= $json; ?>
-
-            var labels = []; // X Axis Label
-            var total = []; // Value and Y Axis basis
-
-            for (var i in dataFromPHP) {
-                // console.log(dataFromPHP[i]);
-                // labels.push(dataFromPHP[i].operador);
-                labels.push(dataFromPHP[i].status);
-                total.push(dataFromPHP[i].quantidade);
-            }
-
-            var myChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: '<?= TRANS('total','',1); ?>',
-                        data: total,
-                        // backgroundColor: [
-                        //     'rgba(255, 99, 132, 0.2)',
-                        //     'rgba(54, 162, 235, 0.2)',
-                        //     'rgba(255, 206, 86, 0.2)',
-                        //     'rgba(75, 192, 192, 0.2)',
-                        //     'rgba(153, 102, 255, 0.2)',
-                        //     'rgba(255, 159, 64, 0.2)'
-                        // ],
-                        // borderColor: [
-                        //     'rgba(255, 99, 132, 1)',
-                        //     'rgba(54, 162, 235, 1)',
-                        //     'rgba(255, 206, 86, 1)',
-                        //     'rgba(75, 192, 192, 1)',
-                        //     'rgba(153, 102, 255, 1)',
-                        //     'rgba(255, 159, 64, 1)'
-                        // ],
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    title: {
-                        display: true,
-                        text: '<?= TRANS('TICKETS_BY_STATUS','',1); ?>',
-                    },
-                    scales: {
-                        yAxes: [{
-                            display: false,
-                            ticks: {
-                                beginAtZero: true
-                            }
-                        }]
-                    },
-                    plugins: {
-                        colorschemes: {
-                            scheme: 'brewer.Paired12'
-                        },
-                        datalabels: {
-                            display: function(context) {
-                                return context.dataset.data[context.dataIndex] >= 1; // or !== 0 or ...
-                            },
-                            formatter: (value, ctx) => {
-                                let sum = ctx.dataset._meta[0].total;
-                                let percentage = (value * 100 / sum).toFixed(2) + "%";
-                                return percentage;
-                            }
-                        },
-                    },
-                }
-            });
-        }
 
     </script>
 </body>

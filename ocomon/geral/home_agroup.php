@@ -117,6 +117,17 @@ $options = [
         'field_reference' => 'aberto_por',
         'sql_alias' => 'o.aberto_por',
         'alias' => 'ua'
+    ],
+    'authorization_status' => [
+        'label' => TRANS('AUTHORIZATION_STATUS'),
+        'table' => 'authorization_status',
+        'field_id' => 'id',
+        'field_name' => 'name_key',
+        'table_reference' => 'ocorrencias',
+        'table_reference_alias' => 'o',
+        'field_reference' => 'authorization_status',
+        'sql_alias' => 'o.authorization_status',
+        'alias' => 'aus'
     ]
 ];
 
@@ -166,6 +177,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
             LEFT JOIN problemas prob ON prob.prob_id = o.problema
             LEFT JOIN localizacao loc ON loc.loc_id = o.local
             LEFT JOIN instituicao un ON un.inst_cod = o.instituicao 
+            LEFT JOIN authorization_status aus ON aus.id = o.authorization_status
 
         WHERE
             o.sistema = ar.sis_id AND 
@@ -198,11 +210,19 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
     ?>
         <!-- Links no primeiro nivel -->
         <a href="#<?= $post['group_1']; ?>-<?= $row_level_1[$options[$post['group_1']]['field_id']] ?>" class="list-group-item" data-toggle="collapse">
-            
             <div class="card-header bg-light" >
                 <span class="glyphicon icon-expand"></span>&nbsp;
                 <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_1']]['label']; ?>" data-placement="top" data-trigger="hover">
-                    <?= $row_level_1[$options[$post['group_1']]['label']]; ?>
+
+                    <?php
+                        /* Se o filtro for por status de autorização, 
+                        o campo nome é apenas uma chave para a nomenclatura do status */
+                        if ($options[$post['group_1']]['table'] == 'authorization_status') {
+                            echo TRANS($row_level_1[$options[$post['group_1']]['label']]);
+                        } else {
+                            echo $row_level_1[$options[$post['group_1']]['label']];
+                        }
+                    ?>
                 </span>
                 <span class="badge badge-primary p-2 "><?= $row_level_1['total']; ?></span>
             </div>
@@ -236,6 +256,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                     LEFT JOIN problemas prob ON prob.prob_id = o.problema
                     LEFT JOIN localizacao loc ON loc.loc_id = o.local
                     LEFT JOIN instituicao un ON un.inst_cod = o.instituicao 
+                    LEFT JOIN authorization_status aus ON aus.id = o.authorization_status
 
                 WHERE
                     {$options[$post['group_1']]['sql_alias']} {$group_1_id_or_null} AND 
@@ -281,16 +302,31 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                 ?>
                     <!-- Links no segundo nível -->
                     <a href="#<?= $post['group_1']; ?>-<?= $row_level_1[$options[$post['group_1']]['field_id']] ?>--<?= $post['group_2']; ?>-<?= $row_level_2[$options[$post['group_2']]['field_id']]; ?>" class="list-group-item" data-toggle="collapse">
-
                         <div class="card-header bg-light" >
                             <span class="glyphicon icon-expand"></span>&nbsp;
                             <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_1']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                <?= $row_level_1[$options[$post['group_1']]['label']]; ?>
+                                <?php
+                                    /* Se o filtro for por status de autorização, 
+                                    o campo nome é apenas uma chave para a nomenclatura do status */
+                                    if ($options[$post['group_1']]['table'] == 'authorization_status') {
+                                        echo TRANS($row_level_1[$options[$post['group_1']]['label']]);
+                                    } else {
+                                        echo $row_level_1[$options[$post['group_1']]['label']];
+                                    }
+                                ?>
                             </span>
                             <!-- <span class="badge badge-secondary p-2 "><?= $row_level_1['total']; ?></span> -->
                             &nbsp;<i class="fas fa-angle-right"></i>&nbsp;
                             <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_2']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                <?= $row_level_2[$options[$post['group_2']]['label']]; ?>
+                                <?php
+                                    /* Se o filtro for por status de autorização, 
+                                    o campo nome é apenas uma chave para a nomenclatura do status */
+                                    if ($options[$post['group_2']]['table'] == 'authorization_status') {
+                                        echo TRANS($row_level_2[$options[$post['group_2']]['label']]);
+                                    } else {
+                                        echo $row_level_2[$options[$post['group_2']]['label']];
+                                    }
+                                ?>
                             </span>
                             <span class="badge badge-primary p-2 "><?= $row_level_2['total']; ?></span>
                         </div>
@@ -325,6 +361,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                             LEFT JOIN problemas prob ON prob.prob_id = o.problema
                             LEFT JOIN localizacao loc ON loc.loc_id = o.local
                             LEFT JOIN instituicao un ON un.inst_cod = o.instituicao 
+                            LEFT JOIN authorization_status aus ON aus.id = o.authorization_status
 
                         WHERE
                             {$options[$post['group_1']]['sql_alias']} {$group_1_id_or_null} AND 
@@ -369,15 +406,42 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                                 <div class="card-header bg-light" >
                                     <span class="glyphicon icon-expand"></span>&nbsp;
                                     <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_1']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                        <?= $row_level_1[$options[$post['group_1']]['label']]; ?>
+                                        <!-- <?= $row_level_1[$options[$post['group_1']]['label']]; ?> -->
+                                        <?php
+                                            /* Se o filtro for por status de autorização, 
+                                            o campo nome é apenas uma chave para a nomenclatura do status */
+                                            if ($options[$post['group_1']]['table'] == 'authorization_status') {
+                                                echo TRANS($row_level_1[$options[$post['group_1']]['label']]);
+                                            } else {
+                                                echo $row_level_1[$options[$post['group_1']]['label']];
+                                            }
+                                        ?>
                                     </span>
                                     &nbsp;<i class="fas fa-angle-right"></i>&nbsp;
                                     <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_2']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                        <?= $row_level_2[$options[$post['group_2']]['label']]; ?>
+                                        <!-- <?= $row_level_2[$options[$post['group_2']]['label']]; ?> -->
+                                        <?php
+                                            /* Se o filtro for por status de autorização, 
+                                            o campo nome é apenas uma chave para a nomenclatura do status */
+                                            if ($options[$post['group_2']]['table'] == 'authorization_status') {
+                                                echo TRANS($row_level_2[$options[$post['group_2']]['label']]);
+                                            } else {
+                                                echo $row_level_2[$options[$post['group_2']]['label']];
+                                            }
+                                        ?>
                                     </span>
                                     &nbsp;<i class="fas fa-angle-right"></i>&nbsp;
                                     <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_3']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                        <?= $row_level_3[$options[$post['group_3']]['label']]; ?>
+                                        <!-- <?= $row_level_3[$options[$post['group_3']]['label']]; ?> -->
+                                        <?php
+                                            /* Se o filtro for por status de autorização, 
+                                            o campo nome é apenas uma chave para a nomenclatura do status */
+                                            if ($options[$post['group_3']]['table'] == 'authorization_status') {
+                                                echo TRANS($row_level_3[$options[$post['group_3']]['label']]);
+                                            } else {
+                                                echo $row_level_3[$options[$post['group_3']]['label']];
+                                            }
+                                        ?>
                                     </span>
                                     <span class="badge badge-primary p-2 "><?= $row_level_3['total']; ?></span>
                                 </div>
@@ -417,6 +481,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                                         LEFT JOIN problemas prob ON prob.prob_id = o.problema
                                         LEFT JOIN localizacao loc ON loc.loc_id = o.local
                                         LEFT JOIN instituicao un ON un.inst_cod = o.instituicao 
+                                        LEFT JOIN authorization_status aus ON aus.id = o.authorization_status
             
                                     WHERE
                                         {$options[$post['group_1']]['sql_alias']} {$group_1_id_or_null} AND 
@@ -463,19 +528,55 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                                             <div class="card-header bg-light" >
                                                 <span class="glyphicon icon-expand"></span>&nbsp;
                                                 <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_1']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                                    <?= $row_level_1[$options[$post['group_1']]['label']]; ?>
+                                                    <!-- <?= $row_level_1[$options[$post['group_1']]['label']]; ?> -->
+                                                    <?php
+                                                        /* Se o filtro for por status de autorização, 
+                                                        o campo nome é apenas uma chave para a nomenclatura do status */
+                                                        if ($options[$post['group_1']]['table'] == 'authorization_status') {
+                                                            echo TRANS($row_level_1[$options[$post['group_1']]['label']]);
+                                                        } else {
+                                                            echo $row_level_1[$options[$post['group_1']]['label']];
+                                                        }
+                                                    ?>
                                                 </span>
                                                 &nbsp;<i class="fas fa-angle-right"></i>&nbsp;
                                                 <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_2']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                                    <?= $row_level_2[$options[$post['group_2']]['label']]; ?>
+                                                    <!-- <?= $row_level_2[$options[$post['group_2']]['label']]; ?> -->
+                                                    <?php
+                                                        /* Se o filtro for por status de autorização, 
+                                                        o campo nome é apenas uma chave para a nomenclatura do status */
+                                                        if ($options[$post['group_2']]['table'] == 'authorization_status') {
+                                                            echo TRANS($row_level_2[$options[$post['group_2']]['label']]);
+                                                        } else {
+                                                            echo $row_level_2[$options[$post['group_2']]['label']];
+                                                        }
+                                                    ?>
                                                 </span>
                                                 &nbsp;<i class="fas fa-angle-right"></i>&nbsp;
                                                 <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_3']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                                    <?= $row_level_3[$options[$post['group_3']]['label']]; ?>
+                                                    <!-- <?= $row_level_3[$options[$post['group_3']]['label']]; ?> -->
+                                                    <?php
+                                                        /* Se o filtro for por status de autorização, 
+                                                        o campo nome é apenas uma chave para a nomenclatura do status */
+                                                        if ($options[$post['group_3']]['table'] == 'authorization_status') {
+                                                            echo TRANS($row_level_3[$options[$post['group_3']]['label']]);
+                                                        } else {
+                                                            echo $row_level_3[$options[$post['group_3']]['label']];
+                                                        }
+                                                    ?>
                                                 </span>
                                                 &nbsp;<i class="fas fa-angle-right"></i>&nbsp;
                                                 <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_4']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                                    <?= $row_level_4[$options[$post['group_4']]['label']]; ?>
+                                                    <!-- <?= $row_level_4[$options[$post['group_4']]['label']]; ?> -->
+                                                    <?php
+                                                        /* Se o filtro for por status de autorização, 
+                                                        o campo nome é apenas uma chave para a nomenclatura do status */
+                                                        if ($options[$post['group_4']]['table'] == 'authorization_status') {
+                                                            echo TRANS($row_level_4[$options[$post['group_4']]['label']]);
+                                                        } else {
+                                                            echo $row_level_4[$options[$post['group_4']]['label']];
+                                                        }
+                                                    ?>
                                                 </span>
 
                                                 <span class="badge badge-primary p-2 "><?= $row_level_4['total']; ?></span>
@@ -521,6 +622,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                                                     LEFT JOIN problemas prob ON prob.prob_id = o.problema
                                                     LEFT JOIN localizacao loc ON loc.loc_id = o.local
                                                     LEFT JOIN instituicao un ON un.inst_cod = o.instituicao 
+                                                    LEFT JOIN authorization_status aus ON aus.id = o.authorization_status
                         
                                                 WHERE
                                                     {$options[$post['group_1']]['sql_alias']} {$group_1_id_or_null} AND 
@@ -577,23 +679,68 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                                                         <div class="card-header bg-light" >
                                                             <span class="glyphicon icon-expand"></span>&nbsp;
                                                             <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_1']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                                                <?= $row_level_1[$options[$post['group_1']]['label']]; ?>
+                                                                <!-- <?= $row_level_1[$options[$post['group_1']]['label']]; ?> -->
+                                                                <?php
+                                                                    /* Se o filtro for por status de autorização, 
+                                                                    o campo nome é apenas uma chave para a nomenclatura do status */
+                                                                    if ($options[$post['group_1']]['table'] == 'authorization_status') {
+                                                                        echo TRANS($row_level_1[$options[$post['group_1']]['label']]);
+                                                                    } else {
+                                                                        echo $row_level_1[$options[$post['group_1']]['label']];
+                                                                    }
+                                                                ?>
                                                             </span>
                                                             &nbsp;<i class="fas fa-angle-right"></i>&nbsp;
                                                             <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_2']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                                                <?= $row_level_2[$options[$post['group_2']]['label']]; ?>
+                                                                <!-- <?= $row_level_2[$options[$post['group_2']]['label']]; ?> -->
+                                                                <?php
+                                                                    /* Se o filtro for por status de autorização, 
+                                                                    o campo nome é apenas uma chave para a nomenclatura do status */
+                                                                    if ($options[$post['group_2']]['table'] == 'authorization_status') {
+                                                                        echo TRANS($row_level_2[$options[$post['group_2']]['label']]);
+                                                                    } else {
+                                                                        echo $row_level_2[$options[$post['group_2']]['label']];
+                                                                    }
+                                                                ?>
                                                             </span>
                                                             &nbsp;<i class="fas fa-angle-right"></i>&nbsp;
                                                             <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_3']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                                                <?= $row_level_3[$options[$post['group_3']]['label']]; ?>
+                                                                <!-- <?= $row_level_3[$options[$post['group_3']]['label']]; ?> -->
+                                                                <?php
+                                                                    /* Se o filtro for por status de autorização, 
+                                                                    o campo nome é apenas uma chave para a nomenclatura do status */
+                                                                    if ($options[$post['group_3']]['table'] == 'authorization_status') {
+                                                                        echo TRANS($row_level_3[$options[$post['group_3']]['label']]);
+                                                                    } else {
+                                                                        echo $row_level_3[$options[$post['group_3']]['label']];
+                                                                    }
+                                                                ?>
                                                             </span>
                                                             &nbsp;<i class="fas fa-angle-right"></i>&nbsp;
                                                             <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_4']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                                                <?= $row_level_4[$options[$post['group_4']]['label']]; ?>
+                                                                <!-- <?= $row_level_4[$options[$post['group_4']]['label']]; ?> -->
+                                                                <?php
+                                                                    /* Se o filtro for por status de autorização, 
+                                                                    o campo nome é apenas uma chave para a nomenclatura do status */
+                                                                    if ($options[$post['group_4']]['table'] == 'authorization_status') {
+                                                                        echo TRANS($row_level_4[$options[$post['group_4']]['label']]);
+                                                                    } else {
+                                                                        echo $row_level_4[$options[$post['group_4']]['label']];
+                                                                    }
+                                                    ?>
                                                             </span>
                                                             &nbsp;<i class="fas fa-angle-right"></i>&nbsp;
                                                             <span class="badge badge-light p-2" data-toggle="popover" data-content="<?= $options[$post['group_5']]['label']; ?>" data-placement="top" data-trigger="hover">
-                                                                <?= $row_level_5[$options[$post['group_5']]['label']]; ?>
+                                                                <!-- <?= $row_level_5[$options[$post['group_5']]['label']]; ?> -->
+                                                                <?php
+                                                                    /* Se o filtro for por status de autorização, 
+                                                                    o campo nome é apenas uma chave para a nomenclatura do status */
+                                                                    if ($options[$post['group_5']]['table'] == 'authorization_status') {
+                                                                        echo TRANS($row_level_5[$options[$post['group_5']]['label']]);
+                                                                    } else {
+                                                                        echo $row_level_5[$options[$post['group_5']]['label']];
+                                                                    }
+                                                                ?>
                                                             </span>
 
 

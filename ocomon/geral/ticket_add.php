@@ -34,27 +34,113 @@ use includes\classes\ConnectPDO;
 $conn = ConnectPDO::getInstance();
 $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 3, 1);
 
+$currentUrl = $_SERVER['PHP_SELF'];
+/* Alterar o basename para ficar compatível com o data-app para marcação no menu lateral */
+$dataAppUrl = str_replace(basename($currentUrl), 'ticket_add.php', $currentUrl);
+$_SESSION['s_page_ocomon'] = $dataAppUrl;
+
+
 $nextDay = new DateTime('+1 day');
 $sysConfig = getConfig($conn);
 $mailConfig = getMailConfig($conn);
 
 $isDynamicMode = ($_SESSION['s_opening_mode'] == 2);
 $issue_type = (isset($_GET['issue_type']) ? (int)($_GET['issue_type']) : "");
-$issue_name = (!empty($issue_type) ? getIssueById($conn, $issue_type)['problema'] : "");
+$requester = (isset($_GET['requester']) ? (int)($_GET['requester']) : $_SESSION['s_uid']);
+
+$issueInfo = (!empty($issue_type) ? getIssueById($conn, $issue_type) : "");
+$issue_name = (!empty($issueInfo) ? $issueInfo['problema'] : "");
 
 $params = "";
 
 
+/* Informações sobre a área que está registrando o chamado
+ - área do usuário logado (não importa se o chamado está sendo aberto para um terceiro) */
+$areaInfo = getAreaInfo($conn, $_SESSION['s_area']);
+
+$pre_filters_string = "";
+$pre_fiters_array = [];
+/* Checa se há configuração de pré-filtros na área que está registrando
+ e caso não exista, consulta também na configuração global */
+if (!empty($areaInfo['use_own_config_cat_chain'] && $areaInfo['use_own_config_cat_chain'])) {
+	$pre_filters_string = (!empty($areaInfo['sis_cat_chain_at_opening']) ? $areaInfo['sis_cat_chain_at_opening'] : "");
+} elseif (!empty($sysConfig['conf_cat_chain_at_opening'])) {
+	$pre_filters_string = $sysConfig['conf_cat_chain_at_opening'];
+}
+
+$pre_filters_array = explode(',', $pre_filters_string);
+
+$categories_names = "";
+$categoriesTablesPrefix = "prob_tipo_";
+$categories_array = [];
+
+
+if (!empty($issue_name) && !empty($pre_filters_array)) {
+	/* Montando a nomenclatura das categorias de pré-filtros */
+	foreach ($pre_filters_array as $key => $filterSufix) {
+		if (!empty($filterSufix)) 
+			$categories_array[] = getIssueCategoryNameBySufixAndId($conn, $filterSufix, $issueInfo[$categoriesTablesPrefix . $filterSufix]);
+	}
+	$categories_names = implode(' > ', array_filter($categories_array));
+	$issue_name = (!empty($categories_names) ? $categories_names . " > " . $issue_name : $issue_name);
+}
+
+
+$onlyOpen = $_SESSION['s_nivel'] == 3;
+/* Desenvolver configuração vinculada à área do operador logado, para defirnir se seus operadores podem
+abrir chamados em nome de outros usuários */
+$canOpenToOthers = true;
+// $canOpenToOthers = ($onlyOpen ? false : $canOpenToOthers);
+
+if ($requester != $_SESSION['s_uid'] && $onlyOpen) {
+	$author_department = getUserDepartment($conn, $_SESSION['s_uid']);
+	$requester_department = getUserDepartment($conn, $requester);
+
+	if (empty($author_department) || $author_department != $requester_department) {
+		$canOpenToOthers = false;
+		$requester = $_SESSION['s_uid'];
+	}
+}
+
+
+if (isset($_GET) && !empty($_GET)) {
+	$_GET = filter_input_array(INPUT_GET, FILTER_DEFAULT);
+	$params = "&" . http_build_query($_GET, "", "&");
+}
+
+// if ($onlyOpen || !$canOpenToOthers) {
+// 	$requester = $_SESSION['s_uid'];
+// }
+
 if ($isDynamicMode && empty($issue_type)) {
 	/* Mode de abertura clássico - padrão */
-	
-	if (isset($_GET) && !empty($_GET)) {
-		$params = "&" . http_build_query($_GET, "", "&");
-	}
-	
 	header("Location: ./choose_ticket_type.php?" . $params);
 	return;
 }
+	
+if (empty($requester)) {
+	header("Location: ./choose_requester.php?" . $params);
+	return;
+	}
+	
+
+/* Se o solicitante for de nível somente abertura ou não for o próprio operador, então tem que receber o email */
+$sendMailToRequester = false;
+$sendMailToRequester = ($requester != $_SESSION['s_uid'] || $onlyOpen);
+
+
+
+$requester_info = getUserInfo($conn, $requester);
+if (empty($requester_info)) {
+	header("Location: ./choose_requester.php?" . $params);
+	return;
+}
+unset($requester_info['password']);
+unset($requester_info['hash']);
+
+$unitFromRequester = getUnitFromUserDepartmentOrUserClient($conn, $requester);
+$unitFromRequester = (empty($unitFromRequester) ? "-1" : $unitFromRequester);
+
 
 $areaToOpen = [];
 $possibleAreasToOpen = [];
@@ -90,6 +176,10 @@ $onlyOpen = $_SESSION['s_nivel'] == 3;
 $userInfo = getUserInfo($conn, $_SESSION['s_uid']);
 
 
+
+
+
+
 if (!isset($_POST['submit']) || empty($_POST)) {
 ?>
 	<!DOCTYPE html>
@@ -104,14 +194,20 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 		<link rel="stylesheet" type="text/css" href="../../includes/components/jquery/datetimepicker/jquery.datetimepicker.css" />
 		<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
 		<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
-		<link rel="stylesheet" type="text/css" href="../../includes/components/summernote/summernote-bs4.css" />
+		<link rel="stylesheet" type="text/css" href="../../includes/components/suneditor/node_modules/suneditor/dist/css/suneditor.min.css" />
+		<link rel="stylesheet" type="text/css" href="../../includes/components/suneditor/node_modules/suneditor/src/assets/css/suneditor-contents.css" />
 		<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
 		<link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+		<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
 		<style>
 			#iframeLoad {
 				border: 1px solid lightgray !important;
 				overflow: scroll !important;
+			}
+			
+			.se-tooltip {
+				color: #3a4d56 !important;
 			}
 		</style>
 	</head>
@@ -191,18 +287,40 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					<?php
 					}
 
+					if ($canOpenToOthers) {
+						?>
+						<label for="requester" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('REQUESTER'); ?></label>
+						<div class="form-group col-md-10">
+							<select class="form-control" id="requester" name="requester">
+								<?php
+									$subtextArray[] = $requester_info['login'];
+									$subtextArray[] = $requester_info['email'];
+									$subtext = implode(' | ', array_filter($subtextArray));
+								?>
+									<option data-subtext="<?= $subtext; ?>" value="<?= $requester_info['user_id']; ?>"><?= $requester_info['nome']; ?></option>
+
+							</select>
+						</div>
+						<div class="w-100"></div>
+						<?php
+					}
+
+
+
+
 
 					/* CLIENTE */
-					$selectedClient = (!empty($father) ? $ticket['client'] : $userInfo['user_client']);
+					$selectedClient = (!empty($father) ? $ticket['client'] : $requester_info['user_client']);
 					if ((isset($screen['conf_scr_client']) && $screen['conf_scr_client']) || empty($screen)) {
 					?>
+						<input type="hidden" name="rendered_client" id="rendered_client" value="1">
 						<label for="client" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right "><?= TRANS('CLIENT'); ?></label>
 						<div class="form-group col-md-4">
 							<select class="form-control bts-select" id="client" name="client">
 								<?php
 								if ($onlyOpen) {
 								?>
-									<option value="<?= $userInfo['user_client']; ?>" selected><?= $userInfo['nickname']; ?></option>
+									<option value="<?= $requester_info['user_client']; ?>" selected><?= $requester_info['nickname']; ?></option>
 								<?php
 								} else {
 									$clients = getClients($conn);
@@ -224,10 +342,10 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					<?php
 					} else {
 						/* Valores padrão */
-						// $client = $userInfo['user_client'];
+						// $client = $requester_info['user_client'];
 						$client = $selectedClient;
 					?>
-						<input type="hidden" name="client" value="<?= $client; ?>">
+						<input type="hidden" name="client" id="client" value="<?= $client; ?>">
 					<?php
 					}
 
@@ -361,6 +479,9 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					/* Unidade */
 					if ((isset($screen['conf_scr_unit']) && $screen['conf_scr_unit']) || empty($screen)) {
 					?>
+						<input type="hidden" name="rendered_unit" id="rendered_unit" value="1">
+						<input type="hidden" name="unit_from_requester" id="unit_from_requester" value="<?= $unitFromRequester; ?>">
+
 						<label for="idUnidade" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('COL_UNIT'); ?></label>
 						<div class="form-group col-md-4">
 							<select class="form-control bts-select" id="idUnidade" name="instituicao">
@@ -372,7 +493,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					} else {
 						/* Valores padrão */
 					?>
-						<input type="hidden" name="instituicao" value="-1">
+						<input type="hidden" name="instituicao" id="idUnidade" value="<?= $unitFromRequester; ?>">
 					<?php
 					}
 
@@ -381,7 +502,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					/* Etiqueta do equipamento */
 					if ((isset($screen['conf_scr_tag']) && $screen['conf_scr_tag']) || empty($screen)) {
 					?>
-						<label for="idEtiqueta" class="col-md-2 col-form-label col-form-label-sm text-md-right text-nowrap"><?= TRANS('ASSET_TAG'); ?></label>
+						<label for="idEtiqueta" class="col-md-2 col-form-label col-form-label-sm text-md-right text-nowrap"><?= TRANS('ASSET_TAG_TAG'); ?></label>
 
 						<div class="form-group col-md-4">
 							<div class="input-group">
@@ -418,31 +539,30 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					<?php
 					}
 
-
+					$contact_name = $requester_info['nome'];
 					/* Contato */
 					if ((isset($screen['conf_scr_contact']) && $screen['conf_scr_contact']) || empty($screen)) {
-						$contact_name = "";
-						if ($_SESSION['s_nivel'] == 3) {
-							$contact_name = $_SESSION['s_usuario_nome'];
-						}
+						$contact_name = $requester_info['nome'];
 					?>
 						<label for="contato" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CONTACT'); ?></label>
 						<div class="form-group col-md-4">
-							<input type="text" class="form-control " id="contato" name="contato" list="contatos" value="<?= (count($ticket) ? $ticket['contato'] : $contact_name); ?>" autocomplete="off" placeholder="<?= TRANS('CONTACT_PLACEHOLDER'); ?>" />
+							<input type="text" class="form-control " id="contato" name="contato" list="contatos" value="<?= $contact_name; ?>" autocomplete="off" placeholder="<?= TRANS('CONTACT_PLACEHOLDER'); ?>" />
+							
 						</div>
 						<datalist id="contatos"></datalist>
 					<?php
 					} else {
 						// valores padrão
 					?>
-						<input type="hidden" name="contato" value="<?= $_SESSION['s_usuario_nome']; ?>">
+						<input type="hidden" name="contato" id="contato" value="<?= $contact_name; ?>">
 					<?php
 					}
 
 
 					/* E-mail de contato */
 					$contact_email_disable = "";
-					$contato_email = getUserInfo($conn, $_SESSION['s_uid'])['email'];
+					// $contato_email = getUserInfo($conn, $_SESSION['s_uid'])['email'];
+					$contato_email = $requester_info['email'];
 					if ($_SESSION['s_nivel'] == "3") {
 						$contact_email_disable = " readonly ";
 					}
@@ -459,7 +579,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					} else {
 						/* Valores padrão */
 					?>
-						<input type="hidden" name="contato_email" value="<?= $contato_email; ?>">
+						<input type="hidden" name="contato_email" id="contato_email" value="<?= $contato_email; ?>">
 					<?php
 					}
 
@@ -469,20 +589,24 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					?>
 						<label for="idTelefone" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('COL_PHONE'); ?></label>
 						<div class="form-group col-md-4">
-							<input type="tel" class="form-control " id="idTelefone" name="telefone" value="<?= (count($ticket) ? $ticket['telefone'] : ""); ?>" placeholder="<?= TRANS('PHONE_PLACEHOLDER'); ?>" />
+							<input type="tel" class="form-control " id="idTelefone" name="telefone" value="<?= $requester_info['fone']; ?>" placeholder="<?= TRANS('PHONE_PLACEHOLDER'); ?>" />
 						</div>
 					<?php
 					} else {
 						/* Valores padrão */
 					?>
-						<input type="hidden" name="telefone" value="">
+						<input type="hidden" name="telefone" value="<?= $requester_info['fone']; ?>" id="idTelefone">
 					<?php
 					}
 
 
 					/* Departamentos */
+					$requester_department_id = $requester_info['user_department'];
 					if ((isset($screen['conf_scr_local']) && $screen['conf_scr_local']) || empty($screen)) {
 					?>
+						
+						<input type="hidden" name="rendered_local" id="rendered_local" value="1">
+						<input type="hidden" name="requester_department_id" id="requester_department_id" value="<?= $requester_department_id; ?>">
 						<label for="idLocal" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('DEPARTMENT'); ?></label>
 
 						<div class="form-group col-md-4">
@@ -522,7 +646,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					} else {
 						/* Valores padrão */
 					?>
-						<input type="hidden" name="local" value="">
+						<input type="hidden" name="local" id="idLocal" value="<?= $requester_department_id; ?>">
 					<?php
 					}
 
@@ -619,6 +743,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					 * Só exibirá as opções de envio caso o envio de e-mails esteja habilitado
 					 */
 					if ($mailConfig['mail_send']) {
+						$checkSendToRequester = ($sendMailToRequester ? " checked" : "");
 						if ((isset($screen['conf_scr_mail']) && $screen['conf_scr_mail']) || empty($screen)) {
 						?>
 							<label class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('OCO_FIELD_SEND_MAIL_TO'); ?></label>
@@ -631,8 +756,10 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 									<input class="form-check-input " type="checkbox" name="mailOP" value="ok" id="mailOP" disabled>
 									<legend class="col-form-label col-form-label-sm"><?= TRANS('TECHNICIAN'); ?></legend>
 								</div>
+
+								
 								<div class="form-check form-check-inline">
-									<input class="form-check-input " type="checkbox" name="mailUS" value="ok" disabled id="mailUS">
+									<input class="form-check-input " type="checkbox" <?= $checkSendToRequester; ?> name="mailUS" value="ok" disabled id="mailUS">
 									<legend class="col-form-label col-form-label-sm"><?= TRANS('CONTACT'); ?></legend>
 								</div>
 							</div>
@@ -848,6 +975,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					<input type="hidden" name="isDynamicMode" id="isDynamicMode" value="<?= $isDynamicMode; ?>" />
 					<input type="hidden" name="profile_id" id="profile_id" value="<?= $profile_id; ?>" />
 					<input type="hidden" name="issue_type" id="issue_type" value="<?= $issue_type; ?>" />
+					<input type="hidden" name="s_uid" id="s_uid" value="<?= $_SESSION['s_uid']; ?>" />
 					<input type="hidden" name="action" value="open" />
 					<input type="hidden" name="submit" value="submit" />
 
@@ -877,10 +1005,11 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 	<script src="../../includes/components/jquery/datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
 	<script src="../../includes/components/bootstrap/js/bootstrap.bundle.js"></script>
 	<script src="../../includes/components/bootstrap-select/dist/js/bootstrap-select.min.js"></script>
-	<script src="../../includes/components/summernote/summernote-bs4.js"></script>
-	<script src="../../includes/components/summernote/lang/summernote-pt-BR.min.js"></script>
 	<script src="../../includes/components/Inputmask-5.x/dist/jquery.inputmask.min.js"></script>
 	<script src="../../includes/components/Inputmask-5.x/dist/bindings/inputmask.binding.js"></script>
+	<script src="../../includes/components/suneditor/node_modules/suneditor/dist/suneditor.min.js"></script>
+    <script src="../../includes/components/suneditor/node_modules/suneditor/src/lang/pt_br.js"></script>
+	<script src="../../includes/javascript/format_bar.js"></script>
 
 	<script>
 		$(function() {
@@ -910,14 +1039,69 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 				x--; //Decrement field counter
 			});
 
+
+			$.fn.selectpicker.Constructor.BootstrapVersion = '4';
+			$('.custom_field_select_multi').selectpicker({
+				/* placeholder */
+				title: "<?= TRANS('SEL_SELECT', '', 1); ?>",
+				liveSearch: true,
+				liveSearchNormalize: true,
+				liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
+				noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
+				style: "",
+				styleBase: "form-control input-select-multi",
+			});
+
+
+			$('.bts-select').selectpicker({
+				/* placeholder */
+				title: "<?= TRANS('SEL_SELECT', '', 1); ?>",
+				showSubtext: true,
+				liveSearch: true,
+				liveSearchNormalize: true,
+				liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
+				noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
+				style: "",
+				styleBase: "form-control input-select-multi",
+			});
+
+
+			if ($('#idProblema').length > 0 && !$("#isDynamicMode").val()) {
+				$('#idProblema').selectpicker({
+					/* placeholder */
+					title: "<?= TRANS('ISSUE_TYPE', '', 1); ?>",
+					liveSearch: true,
+					liveSearchNormalize: true,
+					liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
+					noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
+					style: "",
+					styleBase: "form-control input-select-multi",
+				});
+			}
+
+			if ($('#idLocal').length > 0) {
+				$('#idLocal').selectpicker({
+					/* placeholder */
+					title: "<?= TRANS('DEPARTMENT', '', 1); ?>",
+					showSubtext: true,
+					liveSearch: true,
+					liveSearchNormalize: true,
+					liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
+					noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
+					style: "",
+					styleBase: "form-control input-select-multi",
+				});
+			}
+
+
 			if ($("#idArea").length > 0) {
 				if ($('#idFoward').length > 0) {
 					loadOperators();
 				}
 			}
 
-
 			loadUnits();
+
 
 			$("#client").on('change', function() {
 				loadUnits();
@@ -1018,28 +1202,15 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 			}
 
 			var bar = '<?php print $_SESSION['s_formatBarOco']; ?>';
+			var onlyOpen = '<?= $onlyOpen; ?>';
 			if ($('#idDescricao').length > 0 && bar == 1) {
-				$('#idDescricao').summernote({
-					// placeholder: 'Hello Bootstrap 4',
-					toolbar: [
-						['style', ['style']],
-						['font', ['bold', 'underline', 'clear']],
-						['fontname', ['fontname']],
-						['fontsize', ['fontsize']],
-						['color', ['color']],
-						['para', ['ul', 'ol', 'paragraph']],
-						['table', ['table']],
-						['insert', ['link']],
-						['view', ['fullscreen']],
-					],
-					lang: 'pt-BR', // default: 'en-US'
-					tabsize: 2,
-					// height: 100,
-					height: 100, // set editor height
-					minHeight: null, // set minimum height of editor
-					maxHeight: null, // set maximum height of editor
-					// focus: true // set focus to editable area after initializing summernote
-				});
+				
+				let bar_type = 'basic';
+				if (!onlyOpen) {
+					bar_type = 'operator';
+				}
+				
+				var editor = render_format_bar('idDescricao', 100, bar_type);
 			}
 
 			controlCheckUserMailSend();
@@ -1072,6 +1243,11 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					loading.hide();
 				});
 
+				/* Testar se a variável "editor" foi inicializada */
+				if (editor) {
+					editor.save();
+				}
+				
 				var form = $('form').get(0);
 				// disabled the submit button
 				$("#idSubmit").prop("disabled", true);
@@ -1132,6 +1308,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 							method: 'POST',
 							dataType: 'json',
 							data: {
+								'is_scheduled': response.is_scheduled,
 								'numero': response.numero,
 								'scheduleDate': $('#idDate_schedule').val(),
 								'main_worker': $('#idFoward').val(),
@@ -1185,60 +1362,6 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					$('#idDate_schedule').val('');
 				}
 			});
-
-
-			$.fn.selectpicker.Constructor.BootstrapVersion = '4';
-			$('.custom_field_select_multi').selectpicker({
-				/* placeholder */
-				title: "<?= TRANS('SEL_SELECT', '', 1); ?>",
-				liveSearch: true,
-				liveSearchNormalize: true,
-				liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
-				noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
-				style: "",
-				styleBase: "form-control input-select-multi",
-			});
-
-
-			$('.bts-select').selectpicker({
-				/* placeholder */
-				title: "<?= TRANS('SEL_SELECT', '', 1); ?>",
-				showSubtext: true,
-				liveSearch: true,
-				liveSearchNormalize: true,
-				liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
-				noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
-				style: "",
-				styleBase: "form-control input-select-multi",
-			});
-
-
-			if ($('#idProblema').length > 0 && !$("#isDynamicMode").val()) {
-				$('#idProblema').selectpicker({
-					/* placeholder */
-					title: "<?= TRANS('ISSUE_TYPE', '', 1); ?>",
-					liveSearch: true,
-					liveSearchNormalize: true,
-					liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
-					noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
-					style: "",
-					styleBase: "form-control input-select-multi",
-				});
-			}
-
-			if ($('#idLocal').length > 0) {
-				$('#idLocal').selectpicker({
-					/* placeholder */
-					title: "<?= TRANS('DEPARTMENT', '', 1); ?>",
-					showSubtext: true,
-					liveSearch: true,
-					liveSearchNormalize: true,
-					liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
-					noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
-					style: "",
-					styleBase: "form-control input-select-multi",
-				});
-			}
 
 
 			/* Idioma global para os calendários */
@@ -1414,9 +1537,16 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 		}
 
 
-		function loadUnits() {
+		function loadUnits(clientid = "", unitFromRequester = "") {
+			if (clientid == "") {
+				clientid = $("#client").val();
+			}
 
-			if ($("#idUnidade").length > 0) {
+			if (unitFromRequester == "") {
+				unitFromRequester = $('#unit_from_requester').val();
+			}
+
+			if ($("#rendered_unit").length > 0) {
 				var loading = $(".loading");
 				$(document).ajaxStart(function() {
 					loading.show();
@@ -1430,7 +1560,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					method: 'POST',
 					dataType: 'json',
 					data: {
-						client: $("#client").val()
+						client: clientid
 					},
 				}).done(function(data) {
 					$('#idUnidade').empty();
@@ -1441,7 +1571,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					$.each(data, function(key, data) {
 						$('#idUnidade').append('<option value="' + data.inst_cod + '">' + data.inst_nome + '</option>');
 					});
-					$('#idUnidade').selectpicker('refresh');
+					$('#idUnidade').selectpicker('refresh').selectpicker('val', unitFromRequester).selectpicker('refresh');
 
 					loadDepartments();
 				});
@@ -1450,9 +1580,22 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 			}
 		}
 
-		function loadDepartments() {
+		function loadDepartments(clientID = "", unitID = "", requesterDepartment = "") {
 
-			if ($("#idLocal").length > 0) {
+			if (clientID == "") {
+				clientID = $("#client").val();
+			}
+
+			if (unitID == "") {
+				unitID = $("#idUnidade").val();
+			}
+
+			if (requesterDepartment == "") {
+				requesterDepartment = $("#requester_department_id").val();
+			}
+			
+
+			if ($("#rendered_local").length > 0) {
 				var loading = $(".loading");
 				$(document).ajaxStart(function() {
 					loading.show();
@@ -1466,8 +1609,8 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					method: 'POST',
 					dataType: 'json',
 					data: {
-						client: $("#client").val(),
-						unit: $("#idUnidade").val()
+						client: clientID,
+						unit: unitID
 					},
 				}).done(function(data) {
 					$('#idLocal').empty();
@@ -1482,7 +1625,8 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 						}
 						$('#idLocal').append('<option data-subtext="' + unit + '" value="' + data.loc_id + '">' + data.local + '</option>');
 					});
-					$('#idLocal').selectpicker('refresh');
+					$('#idLocal').selectpicker('refresh').selectpicker('val', requesterDepartment).selectpicker('refresh');
+					
 				});
 			}
 		}

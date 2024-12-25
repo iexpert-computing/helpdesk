@@ -36,6 +36,11 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 2);
 $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 
 
+$optionsForTypes = [
+    1 => TRANS('ALL_TYPES'),
+    2 => TRANS('ONLY_ASSETS'),
+    3 => TRANS('ONLY_RESOURCES')
+];
 $categories = getAssetsCategories($conn);
 
 
@@ -52,10 +57,13 @@ $json3 = 0;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" type="text/css" href="../../includes/css/estilos.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/jquery/datetimepicker/jquery.datetimepicker.css" />
+    <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
     <style>
         .chart-container {
@@ -68,7 +76,7 @@ $json3 = 0;
         }
     </style>
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -150,7 +158,20 @@ $json3 = 0;
                     </div>
                     
 
-                    
+                    <label for="asset_or_resource" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CONSIDERS'); ?></label>
+                    <div class="form-group col-md-10">
+                        <select class="form-control bs-select" id="asset_or_resource" name="asset_or_resource">
+                            <?php
+                                foreach ($optionsForTypes as $key => $type) {
+                                    ?>
+                                        <option value="<?= $key; ?>"
+                                        <?= ($key == 1 ? ' selected' : ''); ?>
+                                        ><?= $type; ?></option>
+                                    <?php
+                                }
+                            ?>
+                        </select>
+                    </div>
 
                     
 
@@ -184,6 +205,8 @@ $json3 = 0;
     </div>
     <script src="../../includes/javascript/funcoes-3.0.js"></script>
     <script src="../../includes/components/jquery/jquery.js"></script>
+    <script src="../../includes/components/jquery/jquery.initialize.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables.js"></script>
     <script src="../../includes/components/jquery/datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
     <script src="../../includes/components/bootstrap/js/bootstrap.bundle.js"></script>
     <script type="text/javascript" src="../../includes/components/chartjs/dist/Chart.min.js"></script>
@@ -200,6 +223,7 @@ $json3 = 0;
                 title: "<?= TRANS('ALL', '', 1); ?>",
                 liveSearch: true,
                 liveSearchNormalize: true,
+                showSubtext: true,
                 liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
                 noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
                 style: "",
@@ -245,7 +269,9 @@ $json3 = 0;
 					} else {
                         /* Aqui ocorrerá as chamadadas para a montagem da tabela e também para os gráficos */
 
-                        let table = '<table class="table table-striped table-bordered">';
+                        // let table = '<table class="table table-striped table-bordered">';
+                        let table = '<table id="table_assets_general" class="table table-striped table-bordered" cellspacing="0" width="100%">';
+
                         table += '<caption>' + data.criteria + '</caption>';
                         table += '<thead>';
                             table += '<tr class="header table-borderless">';
@@ -265,7 +291,7 @@ $json3 = 0;
                                     table += '<td class="line">' + data['table'][i].asset_type + '</td>';
                                     table += '<td class="line">' + data['table'][i].asset_unit + '</td>';
                                     table += '<td class="line">' + data['table'][i].quantidade + '</td>';
-                                    table += '<td class="line">' + data['table'][i].percentual + '</td>';
+                                    table += '<td class="line">' + data['table'][i].percentual + '%</td>';
                                 table += '</tr>';
                             }
                         }
@@ -314,6 +340,38 @@ $json3 = 0;
 				});
 				return false;
 			});
+
+
+
+            /* Adicionei o mutation observer em função dos elementos que são adicionados após o carregamento do DOM */
+            var obs = $.initialize("#table_assets_general", function() {
+                
+                $(function() {
+                    $('[data-toggle="popover"]').popover()
+                });
+
+                $('.popover-dismiss').popover({
+                    trigger: 'focus'
+                });
+                
+                var criterios = $('#divCriterios').text();
+
+                var table = $('#table_assets_general').DataTable({
+                    language: {
+                        url: "../../includes/components/datatables/datatables.pt-br.json",
+                    },
+                    paging: true,
+                    deferRender: true,
+                    "pageLength": 50,
+                });
+
+            }, {
+                target: document.getElementById('table')
+            }); /* o target limita o scopo do mutate observer */
+
+
+
+
         });
 
 
@@ -393,7 +451,7 @@ $json3 = 0;
                 //     $('#' + targetId).append('<option value=""><?= TRANS("SEL_SELECT"); ?></option>');
                 // }
                 $.each(data, function(key, data) {
-                    $('#' + targetId).append('<option value="' + data.tipo_cod + '">' + data.tipo_nome + '</option>');
+                    $('#' + targetId).append('<option data-subtext="' + data.cat_name + '" value="' + data.tipo_cod + '">' + data.tipo_nome + '</option>');
                 });
 
                 $('#' + targetId).selectpicker('refresh');

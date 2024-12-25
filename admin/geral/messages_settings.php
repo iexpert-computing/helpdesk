@@ -54,11 +54,21 @@ $tags = array(
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
-	<link rel="stylesheet" type="text/css" href="../../includes/components/summernote/summernote-bs4.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/components/suneditor/node_modules/suneditor/dist/css/suneditor.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../includes/components/suneditor/node_modules/suneditor/src/assets/css/suneditor-contents.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
 	<style>
+		
+		/*.se-btn-list {
+			color: yellow !important;
+		}*/
+		.se-tooltip {
+			color: #3a4d56 !important;
+		}
 		
 		.evento {
 			line-height: 1.5em;
@@ -193,7 +203,10 @@ $tags = array(
 
 								<div id="collapseOne" class="collapse " aria-labelledby="headingOne" data-parent="#accordionVariables">
 									<div class="card-body bg-light">
-										<?= nl2br(getEnvVars($conn)); ?>
+										<?php
+											$eventVars = ($row['has_specific_env_vars'] ? $row['msg_event'] : null);
+											echo nl2br(getEnvVars($conn, null, $eventVars));
+										?>
 									</div>
 								</div>
 							</div>
@@ -236,12 +249,11 @@ $tags = array(
 
 	<script src="../../includes/javascript/funcoes-3.0.js"></script>
 	<script src="../../includes/components/jquery/jquery.js"></script>
-	<!-- <script src="../../includes/components/bootstrap/js/bootstrap.min.js"></script> -->
 	<script src="../../includes/components/bootstrap/js/bootstrap.bundle.js"></script>
 	<script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables.js"></script>
-	<!-- <script type="text/javascript" charset="utf8" src="../../includes/components/ckeditor/ckeditor.js"></script> -->
-	<script src="../../includes/components/summernote/summernote-bs4.js"></script>
-	<script src="../../includes/components/summernote/lang/summernote-pt-BR.min.js"></script>
+	<script src="../../includes/components/suneditor/node_modules/suneditor/dist/suneditor.min.js"></script>
+    <script src="../../includes/components/suneditor/node_modules/suneditor/src/lang/pt_br.js"></script>
+	<script src="../../includes/javascript/format_bar.js"></script>
 	<script type="text/javascript">
 		$(function() {
 
@@ -265,30 +277,7 @@ $tags = array(
 
 
 			if ($('#body_content').length > 0) {
-				$('#body_content').summernote({
-
-					toolbar: [
-						['style', ['style']],
-						['font', ['bold', 'underline', 'clear']],
-						['fontname', ['fontname']],
-						['fontsize', ['fontsize']],
-						['color', ['color']],
-						['para', ['ul', 'ol', 'paragraph']],
-						['table', ['table']],
-						['insert', ['link', 'picture', 'video']],
-						['view', ['fullscreen', 'codeview', 'help']],
-					],
-					tabDisable: true,
-
-					// placeholder: 'Hello Bootstrap 4',
-					lang: 'pt-BR', // default: 'en-US'
-					tabsize: 2,
-					// height: 100,
-					height: 300, // set editor height
-					minHeight: null, // set minimum height of editor
-					maxHeight: null, // set maximum height of editor
-					focus: true // set focus to editable area after initializing summernote
-				});
+				var editor = render_format_bar('body_content', 300, 'advanced');
 			}
 
 
@@ -303,6 +292,7 @@ $tags = array(
 					loading.hide();
 				});
 
+				editor.save();
 				$.ajax({
 					url: './configmsgs_process.php',
 					method: 'POST',

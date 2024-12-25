@@ -47,6 +47,7 @@ if (isset($post['level']) && $post['level'] == 5 && isset($post['clientDb']) && 
     $data[] = $clients;
     echo json_encode($data);
     return;
+    
 
 } elseif (isset($post['level']) && $post['level'] == 3) {
     $clients = getClients($conn, null, 2);

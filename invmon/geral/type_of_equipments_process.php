@@ -43,7 +43,9 @@ $data['field_id'] = "";
 $data['csrf_session_key'] = (isset($post['csrf_session_key']) ? $post['csrf_session_key'] : "");
 
 $data['type_name'] = (isset($post['type_name']) ? noHtml($post['type_name']) : "");
-$data['tipo_categoria'] = (isset($post['tipo_categoria']) ? noHtml($post['tipo_categoria']) : "");
+$data['tipo_categoria'] = (isset($post['tipo_categoria']) ? (int)$post['tipo_categoria'] : "");
+$data['can_be_product'] = (isset($post['can_be_product']) ? ($post['can_be_product'] == "yes" ? 1 : 0) : 0);
+$data['is_digital'] = (isset($post['is_digital']) ? ($post['is_digital'] == "yes" ? 1 : 0) : 0);
 
 /* Gravar em assets_types_part_of */
 $data['is_part_of'] = (isset($post['is_part_of']) ? $post['is_part_of'] : []);
@@ -96,12 +98,16 @@ if ($data['action'] == 'new') {
     $sql = "INSERT INTO tipo_equip 
         (
             tipo_nome, 
-            tipo_categoria
+            tipo_categoria,
+            can_be_product,
+            is_digital
         ) 
         VALUES 
         (
             '" . $data['type_name'] . "',
-            '" . $data['tipo_categoria'] . "'
+            '" . $data['tipo_categoria'] . "',
+            " . dbField($data['can_be_product']) . ",
+            " . dbField($data['is_digital']) . "
         )";
 
     try {
@@ -216,7 +222,9 @@ if ($data['action'] == 'new') {
 
     $sql = "UPDATE tipo_equip SET 
 				tipo_nome = '" . $data['type_name'] . "',
-				tipo_categoria = '" . $data['tipo_categoria'] . "'
+				tipo_categoria = '" . $data['tipo_categoria'] . "',
+                can_be_product = " . dbField($data['can_be_product']) . ",
+                is_digital = " . dbField($data['is_digital']) . "
             WHERE tipo_cod = '" . $data['cod'] . "'";
 
     try {

@@ -652,7 +652,7 @@
     $TRANS["TTL_CURRENT_PASS"] = "Contraseña Actual";
     $TRANS["OPT_PASS_TO_AUTH"] = "Contraseña para Autenticación";
     $TRANS["YES"] = "Si";
-    $TRANS["OCOMON_ABSTRACT"] = "Gestión de Demandas de Soporte Técnico y Activos de TI";
+    $TRANS["OCOMON_ABSTRACT"] = "Sistema Completo para la Gestión de Demandas de Soporte Técnico y Activos de TI";
     $TRANS["OPT_SITE"] = "SITIO DE ACCESO HELPDESK";
     $TRANS["HELP_SITE"] = "La URL para que los usuarios accedan al sistema.";
     $TRANS["STATE"] = "Situación";
@@ -1832,7 +1832,7 @@
     $TRANS["TOGGLE_NORENDER_CHECKBOXES"] = "Mark all fields to not be rendered";
     $TRANS["RENDER_CUSTOM_FIELDS"] = "Render the customized fields";
     $TRANS["HELPER_RENDER_CUSTOM_FIELDS"] = "In listings returned through cards, if there are many custom fields, this can generate excessive processing.";
-    $TRANS["MSG_CONECTION_TO_DATABASE_FAILED"] = "It was not possible to connect to the database informed in the connection settings!";
+
 
 
     /* customizado */

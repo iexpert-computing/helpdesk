@@ -1,21 +1,21 @@
 <?php session_start();
-/*                        Copyright 2023 Flávio Ribeiro
+/*Copyright 2023 Flávio Ribeiro
 
-         This file is part of OCOMON.
+This file is part of OCOMON.
 
-         OCOMON is free software; you can redistribute it and/or modify
-         it under the terms of the GNU General Public License as published by
-         the Free Software Foundation; either version 3 of the License, or
-         (at your option) any later version.
-         OCOMON is distributed in the hope that it will be useful,
-         but WITHOUT ANY WARRANTY; without even the implied warranty of
-         MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-         GNU General Public License for more details.
+OCOMON is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 3 of the License, or
+(at your option) any later version.
+OCOMON is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-         You should have received a copy of the GNU General Public License
-         along with Foobar; if not, write to the Free Software
-         Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
+You should have received a copy of the GNU General Public License
+along with Foobar; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 
 require_once __DIR__ . "/" . "../../includes/include_geral_new.inc.php";
 require_once __DIR__ . "/" . "../../includes/classes/ConnectPDO.php";
@@ -31,22 +31,29 @@ $isAreaAdmin = false;
 $allowTreat = false;
 $onlyView = false;
 
-
 $numero = (int)$_GET['numero'];
-$id = (isset($_GET['id']) && !empty($_GET['id']) ? noHtml($_GET['id']) : '');
+$id = (isset($_GET['id']) && !empty($_GET['id']) ? $_GET['id'] : '');
 
 /* Checa se tem o link global da ocorrência */
 $gtID = str_replace(" ", "+", $id);
+$gtID = noHtml($gtID);
 if ($gtID == getGlobalTicketId($conn, $numero));
 $GLOBALACCESS = true;
 
 $rating_id = "";
-if (isset($_GET['rating_id']) && !empty($_GET['rating_id']) && $_GET['rating_id'] == getGlobalTicketRatingId($conn, $numero)) {
+
+$formatUrlIds = function ($url) {
+    return noHtml(str_replace(" ", "+", $url));
+};
+
+if (isset($_GET['rating_id']) && !empty($_GET['rating_id']) && asEquals($formatUrlIds($_GET['rating_id']), getGlobalTicketRatingId($conn, $numero))) {
     $globalRating = true;
-    $rating_id = '&rating_id=' . noHtml($_GET['rating_id']);
+    $rating_id = '&rating_id=' . $formatUrlIds($_GET['rating_id']);
 }
 
+
 if ($globalRating && $GLOBALACCESS) {
+    // echo 'Redirecionando...'; exit;
     echo "<script>top.window.location = '../../ocomon/open_form/ticket_show_global.php?numero={$numero}&id={$gtID}{$rating_id}'</script>";
     exit;
 }
@@ -66,14 +73,17 @@ if ((!isset($_SESSION['s_logado']) || !$_SESSION['s_logado']) && isset($_GET['nu
 
 $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 3, 1);
 
-$uareas = explode(',', $_SESSION['s_uareas']);
+$uareas = explode(',', (string)$_SESSION['s_uareas']);
 $config = getConfig($conn);
 $mailConfig = getMailConfig($conn);
 
+/* Posicionamento do campo de descrição do chamado: default | top | bottom */
+$fieldDescriptionPosition = getConfigValue($conn, 'TICKET_DESCRIPTION_POS') ?? 'default';
 
 /* Se é próprio solicitante */
 $isRequester = false;
 $isResponsible = false;
+$allowRequestFeedback = false;
 
 ?>
 <!DOCTYPE html>
@@ -89,9 +99,14 @@ $isResponsible = false;
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+    <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
     <link href="../../includes/components/fullcalendar/lib/main.css" rel="stylesheet" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_fullcalendar.css" />
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <link rel="stylesheet" type="text/css" href="../../includes/css/util.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
+
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
     <style>
         .navbar-nav>.nav-link:hover {
             background-color: #3a4d56 !important;
@@ -124,6 +139,11 @@ $isResponsible = false;
             outline: 2px solid #e9ecef;
         }
 
+        .ticket-cost {
+            font-weight: bold;
+            color: green;
+        }
+
         .modal-1000 {
             max-width: 1000px;
             margin: 30px auto;
@@ -146,6 +166,32 @@ $isResponsible = false;
 			left: 140px;
 			z-index: 1;
 		}
+
+        .btn-project {
+            cursor: pointer;
+        }
+
+        .btn-project:before {
+            font-family: "Font Awesome\ 5 Free";
+            content: "\f542";
+            font-weight: 900;
+            font-size: 16px;
+            color: #3a4d56;
+        }
+
+        .bt-request-feedback:before {
+            font-family: "Font Awesome\ 5 Free";
+            /* content: "\f4ad"; */
+            content: "\f4fd";
+            font-weight: 900;
+            font-size: 16px;
+        }
+
+        .ImportantPointer {
+            cursor: pointer !important;
+        }
+
+        
     </style>
 
 </head>
@@ -168,6 +214,32 @@ $isResponsible = false;
     $resultado = $conn->query($query);
     $row = $resultado->fetch();
 
+
+    // Recursos do chamado
+    $resources = getResourcesFromTicket($conn, $row['numero']);
+    $resources_info = [];
+    if (!empty($resources)) {
+        foreach ($resources as $resource) {
+            $modelInfo = getAssetsModels($conn, $resource['model_id'], null, null, 1, ['t.tipo_nome']);
+            
+            $resources_info[$resource['model_id']]['model_id'][] = $resource['model_id'];
+            $resources_info[$resource['model_id']]['modelo_full'][] = $modelInfo['tipo'] . ' ' . $modelInfo['fabricante'] . ' ' . $modelInfo['modelo'];
+            $resources_info[$resource['model_id']]['categoria'][] = $modelInfo['cat_name'];
+            $resources_info[$resource['model_id']]['amount'][] = $resource['amount'];
+            $resources_info[$resource['model_id']]['unitary_price'][] = $resource['unitary_price'];
+        }
+    
+        foreach ($resources_info as $key => $value) {
+            $resources_info[$key]['model_id'] = implode(', ', $resources_info[$key]['model_id']);
+            $resources_info[$key]['modelo_full'] = implode(', ', $resources_info[$key]['modelo_full']);
+            $resources_info[$key]['categoria'] = implode(', ', $resources_info[$key]['categoria']);
+            $resources_info[$key]['amount'] = implode(', ', $resources_info[$key]['amount']);
+            $resources_info[$key]['unitary_price'] = implode(', ', $resources_info[$key]['unitary_price']);
+        }
+
+        $resources_info = arraySortByColumn($resources_info, 'modelo_full');
+    }
+    
     $GLOBALACCESS = false;
 
     /* Se não for o próprio usuário que abriu o chamado */
@@ -188,7 +260,7 @@ $isResponsible = false;
             $isAreaAdmin = in_array($row['aberto_por_area'], $managebleAreas);
             
             // if (!$_SESSION['s_area_admin'] || $_SESSION['s_area'] != $row['aberto_por_area']) {
-            if (!$_SESSION['s_area_admin'] || !$isAreaAdmin) {
+            if (!$_SESSION['s_area_admin'] || !in_array($row['aberto_por_area'], $managebleAreas)) {
 
                 echo message('danger', 'Ooops!', TRANS('MSG_NOT_ALLOWED'), '', '', true);
                 exit;
@@ -221,9 +293,13 @@ $isResponsible = false;
     //     $isResponsible = true;
     // }
     $isResponsible = isTicketTreater($conn, $numero, $_SESSION['s_uid']);
+    /** Controle de inatividade */
+    $statusToMonitor = $config['stats_to_close_by_inactivity'];
+    $statusAnswered = $config['stat_out_inactivity'];
 
     // $isApproved = false;
     $isRated = isRated($conn, $COD);
+    $showClosureOption = true;
     $isDone = false;
     $canBeRated = false;
     $isClosed = ($row['status_cod'] == 4 ? true : false);
@@ -233,8 +309,6 @@ $isResponsible = false;
     $doneStatus = $closedStatus;
     $deadlineToApprove = '';
     $onlyBusinessDays = ($config['conf_only_weekdays_to_count_after_done'] ? true : false);
-
-    // $closingRequesterMode = $config['conf_closing_mode'] == 2;
 
     $ratedInfo = getRatedInfo($conn, $COD);
 
@@ -249,10 +323,6 @@ $isResponsible = false;
 
             $deadlineToApprove = addDaysToDate($row['data_fechamento'], $config['conf_time_to_close_after_done'], $onlyBusinessDays);
             
-            /* if (daysFromDate($row['data_fechamento']) <= $config['conf_time_to_close_after_done']) {
-                $showApprovalOption = ($isRequester && !$isResponsible && !$isRated ? true : false);
-                $canBeRated = (!$isRated ? true : false);
-            } */
             if (date('Y-m-d H:i:s') < $deadlineToApprove) {
                 $showApprovalOption = ($isRequester && !$isResponsible && !$isRated ? true : false);
                 $canBeRated = (!$isRated ? true : false);
@@ -260,10 +330,134 @@ $isResponsible = false;
         }
     }
 
-    // $isRejected = (!empty($ratedInfo) && empty($ratedInfo['rate']) && !$isDone);
     $isRejected = isRejected($conn, $COD);
 
     $deadlineToApprove = ($isDone ? dateScreen($deadlineToApprove, 0, 'd/m/Y H:i') : '');
+
+
+
+
+
+
+    /* Se o tipo de solicitação precisar de autorização sobre o custo do chamado */
+    $tickets_cost_field = (!empty($config['tickets_cost_field']) ? $config['tickets_cost_field'] : "");
+    $isAuthorizer = false;
+    $has_cost = false;
+    if ($row['need_authorization']) {
+
+        if ($row['authorization_status'] != 2 && $row['authorization_status'] != 3) {
+            /* Só poderá ser concluído se for autorizado ou recusado */
+            $showClosureOption = false;
+        }
+
+
+
+
+        $cost_field_info = [];
+        
+        if (empty($tickets_cost_field)) {
+            echo message('danger', 'Ooops!', TRANS('CONFIG_NEED_COST_FIELD_DEFINED'), '', '', true);
+        } else {
+            insertCfieldCaseNotExists($conn, $row['numero'], $tickets_cost_field);
+            
+            $cost_field_info = getTicketCustomFields($conn, $row['numero'], $tickets_cost_field);
+            if (!empty($cost_field_info['field_value']) && priceDB($cost_field_info['field_value']) > 0) {
+                $has_cost = true;
+            }
+        }
+
+        $requesterArea = $row['area_solicitante_cod'];
+
+        $possibleAuthorizers = [];
+        if (!empty($cost_field_info)) {
+            $possibleAuthorizers = getAreaAdmins($conn, $requesterArea, priceDB($cost_field_info['field_value']));
+        }
+
+        if (!empty($possibleAuthorizers)) {
+            foreach ($possibleAuthorizers as $possibleAuthorizer) {
+                if ($possibleAuthorizer['user_id'] == $_SESSION['s_uid']) {
+                    $isAuthorizer = true;
+                    break;
+                }
+            }
+        }
+    }
+    
+    $authorizationTypes = [
+        0 => TRANS('NOT_APPLICABLE'),
+        1 => TRANS('STATUS_WAITING_AUTHORIZATION'),
+        2 => TRANS('STATUS_AUTHORIZED'),
+        3 => TRANS('STATUS_REFUSED')
+    ];
+    $authorizationMsgTypes = [
+        0 => 'primary',
+        1 => 'info',
+        2 => 'success',
+        3 => 'danger'
+    ];
+    $authorizationIconTypes = [
+        0 => 'check',
+        1 => 'pause',
+        2 => 'check',
+        3 => 'exclamation-triangle'
+    ];
+
+    $authorizationMsgType = "info";
+    $authorizationIcon = "check";
+    $renderRequestAuthorizationBT = false;
+
+    $btSetCost = false;
+
+    $authorizationStatus = TRANS('NOT_APPLICABLE');
+    if ($row['need_authorization']) {
+        if (!$has_cost && !$isClosed && !$isDone) {
+            
+            $authorizationMsgType = "oc-orange";
+            $authorizationIcon = "comment-dollar";
+            $authorizationStatus = TRANS('WAITING_COST_SET');
+            if ($_SESSION['s_nivel'] != 3) {
+                $btSetCost = true;
+            }
+            
+        } elseif ($has_cost && empty($row['authorization_status'])) {
+            $authorizationStatus = TRANS('WAITING_REQUEST_AUTHORIZATION');
+            $authorizationMsgType = "oc-orange";
+            $authorizationIcon = "exclamation-circle";
+            
+            if ($_SESSION['s_nivel'] != 3) {
+                $renderRequestAuthorizationBT = true;
+                $btSetCost = true;
+            }
+
+        } elseif ($has_cost && $row['authorization_status'] == 3 && $_SESSION['s_nivel'] != 3 && empty($row['data_fechamento'])) {
+            /* Recusados - Ainda podem ter o custo alterado */
+            $btSetCost = true;
+            $authorizationStatus = $authorizationTypes[$row['authorization_status'] ?? 0];
+            $authorizationMsgType = $authorizationMsgTypes[$row['authorization_status'] ?? 0];
+            $authorizationIcon = $authorizationIconTypes[$row['authorization_status'] ?? 0];
+        } else {
+            $authorizationStatus = $authorizationTypes[$row['authorization_status'] ?? 0];
+            $authorizationMsgType = $authorizationMsgTypes[$row['authorization_status'] ?? 0];
+            $authorizationIcon = $authorizationIconTypes[$row['authorization_status'] ?? 0];
+        }
+    }
+
+    $badgeNotification = "<span class='badge badge-{$authorizationMsgType} ticket-interaction p-2 mb-2'><i class='fas fa-{$authorizationIcon} fs-16 text-white'></i></span>";
+
+
+    if ($btSetCost) {
+        /* Botão para definir ou atualizar o custo */
+        $currentCostField = getTicketCustomFields($conn, $row['numero'], $tickets_cost_field);
+        $currentCost = $currentCostField['field_value'];
+        $textBTSetCost = ($currentCost > 0 ? TRANS('BT_UPDATE_COST') : TRANS('BT_SET_COST'));
+        $renderCostBT = '<button class="btn btn-oc-orange text-white" id="btSetTicketCost"><i class="fas fa-comment-dollar">&nbsp;</i>'.$textBTSetCost.'</button>';
+    }
+
+    if ($renderRequestAuthorizationBT) {
+        /* Botão para solicitar autorização */
+        $textBTRequestAuthorization = TRANS('BT_REQUEST_AUTHORIZATION');
+        $btRequestAuthorization = '<button class="btn btn-oc-orange text-white" id="requestAuthorization"><i class="fas fa-user-check">&nbsp;</i>'.$textBTRequestAuthorization.'</button>';
+    }
 
 
     $closingTextClass = "text-white";
@@ -291,6 +485,16 @@ $isResponsible = false;
         $allowTreat = true;
     }
 
+
+    $arrayStatusToMonitor = [];
+    if (!empty($statusToMonitor)) {
+        $arrayStatusToMonitor = explode(',', (string)$statusToMonitor);
+        $alreadyRequestedFeedback = (in_array($row['status_cod'], $arrayStatusToMonitor) ? true : false);
+        $alreadyAnswered = ($row['status_cod'] == $statusAnswered ? true : false);
+
+        $allowRequestFeedback = (!$isClosed && !$isDone && !$isScheduled && !$isRequester && $isResponsible && !$alreadyRequestedFeedback && !$alreadyAnswered);
+    }
+
     $ticketWorkers = getTicketWorkers($conn, $COD);
     $hasWorker = (empty($ticketWorkers) ? false : true);
     $mainWorker = getTicketWorkers($conn, $COD, 1);
@@ -299,12 +503,13 @@ $isResponsible = false;
 
     /* ASSENTAMENTOS */
     if ($allowTreat) {
-        $query2 = "SELECT a.*, u.* FROM assentamentos a LEFT JOIN usuarios u ON u.user_id = a.responsavel WHERE a.ocorrencia = {$COD}";
+        $entries = getTicketEntries($conn, $numero, true);
     } else
-        $query2 = "SELECT a.*, u.* FROM assentamentos a LEFT JOIN usuarios u ON u.user_id = a.responsavel WHERE a.ocorrencia = {$COD} and a.asset_privated = 0";
+        $entries = getTicketEntries($conn, $numero);
 
-    $resultAssets = $conn->query($query2);
-    $assentamentos = $resultAssets->rowCount();
+    $assentamentos = count($entries);
+
+    // var_dump($query2);
 
 
     /* CHECA SE A OCORRÊNCIA É SUB CHAMADO */
@@ -313,22 +518,18 @@ $isResponsible = false;
     $rowPai = $execpai->fetch();
     if ($rowPai && $rowPai['dep_pai'] != "") {
     
-        $msgPai = "
-            <div class='d-flex justify-content-center'>
-                <div class='alert alert-info fade show w-100' role='alert' id='divMsgSubCall' style=' z-index:1030 !important;'>
-                    <i class='fas fa-info-circle'></i>&nbsp;" . TRANS('FIELD_OCCO_SUB_CALL') . "<strong onClick=\"location.href = '" . $_SERVER['PHP_SELF'] . "?numero=" . $rowPai['dep_pai'] . "'\" style='cursor: pointer'>" . $rowPai['dep_pai'] . "</strong>
-                    
-                </div>
-            </div>
-        ";
+        $msgPai = TRANS('FIELD_OCCO_SUB_CALL') . "<strong onClick=\"location.href = '" . $_SERVER['PHP_SELF'] . "?numero=" . $rowPai['dep_pai'] . "'\" style='cursor: pointer'>" . $rowPai['dep_pai'] . "</strong>";
     } else
         $msgPai = "";
 
 
-    /* Checagem para identificar chamados relacionados */
-    $qrySubCall = "SELECT * FROM ocodeps WHERE dep_pai = {$COD} OR dep_filho = {$COD}";
-    $execSubCall = $conn->query($qrySubCall);
-    $existeSub = $execSubCall->rowCount();
+    $storeParent = [];
+    $storeSons = [];
+    $relations = [];
+    $firstOfAll = getFirstFather($conn, $COD, $storeParent);
+    if ($firstOfAll) {
+        $relations = getTicketDownRelations($conn, $firstOfAll, $storeSons);
+    }
 
 
     /* INÍCIO DAS CHECAGENS PARA A MONTAGEM DO MENU DE OPÇÕES */
@@ -363,8 +564,7 @@ $isResponsible = false;
         $itemClosure = " onClick=\"approvingTicket({$row['numero']})\""; 
     } else {
         if ($row['status_cod'] != 4 && $row['status_cod'] != $doneStatus && $allowTreat) {
-            $showItemClosure = true;
-            // $itemClosure = "ticket_close.php?numero=" . $row['numero']; 
+            $showItemClosure = $showClosureOption;
             $itemClosure = "href=\"ticket_close.php?numero={$row['numero']}\"";
 
             $showItemSchedule = true;
@@ -372,7 +572,10 @@ $isResponsible = false;
     }
     
 
+    $showAddResources = false;
+
     if ($allowTreat && !$isClosed && !$isDone) {
+        $showAddResources = true;
         $showItemEdit = true;
         $itemEdit = "ticket_edit.php?numero=" . $row['numero']; /* TRANS('BT_EDIT') */
     }
@@ -391,8 +594,12 @@ $isResponsible = false;
      * Só permite reabertura para o usuário solicitante ou operador técnico (do próprio chamado) 
      * dentro do prazo limite pós encerramento e se o chamado não tiver sido aprovado e avaliado.
     */
-    if ($row['status_cod'] == 4 && $config['conf_allow_reopen'] && ($isRequester || $isResponsible) && !$isRated) {
+    // if ($row['status_cod'] == 4 && $config['conf_allow_reopen'] && ($isRequester || $isResponsible) && !$isRated) {
+    
+    /* A partir da implementação da avaliação dos atendimento, agora somente os responsáveis pelo chamado podem reabrir */
+    if (($isClosed || $isDone) && $config['conf_allow_reopen'] && $isResponsible && !$isRated) {
         
+
         /* Checar o limite de tempo */
         if ($config['conf_reopen_deadline']) {
 
@@ -405,6 +612,7 @@ $isResponsible = false;
                 $showItemReopen = false;
             }
         } else {
+            // $showItemReopen = ($isRequester && !$isResponsible && $isDone ? false : true);
             $showItemReopen = true;
         }
     }
@@ -419,15 +627,9 @@ $isResponsible = false;
 
     /* INÍCIO DAS CONSULTAS REFERENTES À OCORRÊNCIA */
 
-    $qryCatProb = "SELECT * FROM problemas as p " .
-        "LEFT JOIN sla_solucao as sl on sl.slas_cod = p.prob_sla " .
-        "LEFT JOIN prob_tipo_1 as pt1 on pt1.probt1_cod = p.prob_tipo_1 " .
-        "LEFT JOIN prob_tipo_2 as pt2 on pt2.probt2_cod = p.prob_tipo_2 " .
-        "LEFT JOIN prob_tipo_3 as pt3 on pt3.probt3_cod = p.prob_tipo_3 " .
-        " WHERE p.prob_id = " . $row['prob_cod'] . " ";
-
-    $execCatprob = $conn->query($qryCatProb);
-    $rowCatProb = $execCatprob->fetch();
+    // $issueDetails = (!empty($row['prob_cod']) && $row['prob_cod'] != '-1' ? getIssueDetailed($conn, $row['prob_cod'])[0] : []);
+    $issueDetails = (!empty($row['prob_cod']) && $row['prob_cod'] != '-1' ? getIssueDetailed($conn, $row['prob_cod']) : []);
+    $issueDetails = (!empty($issueDetails) && $issueDetails[0] ? $issueDetails[0] : []);
 
     $descricao = "";
     if (isset($_GET['destaca'])) {
@@ -509,6 +711,8 @@ $isResponsible = false;
     $colContentLine = $colsDefault . " col-sm-9";
     $colContentLineFile = " text-break border-bottom rounded p-2 bg-white col-sm-9";
 
+    // $colContentDescription = "small text-break border border-secondary rounded p-2 bg-white col-sm-9";
+    $colContentDescription = "small text-break alert alert-secondary rounded p-4 bg-white col-sm-9";
 
     $ticketAuxWorkers = getTicketWorkers($conn, $COD, 2);
     $selectAuxWorkers = [];
@@ -538,6 +742,15 @@ $isResponsible = false;
             <div class="navbar-nav ml-2 mr-2">
 
                 <?php
+                
+                if ($showAddResources) {
+                ?>
+                    <a class="nav-link small text-white" onclick="addResource('<?= $row['numero']; ?>')"><i class="fas fa-plus"></i><?= TRANS('RESOURCES'); ?></a>
+                <?php
+                }
+                
+                
+                
                 if ($showItemSchedule) {
                 ?>
                     <a class="nav-link small text-white" onclick="scheduleTicket('<?= $row['numero']; ?>')"><i class="fas fa-calendar-alt"></i><?= TRANS('TO_SCHEDULE_OR_TO_ROUTE'); ?></a>
@@ -667,6 +880,249 @@ $isResponsible = false;
             </div>
         </div>
     </div>
+
+
+    <?php
+
+        /* Se existem chamados relacionados | subchamados */
+        // if ($existeSub) {
+        if ($firstOfAll) {
+            ?>
+            <div class="modal fade" id="modalDefineProject" tabindex="-1" style="z-index:2001!important" role="dialog" aria-labelledby="projectDefinition" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div id="divResultDefineProject"></div>
+                        <div class="modal-header bg-light">
+                            <h5 class="modal-title" id="defineProjectTitle"><i class="fas fa-project-diagram"></i>&nbsp;<?= TRANS('PROJECT_DEFINITION'); ?></h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <?= TRANS('PROVIDE_PROJECT_DEFINITION'); ?>
+                        </div>
+                        <!-- Campos para definição do projeto -->
+                        <div class="row mx-2">
+                            <div class="form-group col-md-12">
+                                <input type="text" name="project_name" id="project_name" class="form-control " placeholder="<?= TRANS('PLACEHOLDER_PROJECT_NAME'); ?>">
+                            </div>
+                            <div class="form-group col-md-12">
+                                <textarea class="form-control " name="project_description" id="project_description" placeholder="<?= TRANS('PLACEHOLDER_PROJECT_DESCRIPTION'); ?>"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer bg-light">
+                            <button type="button" id="projectButton" class="btn "><?= TRANS('BT_OK'); ?></button>
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal"><?= TRANS('BT_CANCEL'); ?></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php
+        }
+
+
+
+        if ($btSetCost) {
+            $totalFromResources = getTotalPricesFromTicket($conn, $row['numero']);
+            $totalFromResourcesFormated = priceScreen($totalFromResources);
+            ?>
+            <!-- Modal para definição ou atualização do custo do chamado -->
+            <div class="modal fade" id="modalSetTicketCost" tabindex="-1" style="z-index:2001!important" role="dialog" aria-labelledby="setTicketCost" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div id="divResultSetCost"></div>
+                        <div class="modal-header bg-light">
+                            <h5 class="modal-title" id="setTicketCostTitle"><i class="fas fa-comment-dollar"></i>&nbsp;<?= TRANS('TITLE_SET_TICKET_COST'); ?>&nbsp;</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <?= TRANS('MSG_SET_TICKET_COST'); ?>
+                        </div>
+                        <!-- Valor total de recursos alocados -->
+                        <div class="row mx-2">
+                            <div class="form-group col-md-12">
+                                <input type="text" name="total_from_resources" id="total_from_resources" class="form-control " placeholder="<?= TRANS('PLACEHOLDER_TICKET_COST'); ?>" value="<?= TRANS('RESOURCES_COST') . "&nbsp;" . TRANS('CURRENCY') . "&nbsp;" . $totalFromResourcesFormated; ?>" disabled>
+                            </div>
+                        </div>
+                        <!-- Input para definição do Custo do chamado -->
+                        <div class="row mx-2">
+                            <div class="form-group col-md-12">
+                                <!-- prepend R$-->
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">R$</span>
+                                    </div>
+                                    <input type="text" name="ticket_cost" id="ticket_cost" class="form-control " placeholder="<?= TRANS('PLACEHOLDER_TICKET_COST'); ?>" value="<?= $currentCost; ?>">
+                                </div>
+                               <input type="hidden" name="current_cost" id="current_cost" value="<?= $currentCost; ?>">
+                            </div>
+                        </div>
+                        <!-- Assentamento -->
+                        <div class="row mx-2">
+                            <div class="form-group col-md-12">
+                                <textarea class="form-control " name="set_cost_entry" id="set_cost_entry" placeholder="<?= TRANS('PLACEHOLDER_ASSENT'); ?>"></textarea>
+                            </div>
+                        </div>
+
+
+                        <div class="modal-footer bg-light">
+                            <button type="button" id="setTicketCostModalButton" class="btn "><?= TRANS('BT_OK'); ?></button>
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal"><?= TRANS('BT_CANCEL'); ?></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php
+        }
+
+
+
+
+        if ($has_cost) {
+            ?>
+            <!-- Modal de solicitação de autorização do custo do chamado -->
+            <div class="modal fade" id="modalRequestAuthorization" tabindex="-1" style="z-index:2001!important" role="dialog" aria-labelledby="requestAuthorization" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div id="divResultRequestAuthorization"></div>
+                        <div class="modal-header bg-light">
+                            <h5 class="modal-title" id="requestAuthorizationTitle"><i class="fas fa-user-check"></i>&nbsp;<?= TRANS('BT_REQUEST_AUTHORIZATION'); ?>&nbsp;</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <?= TRANS('MSG_AUTHORIZATION_REQUEST_HELPER'); ?>
+                        </div>
+                        <!-- Assentamento -->
+                        <div class="row mx-2">
+                            <div class="form-group col-md-12">
+                                <textarea class="form-control " name="request_authorization_entry" id="request_authorization_entry" placeholder="<?= TRANS('PLACEHOLDER_ASSENT'); ?>"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer bg-light">
+                            <button type="button" id="requestAuthorizationButton" class="btn "><?= TRANS('BT_OK'); ?></button>
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal"><?= TRANS('BT_CANCEL'); ?></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php
+        }
+
+        if ($allowRequestFeedback) {
+            ?>
+            <!-- Se for elegível - Modal para solicitar retorno do solicitante -->
+            <div class="modal fade" id="modalRequestFeedback" tabindex="-1" style="z-index:2001!important" role="dialog" aria-labelledby="requestFeedback" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div id="divResultRequestFeedback"></div>
+                        <div class="modal-header bg-light">
+                            <h5 class="modal-title" id="requestFeedback"><i class="fas fa-user-clock"></i>&nbsp;<?= TRANS('REQUEST_FEEDBACK'); ?>&nbsp;<span id="j_param_id"></span></h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <?= message('info', '', TRANS('MSG_REQUEST_FEEDBACK'), '', '', true); ?>
+                        </div>
+                        <!-- Assentamento -->
+                        <div class="row mx-2 mt-0">
+                            <div class="form-group col-md-12">
+                                <textarea class="form-control " name="entryRequestFeedback" id="entryRequestFeedback" placeholder="<?= TRANS('WRITE_YOUR_MESSAGE'); ?>"></textarea>
+                            </div>
+                        </div>
+                        <div class="row mx-2">
+                            <div class="form-group col-md-12">
+                                <select class="form-control" name="statusRequestFeedback" id="statusRequestFeedback">
+                                    <?php
+                                        $listStatus = getStatus($conn);
+                                        foreach ($listStatus as $stat) {
+                                            if (in_array($stat['stat_id'], $arrayStatusToMonitor)) {
+                                            ?>
+                                                <option value="<?= $stat['stat_id']; ?>"><?= $stat['status']; ?></option>
+                                            <?php
+                                            }
+                                        }
+                                    ?>
+                                </select>
+                                <small id="statusRequestFeedbackHelp" class="form-text text-muted"><?= TRANS('NEW_STATUS_UNTIL_FEEDBACK'); ?></small>
+                            </div>
+                        </div>
+
+                        <?= csrf_input('requestFeedback'); ?>
+                        <div class="modal-footer bg-light">
+                            <button type="button" id="requestFeedbackButton" class="btn "><?= TRANS('BT_OK'); ?></button>
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal"><?= TRANS('BT_CANCEL'); ?></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php
+        }
+    
+
+        if ($isAuthorizer) {
+            ?>
+            <!-- Modal para autorização do custo do chamado -->
+            <div class="modal fade" id="modalAuthorization" tabindex="-1" style="z-index:2001!important" role="dialog" aria-labelledby="authorization" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+                <div class="modal-dialog modal-lg" role="document">
+                    <div class="modal-content">
+                        <div id="divResultAuthorization"></div>
+                        <div class="modal-header text-center bg-light">
+
+                            <h4 class="modal-title w-100 font-weight-bold text-secondary"><i class="fas fa-user-check"></i>&nbsp;<?= TRANS('OPT_OPERATION_AUTHORIZATION'); ?></h4>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+
+                        <div class="row mx-2 mt-4">
+                            <div class="form-group col-md-12">
+                                <h5><?= TRANS('THE_TICKET_COST_IS'); ?>:&nbsp;<span class="ticket-cost"><?= TRANS('CURRENCY'); ?>&nbsp;<?= $cost_field_info['field_value']; ?></span></h5><hr />
+                                <h5><?= TRANS('DO_YOU_AUTHORIZE_THIS_SERVICE'); ?></h5>
+                            </div>
+                        </div>
+                        
+                        <!-- Autoriza o atendimento ou nao -->
+                        <div class="row mx-2">
+                            <div class="form-group col-md-12 switch-field container-switch">
+                                <input type="radio" id="authorized" name="authorized" value="yes" checked/>
+                                <label for="authorized"><?= TRANS('YES'); ?>&nbsp;&nbsp;<i class="fas fa-thumbs-up"></i></label>
+                                <input type="radio" id="authorized_no" name="authorized" value="no" />
+                                <label for="authorized_no"><?= TRANS('NOT'); ?>&nbsp;&nbsp;<i class="fas fa-thumbs-down"></i></label>
+                            </div>
+                        </div>
+
+                        <!-- Comentário / justificativa -->
+                        <div class="row mx-2">
+                            <div class="form-group col-md-12 ">
+                                <textarea class="form-control " name="authorization_entry" id="authorization_entry" placeholder="<?= TRANS('PLACEHOLDER_ASSENT'); ?>"></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="row mx-2 mt-0 d-none" id="msg-case-not-authorized">
+                            <div class="form-group col-md-12">
+                                <?= message('info', '', TRANS('MSG_CASE_NOT_AUTHORIZED'), '', '', 1); ?>
+                            </div>
+                        </div>
+                        
+
+                        <div class="modal-footer d-flex justify-content-end bg-light">
+                            <button id="authorizationButton" class="btn "><?= TRANS('BT_OK') ?></button>
+                            <button id="cancelAuthorization" class="btn btn-secondary" data-dismiss="modal" aria-label="Close"><?= TRANS('BT_CANCEL'); ?></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php
+        }
+    ?>    
+
 
     <!-- Modal de validacao do atendimento -->
     <div class="modal fade" id="modalValidate" tabindex="-1" style="z-index:2001!important" role="dialog" aria-labelledby="myModalValidate" aria-hidden="true" data-backdrop="static" data-keyboard="false">
@@ -823,7 +1279,170 @@ $isResponsible = false;
         if ($isScheduled) {
             $btSchedule = TRANS('BT_RESCHEDULE');
         }
+    
+        if ($allowTreat && !$isClosed && !$isDone) {
+            ?>
+            <!-- Modal para adicionar recursos ao chamado -->
+            <form method="post" action="<?= $_SERVER['PHP_SELF']; ?>" id="form_resources">
+                <?= csrf_input(); ?>
+            <div class="modal fade" id="modalResource" tabindex="-1" style="z-index:2001!important" role="dialog" aria-labelledby="myModalResource" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+                <div class="modal-dialog modal-xl" role="document">
+                    <div class="modal-content">
+                        <div id="divResultResource"></div>
+                        <div class="modal-header text-center bg-light">
+
+                            <h4 class="modal-title w-100 font-weight-bold text-secondary"><i class="fas fa-plus-square"></i>&nbsp;<?= TRANS('RESOURCES_ALLOCATION'); ?></h4>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        
+
+                        <?php
+                            
+                            $idx = 0;
+                            if (!empty($resources_info)) {
+                                // Recursos já alocados para o chamado
+                                foreach ($resources_info as $resource) {
+                                    // $modelInfo = getAssetsModels($conn, $resource['model_id'], null, null, 1, ['t.tipo_nome']);
+                                    $marginTop = ($idx == 0) ? 'mt-4' : '';
+                                    ?>
+                                        <div class="row mx-2 <?= $marginTop; ?> old_resources_row">
+                                            <div class="form-group col-md-6 <?= $resource['model_id']; ?>">
+                                                <div class="field_wrapper_specs">
+                                                    <div class="input-group">
+                                                        <div class="input-group-prepend">
+                                                            <div class="input-group-text">
+                                                                <a href="javascript:void(0);" class="remove_button_resource" data-random="<?= $resource['model_id']; ?>" title="<?= TRANS('REMOVE'); ?>"><i class="fa fa-trash text-danger"></i></a>
+                                                            </div>
+                                                        </div>
+                                                        <select class="form-control bs-select" name="resource[]" id="resource<?= $resource['model_id']; ?>">
+
+                                                            <option data-subtext="<?= $resource['categoria']; ?>" data-model="<?= $resource['model_id']; ?>" value="<?= $resource['model_id']; ?>" selected><?= $resource['modelo_full']; ?></option>
+                                                            <?php
+                                                        ?>
+                                                        </select>
+                                                    </div>
+                                                    <small class="form-text text-muted"><?= TRANS('TYPE_OF_RESOURCE'); ?></small>
+                                                </div>
+                                            </div>
+
+                                            <div class="form-group col-md-2 <?= $resource['model_id']; ?>">
+                                                <div class="field_wrapper_specs" >
+                                                    <input type="number" class="form-control amount-control" data-random="<?= $resource['model_id']; ?>" name="amount[]" id="amount<?= $resource['model_id']; ?>" value="<?= $resource['amount']; ?>" data-oldvalue="<?= $resource['amount']; ?>" required min="1" onchange="updateRowPrice(<?= $resource['model_id']; ?>)" />
+                                                    <small class="form-text text-muted"><?= TRANS('COL_AMOUNT'); ?></small>
+                                                </div>
+                                            </div>
+                                            <div class="form-group col-md-2 <?= $resource['model_id']; ?>">
+                                                <div class="field_wrapper_specs" >
+                                                    <input type="text" class="form-control " name="unitary_price[]" id="unitary_price<?= $resource['model_id']; ?>" value="<?= $resource['unitary_price']; ?>" data-random="<?= $resource['model_id']; ?>" readonly />
+                                                    <small class="form-text text-muted"><?= TRANS('UNITARY_PRICE'); ?></small>
+                                                </div>
+                                            </div>
+                                            <div class="form-group col-md-2 <?= $resource['model_id']; ?>">
+                                                <div class="field_wrapper_specs" >
+                                                    
+                                                    <?php
+                                                        $rowPrice = $resource['unitary_price'] * $resource['amount'];
+                                                    ?>
+                                                    <input type="text" class="form-control row-price" name="row_price[]" id="row_price<?= $resource['model_id']; ?>" value="<?= $rowPrice; ?>" data-oldvalue="<?= $rowPrice; ?>" data-random="<?= $resource['model_id']; ?>" readonly />
+                                                    <input type="hidden" name="row_price_hidden[]" id="row_price_hidden<?= $resource['model_id']; ?>" class="row-price-hidden" value="<?= $rowPrice; ?>" data-random="<?= $resource['model_id']; ?>" />
+
+
+                                                    <small class="form-text text-muted"><?= TRANS('TOTAL'); ?></small>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    
+                                    <?php 
+                                    $idx++;
+                                }
+                            }
+                            $marginTop = ($idx == 0) ? 'mt-4' : '';
+                        ?>
+                        <!-- Novos recursos que podem ser alocados -->
+                        <div class="row mx-2 <?= $marginTop; ?>">
+
+                            <div class="form-group col-md-6">
+                                <div class="field_wrapper_specs" id="field_wrapper_specs">
+                                    <div class="input-group">
+                                        <div class="input-group-prepend">
+                                            <div class="input-group-text">
+                                                <a href="javascript:void(0);" class="add_button_resources" title="<?= TRANS('ADD'); ?>"><i class="fa fa-plus"></i></a>
+                                            </div>
+                                        </div>
+                                        <select class="form-control bs-select" id="resource" name="resource[]">
+                                            <option value=""><?= TRANS('TYPE_OF_RESOURCE'); ?></option>
+                                            <?php
+                                                
+                                                $types = getAssetsModels($conn, null, null, null, 1, ['t.tipo_nome'], 1);
+                                                foreach ($types as $type) {
+                                                    
+                                                    $fullType = $type['tipo'] . ' - ' . $type['fabricante'] . ' - ' . $type['modelo'];
+                                                    ?>
+                                                    <option data-subtext="<?= $type['cat_name']; ?>" data-model="<?= $type['codigo']; ?>" value="<?= $type['codigo']; ?>"><?= $fullType; ?></option>
+                                                    <?php
+                                                }
+                                            ?>
+                                        </select>
+                                    </div>
+                                    <small class="form-text text-muted"><?= TRANS('TYPE_OF_RESOURCE'); ?></small>
+                                </div>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <div class="field_wrapper_specs" >
+                                    <input type="number" class="form-control amount-control" data-random='' id="amount" name="amount[]" value="1" required min="1"/>
+                                    <small class="form-text text-muted"><?= TRANS('COL_AMOUNT'); ?></small>
+                                </div>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <div class="field_wrapper_specs" >
+                                    <input type="text" class="form-control " id="unitary_price" name="unitary_price[]" value="0" readonly />
+                                    <small class="form-text text-muted"><?= TRANS('UNITARY_PRICE'); ?></small>
+                                </div>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <div class="field_wrapper_specs" >
+                                    <input type="text" class="form-control row-price" id="row_price" name="row_price[]" value="0" readonly />
+                                    <small class="form-text text-muted"><?= TRANS('TOTAL'); ?></small>
+                                </div>
+                            </div>
+                            
+                        </div>
+
+                        <!-- Receberá cada um dos recursos alocados no chamado -->
+                        <!-- <div id="new_resources_row" class="form-group row my-4 new_resources_row">
+                        </div> -->
+                        <div id="new_resources_row" class="row mx-2 mt-1 new_resources_row">
+                        </div>
+
+                        <div id="summary" class="row mx-2 mt-4">
+                            <div class="form-group col-md-10"></div>
+                            <div class="form-group col-md-2">
+                                <div>
+                                    <input type="text" class="form-control " id="summary_rows_prices" name="summary_rows_prices" value="0" readonly />
+                                    <small class="form-text text-muted"><?= TRANS('SUMMARY_TOTAL'); ?></small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer d-flex justify-content-end bg-light">
+                            <button id="confirmResource" class="btn btn-primary"><?= TRANS('BT_UPDATE'); ?></button>
+                            <button id="cancelResource" class="btn btn-secondary" data-dismiss="modal" aria-label="Close"><?= TRANS('BT_CANCEL'); ?></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <input type="hidden" name="numero" id="numero" value="<?= $numero; ?>">
+            </form>
+
+            <?php
+        }
     ?>
+    
+
+
     <!-- Modal de agendamento -->
     <div class="modal fade" id="modalSchedule" tabindex="-1" style="z-index:2001!important" role="dialog" aria-labelledby="myModalSchedule" aria-hidden="true" data-backdrop="static" data-keyboard="false">
         <div class="modal-dialog modal-lg" role="document">
@@ -1069,7 +1688,7 @@ $isResponsible = false;
 
                 <div class="row mx-2">
                     <div class="form-group col-md-3 font-weight-bold text-right">
-                        <?= TRANS('OPENED_BY'); ?>:
+                        <?= TRANS('REQUESTER'); ?>:
                     </div>
                     <div class="form-group col-md-3 small" id="openedBy"></div>
                     
@@ -1141,7 +1760,7 @@ $isResponsible = false;
 
                 <div class="row p-3">
                     <div class="col">
-                        <p><?= TRANS('SLAS_HELPER'); ?>: <span class="badge badge-secondary p-2"><?= $row['numero']; ?></span></p>
+                        <p class="font-weight-bold"><?= TRANS('SLAS_HELPER'); ?>: <span class="badge badge-secondary p-2"><?= $row['numero']; ?></span></p>
                     </div>
                 </div>
 
@@ -1176,6 +1795,41 @@ $isResponsible = false;
                     <div id="idAbsSolutionTime" class="col"></div>
                 </div>
 
+
+                <!-- Testar se possui registro de operadores e períodos de atendimento - pode ter sido concluído e reaberto -->
+                <?php
+                    $treaters = [];
+                    $treaters = getTreatersManualStagesByTicket($conn, $row['numero']);
+
+                    if (count($treaters)) {
+                        ?>
+                        <div class="row mx-2">
+                            <div class="col-8"><p class="font-weight-bold"><?= TRANS('PROVIDED_TIMES'); ?>:</p></div>
+                        </div>
+                        <div class="row border-bottom mx-2 mb-4 font-weight-bold">
+                            <div class="col-3"><?= TRANS('WORKER'); ?></div>
+                            <div class="col-2"><?= TRANS('TREATING_START_DATE'); ?></div>
+                            <div class="col-2"><?= TRANS('TREATING_STOP_DATE'); ?></div>
+                            <div class="col-2"><?= TRANS('DURATION'); ?></div>
+                        </div>
+                        <?php
+
+                        foreach ($treaters as $treat) {
+                            ?>
+                            <div class="row border-bottom mx-2 mb-2">
+                                <div class="col-3"><?= $treat['nome']; ?></div>
+                                <div class="col-2"><?= dateScreen($treat['date_start']); ?></div>
+                                <div class="col-2"><?= dateScreen($treat['date_stop']); ?></div>
+                                <?php
+                                    $period = [];
+                                    $period[] = [$treat['date_start'], $treat['date_stop']];
+                                ?>
+                                <div class="col-2"><?= sumTimePeriods($period)[0]; ?></div>
+                            </div>
+                            <?php
+                        }
+                    }
+                ?>
                 <div class="row mx-2 mb-4">
                     <div class="col-7"></div>
                     <div class="col"><a href="#" onclick="showStages('<?= $row['numero']; ?>')"><i class="fab fa-stack-exchange"></i>&nbsp;<?= TRANS('STATUS_STACK'); ?></a></div>
@@ -1217,7 +1871,9 @@ $isResponsible = false;
                 <div class="row p-3" id="idStages">
                     <!-- Conteúdo carregado via ajax -->
                 </div>
-
+                <div id="idTreaters"> <!-- class="row p-3"  -->
+                    <!-- Conteúdo carregado via ajax -->
+                </div>
 
                 <div class="modal-footer d-flex justify-content-end bg-light">
                     <button id="cancelSchedule" class="btn btn-secondary" data-dismiss="modal" aria-label="Close"><?= TRANS('BT_CLOSE'); ?></button>
@@ -1235,13 +1891,10 @@ $isResponsible = false;
         <?php
         /* MENSAGEM SE FOR SUBCHAMADO */
         if (!empty($msgPai)) {
-        ?>
-            <div class="row my-2 mb-0">
-                <div class="<?= $colsDefault . " col-sm-12"; ?>">
-                    <?= $msgPai; ?>
-                </div>
-            </div>
-        <?php
+            ?>
+            <div class="w-100 mb-4"></div>
+            <?php
+            echo message('info', '', $msgPai, '', '', true);
         }
 
         /* MENSAGEM DE RETORNO PARA ABERTURA, EDIÇÃO E ENCERRAMENTO DO CHAMADO */
@@ -1281,22 +1934,25 @@ $isResponsible = false;
                 </div>
             <?php
         } elseif (($hasWorker || $row['stat_painel_cod'] == 1) && !$isRejected ) {
-            $msg_info = TRANS('TICKET_HAS_ROUTED');
+            $msg_info = ($row['stat_painel_cod'] == 1 ? TRANS('TICKET_HAS_ROUTED') : "") ;
             
-            if (in_array($_SESSION['s_uid'], array_column(getTicketWorkers($conn, $COD), 'user_id'))) {
+            if (in_array($_SESSION['s_uid'], array_column(getTicketWorkers($conn, $COD), 'user_id')) && $row['stat_painel_cod'] == 1) {
                 $msg_info = TRANS('MSG_TICKET_IS_IN_YOUR_QUEUE');
             } elseif ($isScheduled && !$hasWorker) {
                 $msg_info = TRANS('MSG_TICKET_IS_SCHEDULED');
             } elseif ($isScheduled) {
                 $msg_info = TRANS('MSG_TICKET_IS_SCHEDULED_TO_WORKER');
-            } elseif ($_SESSION['s_uid'] == $row['operador_cod']) {
+            } elseif ($_SESSION['s_uid'] == $row['operador_cod'] && $row['stat_painel_cod'] == 1) {
                 $msg_info = TRANS('MSG_TICKET_IS_IN_YOUR_QUEUE');
             }
+
+            if (!empty($msg_info)) {
             ?>
                 <div class="mt-2 mb-0">
                     <?= message('info', '', $msg_info, '', '', true); ?>
                 </div>
             <?php
+            }
         } elseif ($isRejected) {
             $msg_info = TRANS('MSG_TICKET_HAS_BEEN_REJECTED_BY_REQUESTER');
             ?>
@@ -1306,6 +1962,76 @@ $isResponsible = false;
             <?php
         }
 
+
+        if ($fieldDescriptionPosition == "top") {
+            ?>
+            <!-- Descrição posição top -->
+            <div class="row my-2">
+                <div class="<?= $colLabel; ?>"><?= TRANS('DESCRIPTION'); ?></div>
+                <div class="<?= $colContentDescription; ?>"><?= $descricao; ?></div>
+            </div>
+            <?php
+        }
+
+
+        /* Checa se possui chamados relacionados */
+        if ($firstOfAll && $_SESSION['s_nivel'] < 3) {
+            $projectInfo = [];
+            ?>
+            <div class="row my-2">
+            <?php
+            $hasProject = getTicketProjectId($conn, $COD);
+            if (!$hasProject) {
+                $buttonIcon = '<i class="fas fa-project-diagram"></i>';
+                ?>
+                    <div class="<?= $colLabel; ?>"><?= TRANS('PROJECT'); ?></div>
+                    <div class="<?= $colContent; ?>"><div class="btn-project btn " id="defineProjectBtn">&nbsp;<?= TRANS('DEFINE_PROJECT'); ?></div></div>
+                <?php
+            } else {
+                $projectInfo = getProjectDefinition($conn, $hasProject);
+                ?>
+                    <div class="<?= $colLabel; ?>"><?= TRANS('PROJECT'); ?></div>
+                    <div class="<?= $colContent; ?>"><div class="btn-project btn " id="projectFullDetails" data-project_id="<?= $hasProject; ?>">&nbsp;<?= $projectInfo['name']; ?></div></div>
+                <?php
+            }
+            ?>
+            </div>
+            <?php
+        }
+
+        ?>
+
+        <!-- Status de autorização do custo do chamado -->
+        <div class="row my-2">
+            <div class="<?= $colLabel; ?>"><?= TRANS('AUTHORIZATION_STATUS'); ?></div>
+            <div class="<?= $colContent; ?>"><?= $badgeNotification . "&nbsp" . $authorizationStatus; ?></div>
+            
+            <?php
+                if ($renderRequestAuthorizationBT) {
+                    ?>
+                        <div class="<?= $colLabel; ?>"><?= TRANS('AUTHORIZATION'); ?></div>
+                        <div class="<?= $colContent; ?>"><?= $btRequestAuthorization; ?></div>
+                    <?php
+                } elseif ($isAuthorizer && $row['authorization_status'] == 1) {
+                    ?>
+                        <div class="<?= $colLabel; ?>"><?= TRANS('AUTHORIZATION'); ?></div>
+                        <div class="<?= $colContent; ?>"><button class="btn btn-oc-orange text-white" id="doAuthorization"><i class="fas fa-user-check">&nbsp;</i><?= TRANS('BT_DO_AUTHORIZATION'); ?></button></div>
+                    <?php
+                } elseif (!empty($row['authorization_author'])) {
+                    $author = getUserInfo($conn, $row['authorization_author'])['nome'];
+                    ?>
+                        <div class="<?= $colLabel; ?>"><?= TRANS('AUTHOR_FOR_AUTHORIZATION_OR_REFUSE'); ?></div>
+                        <div class="<?= $colContent; ?>"><?= $author; ?></div>
+                    <?php
+                }
+            ?>
+            
+
+        </div>
+        <?php
+
+
+        
 
         $client = getClientByTicket($conn, $row['numero']);
         $ticket_rate = getRatedInfo($conn, $row['numero']);
@@ -1327,7 +2053,7 @@ $isResponsible = false;
         </div>
 
         <div class="row my-2">
-            <div class="<?= $colLabel; ?>"><?= TRANS('OPENED_BY'); ?></div>
+            <div class="<?= $colLabel; ?>"><?= TRANS('REQUESTER'); ?></div>
             <div class="<?= $colContent; ?>"><?= $row['aberto_por']; ?></div>
             <div class="<?= $colLabel; ?>"><?= TRANS('DEPARTMENT'); ?></div>
             <div class="<?= $colContent; ?>"><?= $row['setor']; ?></div>
@@ -1360,9 +2086,27 @@ $isResponsible = false;
             <div class="<?= $colContent; ?>"><?= $row['problema'] . "&nbsp;" . $ShowlinkScript; ?></div>
             <div class="<?= $colLabel; ?>"><?= TRANS('COL_CAT_PROB'); ?></div>
             <?php
-            if ($rowCatProb) {
+            if ($issueDetails) {
+                $categories = "";
+                $catKeys = ["probt1_desc", "probt2_desc", "probt3_desc", "probt4_desc", "probt5_desc", "probt6_desc"];
+                $groupNames = [
+                    $config['conf_prob_tipo_1'],
+                    $config['conf_prob_tipo_2'],
+                    $config['conf_prob_tipo_3'],
+                    $config['conf_prob_tipo_4'],
+                    $config['conf_prob_tipo_5'],
+                    $config['conf_prob_tipo_6']
+                ];
+
+                $arrayCategories = [];
+                foreach ($catKeys as $key => $catKey) {
+                    if (!empty($issueDetails[$catKey]) && strlen($issueDetails[$catKey]) > 1) {
+                        $arrayCategories[] = $groupNames[$key] . ": " . $issueDetails[$catKey];
+                    }
+                }
+                $categories = implode(",", $arrayCategories);
             ?>
-                <div class="<?= $colContent; ?>"><?= $rowCatProb['probt1_desc'] . " | " . $rowCatProb['probt2_desc'] . " | " . $rowCatProb['probt3_desc']; ?></div>
+                <div class="<?= $colContent; ?>"><?= strToTags($categories, 0, "secondary", "issue-category"); ?></div>
             <?php
             } else {
             ?>
@@ -1373,14 +2117,57 @@ $isResponsible = false;
 
         </div>
 
-        <!-- Descrição -->
-        <div class="row my-2">
-            <div class="<?= $colLabel; ?>"><?= TRANS('DESCRIPTION'); ?></div>
-            <div class="<?= $colContentLine; ?>"><?= $descricao; ?></div>
-        </div>
-
-
         <?php
+            if ($fieldDescriptionPosition == "default") {
+                ?>
+                <!-- Descrição posição default -->
+                <div class="row my-2">
+                    <div class="<?= $colLabel; ?>"><?= TRANS('DESCRIPTION'); ?></div>
+                    <div class="<?= $colContentDescription; ?>"><?= $descricao; ?></div>
+                </div>
+                <?php
+            }
+        
+
+        if (!empty($resources_info)) {
+            ?>
+            <div class="row my-2">
+                <div class="<?= $colLabel; ?>"><?= TRANS('RESOURCES'); ?></div>
+                <div class="<?= $colContentLine; ?>">
+                    <table id="table_materials" class="table stripe hover order-column row-border" border="0" cellspacing="0" width="100%" >
+                        <thead>
+                            <tr>
+                                <th><?= TRANS('COL_TYPE'); ?></th>
+                                <th><?= TRANS('COL_AMOUNT'); ?></th>
+                                <th><?= TRANS('UNITARY_PRICE'); ?></th>
+                                <th><?= TRANS('TOTAL_CURRENCY'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        <?php
+                    $summary = 0;
+                    foreach ($resources_info as $resource) {
+                        $row_price = (float)$resource['unitary_price'] * (int)$resource['amount'];
+                        $summary += (float)$row_price;
+                        ?>
+                            <tr>
+                                <td><?= $resource['modelo_full']; ?></td>
+                                <td><?= $resource['amount']; ?></td>
+                                <td><?= priceScreen($resource['unitary_price']); ?></td>
+                                <td><?= priceScreen($row_price); ?></td>
+                            </tr>
+                        <?php
+                    }
+                ?>
+                        <tfoot>
+                            <tr><td colspan="3"></td><td class="font-weight-bold"><?= priceScreen($summary); ?></td></tr>
+                        </tfoot>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+            <?php
+        }
 
         if (!empty($ticketWorkers)) {
             /* Informações a respeito de operadores alocados para o chamado */
@@ -1419,7 +2206,7 @@ $isResponsible = false;
         <?php
             $fontColor = (!empty($row['cor_fonte']) ? $row['cor_fonte']: "#FFFFFF");
             $bgColor = (!empty($row['cor']) ? $row['cor']: "#CCCCCC");
-            $priorityBadge = "<span class='badge p-2' style='color: " . $fontColor . "; background-color: " . $bgColor . "'>" . $row['pr_descricao'] . "</span>";
+            $priorityBadge = "<span class='btn btn-sm cursor-no-event text-wrap p-2' style='color: " . $fontColor . "; background-color: " . $bgColor . "'>" . $row['pr_descricao'] . "</span>";
         ?>
         <div class="row my-2">
             <div class="<?= $colLabel; ?>"><?= TRANS('OCO_PRIORITY'); ?></div>
@@ -1483,20 +2270,56 @@ $isResponsible = false;
         ?>
 
         <div class="row my-2">
+            <?php
+            $statusBadge = "<span class='btn btn-sm cursor-no-event text-wrap p-2' style='color: " . $row['textcolor'] . "; background-color: " . ($row['bgcolor'] ?? '#FFFFFF') . "'>" . $row['chamado_status'] . "</span>"; /* font-size: 16px; */
+            ?>
             <div class="<?= $colLabel; ?>"><?= TRANS('COL_STATUS'); ?></div>
-            <div class="<?= $colContent; ?>"><?= $row['chamado_status']; ?></div>
-            <div class="<?= $colLabel; ?>"><?= TRANS('FIELD_LAST_OPERATOR'); ?></div>
-            <div class="<?= $colContent; ?>"><?= $row['nome']; ?></div>
+            <div class="<?= $colContent; ?>"><?= $statusBadge; ?></div>
+            
+            <?php
+                if (!empty($row['registration_operator_cod'])) {
+                    $registratorInfo = getUserInfo($conn, $row['registration_operator_cod']);
+                    ?>
+                        <div class="<?= $colLabel; ?>"><?= TRANS('REGISTRATION_AUTHOR'); ?></div>
+                        <div class="<?= $colContent; ?>"><?= $registratorInfo['nome']; ?></div>
+                    <?php
+                }
+            ?>
         </div>
+        <?php
+            $ticketTreaterInfo = getTicketTreater($conn, $row['numero']);
+            if (!empty($ticketTreaterInfo)) {
+                ?>
+                <div class="row my-2">
+                    <div class="<?= $colLabel; ?>"><?= TRANS('OCO_RESP'); ?></div>
+                    <div class="<?= $colContent; ?>"><?= $ticketTreaterInfo['nome']; ?></div>
+                </div>
+                <?php
+            }
+        ?>
 
         <div class="row my-2">
             <div class="<?= $colLabel; ?>"><?= TRANS('GLOBAL_LINK'); ?></div>
             <div class="<?= $colContentLine; ?>"><?= $global_link; ?></div>
-
         </div>
 
         <?php
-            /* Exibição dos Campos personalizados */
+
+        if ($fieldDescriptionPosition == "bottom") {
+            ?>
+            <!-- Descrição posição bottom -->
+            <div class="row my-2">
+                <div class="<?= $colLabel; ?>"><?= TRANS('DESCRIPTION'); ?></div>
+                <div class="<?= $colContentDescription; ?>"><?= $descricao; ?></div>
+            </div>
+            <?php
+        }
+
+
+
+
+
+            /* Exibição dos Campos personalizados | customizados */
             $hiddenCustomFields = [];
             $profile_id = $row['profile_id'];
             if ($_SESSION['s_nivel'] == 3) {
@@ -1504,7 +2327,7 @@ $isResponsible = false;
                 $hiddenCustomFields = ($profile_id ? explode(',', (string)getScreenInfo($conn, $profile_id)['cfields_user_hidden']) : []);
             }
             
-
+            // insertCfieldCaseNotExists($conn, $row['numero'], );
             $custom_fields = getTicketCustomFields($conn, $row['numero']);
 
             /* Removendo campos marcados como invisíveis para o usuário final */
@@ -1524,7 +2347,10 @@ $isResponsible = false;
                 <p class="h6 text-center font-weight-bold mt-4"><?= TRANS('EXTRA_FIELDS'); ?></p>
                 <?php
                 $col = 1;
+                $highlightCost = false;
                 foreach ($custom_fields as $field) {
+
+                    $highlightCost = ($field['field_id'] == $tickets_cost_field);
                     
                     $isTextArea = false;
                     $value = "";
@@ -1539,6 +2365,9 @@ $isResponsible = false;
                     } elseif ($field['field_type'] == 'textarea') {
                         $isTextArea = true;
                     }
+
+
+                    $field_value = (!empty($field_value) && $highlightCost ? '<span class="text-success font-weight-bold">'.TRANS("CURRENCY").'&nbsp;' . $field_value . '</span>' : $field_value);
                     
                     $col = ($col > $number_of_collumns ? 1 : $col);
 
@@ -1555,7 +2384,7 @@ $isResponsible = false;
                     }
                     ?>
                         <div class="<?= $colLabel; ?>"><?= $field['field_label']; ?></div>
-                        <div class="<?= ($field['field_type'] == 'textarea' ? $colContentLine : $colContent); ?>"><?= $field_value; ?></div>
+                        <div class="<?= ($field['field_type'] == 'textarea' ? $colContentLine : $colContent); ?>"><?= $field_value; ?><?= ($highlightCost && $btSetCost ? '&nbsp;' . $renderCostBT : ''); ?></div>
                     <?php
                     if ($col == $number_of_collumns || $isTextArea) {
                         $col = ($isTextArea ? 2 : $col);
@@ -1642,6 +2471,18 @@ $isResponsible = false;
         }
         /* Final do trecho para inserção de arquivos e comentários */
 
+
+        if ($allowRequestFeedback) {
+            /* Botão para solicitar feedback do solicitante */
+            ?>
+            <div class="row my-2">
+                <div class="<?= $colLabel; ?>"><button id="bt_request_feedback" class="btn btn-secondary bt-request-feedback" type="button" value="<?= TRANS('REQUEST_FEEDBACK_BT'); ?>">&nbsp;<?= TRANS('REQUEST_FEEDBACK_BT'); ?></button></div>
+            </div>
+            <?php
+
+        }
+
+
         ?>
             <input type="hidden" name="numero" id="numero" value="<?= $COD; ?>">
             <input type="hidden" name="isDone" id="isDone" value="<?= $isDone; ?>">
@@ -1659,8 +2500,8 @@ $isResponsible = false;
         $ariaDisabledEmails = ($emails > 0 ? '' : ' true');
         $classDisabledFiles = ($hasFiles > 0 ? '' : ' disabled');
         $ariaDisabledFiles = ($hasFiles > 0 ? '' : ' true');
-        $classDisabledSubs = ($existeSub > 0 ? '' : ' disabled');
-        $ariaDisabledSubs = ($existeSub > 0 ? '' : ' true');
+        $classDisabledSubs = ($firstOfAll ? '' : ' disabled');
+        $ariaDisabledSubs = ($firstOfAll ? '' : ' true');
 
         ?>
         <div class="row my-2">
@@ -1678,7 +2519,7 @@ $isResponsible = false;
                         <a class="nav-link <?= $classDisabledFiles; ?>" id="divFiles-tab" data-toggle="pill" href="#divFiles" role="tab" aria-controls="divFiles" aria-selected="true" aria-disabled="<?= $ariaDisabledFiles; ?>"><i class="fas fa-paperclip"></i>&nbsp;<?= TRANS('FILES'); ?>&nbsp;<span class="badge badge-light pt-1"><?= $hasFiles; ?></span></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link <?= $classDisabledSubs; ?>" id="divSubs-tab" data-toggle="pill" href="#divSubs" role="tab" aria-controls="divSubs" aria-selected="true" aria-disabled="<?= $ariaDisabledSubs; ?>"><i class="fas fa-stream"></i>&nbsp;<?= TRANS('TICKETS_REFERENCED'); ?>&nbsp;<span class="badge badge-light pt-1"><?= $existeSub; ?></span></a>
+                        <a class="nav-link <?= $classDisabledSubs; ?>" id="divSubs-tab" data-toggle="pill" href="#divSubs" role="tab" aria-controls="divSubs" aria-selected="true" aria-disabled="<?= $ariaDisabledSubs; ?>"><i class="fas fa-stream"></i>&nbsp;<?= TRANS('TICKETS_REFERENCED'); ?>&nbsp;<span class="badge badge-light pt-1"><?= (count($relations) ? count($relations) -1 : 0); ?></span></a>
                     </li>
                 </ul>
             </div>
@@ -1687,7 +2528,7 @@ $isResponsible = false;
 
 
 
-        <!-- LISTAGEM DE ASSENTAMENTOS -->
+        <!-- LISTAGEM DE ASSENTAMENTOS / COMENTÁRIOS -->
 
         <div class="tab-content" id="pills-tabContent">
             <?php
@@ -1700,7 +2541,7 @@ $isResponsible = false;
 
                         <div class="col-sm-12 border-bottom rounded p-0 bg-white " id="assentamentos">
                             <!-- collapse -->
-                            <table class="table  table-hover table-striped rounded">
+                            <table class="table table-hover table-striped rounded">
                                 <!-- table-responsive -->
                                 <thead class="text-white" style="background-color: #48606b;">
                                     <tr>
@@ -1714,8 +2555,9 @@ $isResponsible = false;
                                 </thead>
                                 <tbody>
                                     <?php
-                                    $i = 1;
-                                    foreach ($resultAssets->fetchAll() as $rowAsset) {
+                                    $i = $assentamentos;
+                                    foreach ($entries as $rowAsset) {
+                                    // foreach ($resultAssets->fetchAll() as $rowAsset) {
                                         $transAssetText = "";
                                         if ($rowAsset['asset_privated'] == 1) {
                                             $transAssetText = "<span class='badge badge-danger p-2'>" . TRANS('CHECK_ASSET_PRIVATED') . "</span>";
@@ -1724,7 +2566,7 @@ $isResponsible = false;
                                         }
                                         /* Badge da primeira resposta */
                                         $badgeFirstResponse = "";
-                                        if (!empty($row['data_atendimento']) && $row['data_atendimento'] == $rowAsset['data']) {
+                                        if (!empty($row['data_atendimento']) && $row['data_atendimento'] == $rowAsset['created_at']) {
                                             $badgeFirstResponse = '&nbsp;<span class="badge badge-info p-2">' . TRANS('FIRST_RESPONSE') . '</span>';
                                         }
 
@@ -1734,12 +2576,12 @@ $isResponsible = false;
                                             <th scope="row"><?= $i; ?></th>
                                             <td><?= $transAssetText; ?></td>
                                             <td><?= $author; ?></td>
-                                            <td><?= formatDate($rowAsset['data']) . $badgeFirstResponse; ?></td>
+                                            <td data-sort="<?= $rowAsset['created_at']; ?>"><?= dateScreen($rowAsset['created_at']) . $badgeFirstResponse; ?></td>
                                             <td><?= getEntryType($rowAsset['tipo_assentamento']); ?></td>
-                                            <td><?= nl2br($rowAsset['assentamento']); ?></td>
+                                            <td><?= nl2br(htmlspecialchars_decode($rowAsset['assentamento'], ENT_QUOTES)); ?></td>
                                         </tr>
                                         <?php
-                                        $i++;
+                                        $i--;
                                     }
                                     ?>
                                 </tbody>
@@ -1869,18 +2711,10 @@ $isResponsible = false;
                                         $rowFiles['img_tipo'] . "](" . $size . "k)";
 
                                         if (isImage($rowFiles["img_tipo"])) {
-                                            /* $viewImage = "&nbsp;<a onClick=\"javascript:popupWH('../../includes/functions/showImg.php?" .
-                                                "file=" . $row['numero'] . "&cod=" . $rowFiles['img_cod'] . "'," . $rowFiles['img_largura'] . "," . $rowFiles['img_altura'] . ")\" " .
-                                                "title='Visualize o arquivo'><i class='fa fa-search'></i></a>"; */
 
                                             $viewImage = "&nbsp;<a onClick=\"javascript:popupWH('../../includes/functions/showImg.php?" .
                                                 "file=" . $row['numero'] . "&cod=" . $rowFiles['img_cod'] . "'," . $rowFiles['img_largura'] . "," . $rowFiles['img_altura'] . ")\" " .
                                                 "title='view'><i class='fa fa-search'></i></a>";
-
-                                            /* $page = "../../includes/functions/showImg.php?file=" . $row['numero'] . "&cod=" . $rowFiles['img_cod'];
-                                                
-                                                
-                                            $viewImage = "&nbsp;<a onClick=\"loadPageInModal('$page')\" title='Visualize o arquivo'><i class='fa fa-search'></i></a>"; */
                                         } else {
                                             $viewImage = "";
                                         }
@@ -1909,7 +2743,8 @@ $isResponsible = false;
 
             <!-- LISTAGEM DE SUBCHAMADOS -->
             <?php
-            if ($existeSub) {
+            // if ($existeSub) {
+            if ($firstOfAll) {
             ?>
                 <div class="tab-pane fade" id="divSubs" role="tabpanel" aria-labelledby="divSubs-tab">
                     <div class="row my-2">
@@ -1935,49 +2770,43 @@ $isResponsible = false;
                                     $i = 1;
                                     $key = "";
                                     $label = "";
-                                    foreach ($execSubCall->fetchAll() as $rowSubPai) {
+                                    
+                                    foreach ($relations as $ticketNumber => $relation) {
 
-                                        // $sqlStatus = "select o.*, s.* from ocorrencias o, `status` s  where o.numero=" . $rowSubPai['dep_filho'] . " and o.`status`=s.stat_id and s.stat_painel not in (3) ";
-                                        // $execStatus = $conn->query($sqlStatus);
-                                        // $regStatus = $execStatus->rowCount();
-                                        // if ($regStatus > 0) {
-                                        //     $comDeps = true;
-                                        // }
-                                        // if ($comDeps) {
-                                        //     $imgSub = ICONS_PATH . "view_tree_red.png";
-                                        // } else {
-                                        //     $imgSub = ICONS_PATH . "view_tree_green.png";
-                                        // }
+                                        /* Deve exibir apenas os demais chamados relacionados não exibindo o próprio */
+                                        if ($ticketNumber != $COD) {
+                                            
+                                            $label = "";
 
-                                        $key = $rowSubPai['dep_filho'];
-                                        $label = "<span class='badge badge-oc-wine p-2'>" . TRANS('CHILD_TICKET') . "</span>";
-                                        // $comDeps = false;
-                                        if ($rowSubPai['dep_pai'] != $COD) {
-                                            $key = $rowSubPai['dep_pai'];
-                                            $label = "<span class='badge badge-oc-teal p-2'>" . TRANS('PARENT_TICKET') . "</span>";
+                                            $qryDetail = $QRY["ocorrencias_full_ini"] . " WHERE  o.numero = " . $ticketNumber . " ";
+                                            $execDetail = $conn->query($qryDetail);
+                                            $rowDetail = $execDetail->fetch();
+
+                                            if ($rowDetail['data_abertura'] <= $row['data_abertura']) {
+                                                $label = "<span class='badge badge-oc-teal p-2'><i class='fas fa-less-than'></i></span>";
+                                            } else {
+                                                $label = "<span class='badge badge-oc-wine p-2'><i class='fas fa-greater-than'></i></span>";
+                                            }
+    
+                                            $texto = trim($rowDetail['descricao']);
+                                            if (strlen((string)$texto) > 200) {
+                                                $texto = substr($texto, 0, 195) . " ..... ";
+                                            };
+    
+                                            ?>
+                                            <tr onClick="showSubsDetails(<?= $rowDetail['numero']; ?>)" style="cursor: pointer;">
+                                                <th scope="row"><?= $rowDetail['numero']; ?>&nbsp;<?= $label; ?></th>
+                                                <td><?= $rowDetail['area']; ?></td>
+                                                <td><?= $rowDetail['problema']; ?></td>
+                                                <td><?= $rowDetail['contato'] . "<br/>" . $rowDetail['telefone']; ?></td>
+                                                <td><?= $rowDetail['setor'] . "<br/>" . $texto; ?></td>
+                                                <td><?= $rowDetail['nome'] . "<br/>" . $rowDetail['chamado_status']; ?></td>
+    
+                                            </tr>
+                                            <?php
+                                            $i++;
                                         }
 
-                                        $qryDetail = $QRY["ocorrencias_full_ini"] . " WHERE  o.numero = " . $key . " ";
-                                        $execDetail = $conn->query($qryDetail);
-                                        $rowDetail = $execDetail->fetch();
-
-                                        $texto = trim($rowDetail['descricao']);
-                                        if (strlen((string)$texto) > 200) {
-                                            $texto = substr($texto, 0, 195) . " ..... ";
-                                        };
-
-                                    ?>
-                                        <tr onClick="showSubsDetails(<?= $rowDetail['numero']; ?>)" style="cursor: pointer;">
-                                            <th scope="row"><?= $rowDetail['numero']; ?></a>&nbsp;<?= $label; ?></th>
-                                            <td><?= $rowDetail['area']; ?></td>
-                                            <td><?= $rowDetail['problema']; ?></td>
-                                            <td><?= $rowDetail['contato'] . "<br/>" . $rowDetail['telefone']; ?></td>
-                                            <td><?= $rowDetail['setor'] . "<br/>" . $texto; ?></td>
-                                            <td><?= $rowDetail['nome'] . "<br/>" . $rowDetail['chamado_status']; ?></td>
-
-                                        </tr>
-                                    <?php
-                                        $i++;
                                     }
                                     ?>
                                 </tbody>
@@ -1992,7 +2821,6 @@ $isResponsible = false;
 
             <input type="hidden" name="area_cod" id="area_cod" value="<?= $row['area_cod']; ?>">
             <input type="hidden" name="isClosed" id="isClosed" value="<?= ($isClosed || $isDone); ?>">
-            <!-- <input type="hidden" name="remainingDays" id="remainingDays" value="<?= $remainingDays; ?>"> -->
             <input type="hidden" name="ticketNumber" id="ticketNumber" value="<?= $COD; ?>">
 
         </div> <!-- tab-content -->
@@ -2002,20 +2830,37 @@ $isResponsible = false;
     <script src="../../includes/javascript/funcoes-3.0.js"></script>
     <script src="../../includes/components/jquery/jquery.js"></script>
     <script src="../../includes/components/jquery/jquery.initialize.min.js"></script>
-    <!-- <script type="text/javascript" src="../../includes/components/jquery/jquery-ui-1.12.1/jquery-ui.js"></script> -->
-    <!-- <script type="text/javascript" src="../../includes/components/jquery/timePicker/jquery.timepicker.min.js"></script> -->
+    <script src="../../includes/components/jquery/plentz-jquery-maskmoney/dist/jquery.maskMoney.min.js"></script>
+
     <script src="../../includes/components/jquery/datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
-    <!-- <script src="../../includes/components/bootstrap/js/bootstrap.min.js"></script> -->
     <script src="../../includes/components/bootstrap/js/bootstrap.bundle.js"></script>
     <script src="../../includes/components/bootstrap-select/dist/js/bootstrap-select.min.js"></script>
+	<script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables.js"></script>
     <script src="../../includes/components/fullcalendar/lib/main.js"></script>
     <script src="../../includes/components/fullcalendar/lib/locales/pt-br.js"></script>
     <script src="./tickets_calendar.js"></script>
     <script>
         $(function() {
 
+            updateSummary();
+
             /* Idioma global para os calendários */
 			$.datetimepicker.setLocale('pt-BR');
+
+            $('.table').DataTable({
+				language: {
+					url: "../../includes/components/datatables/datatables.pt-br.json",
+				},
+				paging: true,
+				deferRender: true,
+				order: [3, 'DESC'],
+				// columnDefs: [{
+				// 	searchable: false,
+				// 	orderable: false,
+				// 	targets: ['editar', 'remover']
+				// }],
+
+			});
 
 
             $.fn.selectpicker.Constructor.BootstrapVersion = '4';
@@ -2053,26 +2898,140 @@ $isResponsible = false;
                 styleBase: "form-control input-select-multi",
             });
 
+			$('.bs-select').selectpicker({
+				/* placeholder */
+				title: "<?= TRANS('SEL_SELECT', '', 1); ?>",
+				liveSearch: true,
+				showSubtext: true,
+				// actionsBox: true,
+				liveSearchNormalize: true,
+				liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
+				noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
+				style: "",
+				styleBase: "form-control input-select-multi",
+			});
+
+
+            /* Trazer os parâmetros do banco a partir da opção que será criada para internacionaliação */
+			$('#ticket_cost').maskMoney({
+                prefix:'R$ ',
+                thousands:'.', 
+                decimal:',', 
+                allowZero: false, 
+                affixesStay: false
+            });
+
+            $('#modalResource').on('hidden.bs.modal', function(){
+                location.reload();
+            });
+
+            $('.amount-control').on('change', function(){
+                updateRowPrice($(this).attr('data-random'));
+            });
+
+
+			if ($('#new_resources_row').length > 0) {
+                /* Adicionei o mutation observer em função dos elementos que são adicionados após o carregamento do DOM */
+                var obsResourceRow = $.initialize(".after-dom-ready", function() {
+					
+					$.fn.selectpicker.Constructor.BootstrapVersion = '4';
+					$('.bs-select').selectpicker({
+						/* placeholder */
+						title: "<?= TRANS('SEL_SELECT', '', 1); ?>",
+						liveSearch: true,
+                        showSubtext: true,
+						liveSearchNormalize: true,
+						liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
+						noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
+						style: "",
+						styleBase: "form-control input-select-multi",
+					});
+
+
+                    $('.sel-control').on('change', function() {
+                        let id = $(this).attr('id');
+                        loadResourcePrice($(this).attr('id'), $('#'+id).find("option:selected").data('random'));
+                        updateRowPrice($('#'+id).find("option:selected").data('random'));
+
+                    });
+
+                    $('.amount-control').on('change', function(){
+                        updateRowPrice($(this).attr('data-random'));
+                    });
+
+
+
+                }, {
+                    target: document.getElementById('new_resources_row')
+                }); /* o target limita o scopo do observer */
+            }	
+
+
+
+            $('#confirmResource').on('click', function(e) {
+                e.preventDefault();
+                addResourceProcess();
+            });
+
+            $('#defineProjectBtn').on('click', function(e) {
+                e.preventDefault();
+                openDefineProjectModal($('#numero').val());
+            });
+
+
+
+
             if ($('#isClosed').val() == true) {
                 showSlaDetails($('#ticketNumber').val(), 'onload');
             }
 
 
+            if ($('#btSetTicketCost').length > 0) {
+                $('#btSetTicketCost').css('cursor', 'pointer').on('click', function(){
+                    openTicketCostModal($('#ticketNumber').val());
+                });
+            }
+
+
+            if ($('#requestAuthorization').length > 0) {
+                $('#requestAuthorization').css('cursor', 'pointer').on('click', function(){
+                    requestAuthorization($('#ticketNumber').val());
+                });
+            }
+            if ($('#doAuthorization').length > 0) {
+                $('#doAuthorization').css('cursor', 'pointer').on('click', function(){
+                    doAuthorization($('#ticketNumber').val());
+                });
+            }
+
             if ($('#rate-your-ticket').length > 0 && $('#isRequester').val() == true && $('#canBeRated').val() == true) {
                 
-                // let remainingDays = $('#remainingDays').val();
-                // if (remainingDays >= 0) {
-                //     /* criar badge contador */
-                //     let badgeCounter = '&nbsp;<span class="badge badge-light">' + remainingDays + '</span>';
-                //     $('#rate-your-ticket').append(badgeCounter);
-                //     $('#rate-your-ticket').attr('title', '<?= TRANS('REMAINING_DAYS_TO_RATE'); ?>');
-                // }
-                $('#rate-your-ticket').css('cursor', 'pointer').on('click', function(){
+                $('#rate-your-ticket').addClass('ImportantPointer').on('click', function(){
                     approvingTicket($('#ticketNumber').val());
                 });
 
             }
 
+            $('#modalRequestAuthorization').on('hidden.bs.modal', function(){
+                $('#divResultRequestAuthorization').html('');
+                $('#request_authorization_entry').removeClass('is-invalid');
+                $('#request_authorization_entry').val('');
+            });
+
+            $('#modalSetTicketCost').on('hidden.bs.modal', function(){
+                $('#divResultSetCost').html('');
+                $('#ticket_cost').val($('#current_cost').val());
+                $('#ticket_cost').removeClass('is-invalid');
+                $('#set_cost_entry').removeClass('is-invalid');
+                $('#set_cost_entry').val('');
+            });
+
+            $('#modalAuthorization').on('hidden.bs.modal', function(){
+                $('#divResultAuthorization').html('');
+                $('#authorization_entry').removeClass('is-invalid');
+                $('#authorization_entry').val('');
+            });
+            
             $('#modalSchedule').on('hidden.bs.modal', function(){
                 if ($('#has_main_worker').val() == "") {
                     $('#main_worker').selectpicker('val', '');
@@ -2111,7 +3070,7 @@ $isResponsible = false;
 
             if ($('#userLevel').val() != 3) {
                 $(".input-tag-link").on("click", function(){
-                    popup_alerta_wide('./get_card_tickets.php?has_tags=' + $(this).attr("data-tag-name"));
+                    popup_alerta_wide('./get_card_tickets.php?has_tags=' + $(this).attr("data-tag-name") + '&app_from=ticket_info');
                 }).addClass("pointer");
             }
             
@@ -2158,6 +3117,20 @@ $isResponsible = false;
                     $(this).removeClass('is-invalid');
                 }
             });
+
+
+            $('#projectFullDetails').on('click', function(){
+                
+                let projectId = $(this).attr('data-project_id');
+                
+                openProjectFullDetails(projectId);
+            }).css({cursor: "pointer"});
+
+            if ($('#bt_request_feedback').length > 0) {
+                $('#bt_request_feedback').on('click', function(){
+                    requestFeedbackModal();
+                });
+            }
 
             //APENAS PARA USUÁRIOS DE ABERTURA
             if ($('#onlyOpen').val() == 1) {
@@ -2278,6 +3251,49 @@ $isResponsible = false;
         });
 
 
+
+        function openDefineProjectModal(id) {
+            $('#modalDefineProject').modal();
+            $('#projectButton').html('<a class="btn btn-primary" onclick="setProject(' + id + ')"><?= TRANS('BT_OK'); ?></a>');
+        }
+
+
+        function setProject(id) {
+            $(document).ajaxStart(function() {
+                $(".loading").show();
+            });
+            $(document).ajaxStop(function() {
+                $(".loading").hide();
+            });
+            $.ajax({
+                url: 'set_project.php',
+                method: 'POST',
+                dataType: 'json',
+                data: {
+                    'numero': id,
+                    'action': 'new',
+                    'name': $('#project_name').val(),
+                    'description': $('#project_description').val()
+                },
+            }).done(function(response) {
+                if (!response.success) {
+
+                    if (response.field_id != "") {
+                        $('#' + response.field_id).focus().addClass('is-invalid');
+                    }
+                    $('#divResultDefineProject').html(response.message);
+                } else {
+                    $('#divResultDefineProject').html('');
+                    $('#modalDefineProject').modal('hide');
+                    openProjectFullDetails(response.project_id);
+                    location.reload();
+
+                }
+            });
+            return false;
+        }
+
+
         function confirmAttendModal(id) {
             $('#modalGetTicket').modal();
             $('#j_param_id').html(id);
@@ -2385,6 +3401,166 @@ $isResponsible = false;
         }
 
 
+        function requestFeedbackModal() {
+            $('#modalRequestFeedback').modal();
+            $('#requestFeedbackButton').html('<a class="btn btn-primary" onclick="requestFeedback()"><?= TRANS('REQUEST_FEEDBACK_BT'); ?></a>');
+        }
+
+        function requestFeedback() {
+
+            let numero = $('#ticketNumber').val();
+            $(document).ajaxStart(function() {
+                $(".loading").show();
+            });
+            $(document).ajaxStop(function() {
+                $(".loading").hide();
+            });
+            $.ajax({
+                url: 'request_feedback.php',
+                method: 'POST',
+                dataType: 'json',
+                data: {
+                    'numero': numero,
+                    'entry': $('#entryRequestFeedback').val(),
+                    'status': $('#statusRequestFeedback').val(),
+                    'csrf': $('#csrf').val(),
+                    'csrf_session_key': $('#csrf_session_key').val()
+                },
+            }).done(function(response) {
+                if (!response.success) {
+                    if (response.field_id != "") {
+                        $('#' + response.field_id).focus().addClass('is-invalid');
+                    }
+                    $('#divResultRequestFeedback').html(response.message);
+                } else {
+                    $('#divResultRequestFeedback').html('');
+                    $('#modalRequestFeedback').modal('hide');
+                    location.reload();
+                }
+            });
+            return false;
+        }
+
+
+
+        function doAuthorization(id) {
+            $('#modalAuthorization').modal();
+            $('#authorizationButton').html('<a class="btn btn-primary" onclick="sendAuthorization(' + id + ')"><?= TRANS('BT_OK'); ?></a>');
+        }
+
+        function sendAuthorization (numero){
+            
+            var authorized = ($('#authorized').is(':checked') ? true : false);
+
+            var loading = $(".loading");
+            $(document).ajaxStart(function() {
+                loading.show();
+            });
+            $(document).ajaxStop(function() {
+                loading.hide();
+            });
+
+            $.ajax({
+                url: 'do_cost_authorization.php',
+                method: 'POST',
+                dataType: 'json',
+                data: {
+                    'ticket': numero,
+                    'authorized': authorized,
+                    'authorization_entry': $('#authorization_entry').val(),
+                },
+            }).done(function(response) {
+                if (!response.success) {
+                    if (response.field_id != "") {
+                        $('#' + response.field_id).focus().addClass('is-invalid');
+                    }
+                    $('#divResultAuthorization').html(response.message);
+                } else {
+                    $('#modalAuthorization').modal('hide');
+                    location.reload();
+                }
+            });
+            return false;
+        }
+        
+        function requestAuthorization(id) {
+            $('#modalRequestAuthorization').modal();
+            $('#requestAuthorizationButton').html('<a class="btn btn-primary" onclick="sendRequest(' + id + ')"><?= TRANS('BT_OK'); ?></a>');
+        }
+
+        function sendRequest (numero){
+
+            var loading = $(".loading");
+            $(document).ajaxStart(function() {
+                loading.show();
+            });
+            $(document).ajaxStop(function() {
+                loading.hide();
+            });
+
+            $.ajax({
+                url: 'request_cost_authorization.php',
+                method: 'POST',
+                dataType: 'json',
+                data: {
+                    'ticket': numero,
+                    'request_authorization_entry': $('#request_authorization_entry').val(),
+                },
+            }).done(function(response) {
+                if (!response.success) {
+                    if (response.field_id != "") {
+                        $('#' + response.field_id).focus().addClass('is-invalid');
+                    }
+                    $('#divResultRequestAuthorization').html(response.message);
+                } else {
+                    $('#modalRequestAuthorization').modal('hide');
+                    location.reload();
+                }
+            });
+            return false;
+        }
+
+
+
+        function openTicketCostModal(id) {
+            $('#modalSetTicketCost').modal();
+            $('#setTicketCostModalButton').html('<a class="btn btn-primary" onclick="setTicketCost(' + id + ')"><?= TRANS('BT_OK'); ?></a>');
+        }
+
+        function setTicketCost (numero){
+            
+            var loading = $(".loading");
+            $(document).ajaxStart(function() {
+                loading.show();
+            });
+            $(document).ajaxStop(function() {
+                loading.hide();
+            });
+
+            $.ajax({
+                url: 'ticket_cost_process.php',
+                method: 'POST',
+                dataType: 'json',
+                data: {
+                    'ticket': numero,
+                    'ticket_cost': $('#ticket_cost').val(),
+                    'set_cost_entry': $('#set_cost_entry').val(),
+                },
+            }).done(function(response) {
+                if (!response.success) {
+                    if (response.field_id != "") {
+                        $('#' + response.field_id).focus().addClass('is-invalid');
+                    }
+                    $('#divResultSetCost').html(response.message);
+                } else {
+                    $('#modalSetTicketCost').modal('hide');
+                    location.reload();
+                }
+            });
+            return false;
+        }
+
+
         function approvingTicket(id) {
             $('#modalValidate').modal();
             $('#confirmApproved').html('<a class="btn btn-primary" onclick="setApproved(' + id + ')"><?= TRANS('BT_OK'); ?></a>');
@@ -2427,6 +3603,100 @@ $isResponsible = false;
             });
             return false;
         }
+
+
+
+        $('.add_button_resources').on('click', function() {
+			loadNewResourceField();
+		});
+
+        // Delegate events
+        $('.new_resources_row, .old_resources_row').on('click', '.remove_button_resource', function(e) {
+            dataRandom = $(this).attr('data-random');
+            $("."+dataRandom).remove();
+            updateSummary();
+        });
+
+        $('#resource').on('change', function() {
+            loadResourcePrice($(this).attr('id'));
+            updateRowPrice();
+        });
+
+        $('#amount').on('change', function(){
+            updateRowPrice();
+        });
+
+
+        function loadResourcePrice(typeId, random = '') {
+			var loading = $(".loading");
+			$(document).ajaxStart(function() {
+				loading.show();
+			});
+			$(document).ajaxStop(function() {
+				loading.hide();
+			});
+
+			$.ajax({
+				url: '../../ocomon/geral/get_model_price.php',
+				method: 'POST',
+				dataType: 'json',
+				data: {
+					modelId: $('#'+typeId).find("option:selected").data('model'),
+				},
+			}).done(function(data) {
+
+				let unitary_priceId = 'unitary_price' + random;
+				$('#'+unitary_priceId).empty();
+                $('#'+unitary_priceId).val(data.comp_valor ?? 0);
+
+                let amountId =  'amount' + random;
+                let totalPriceId = 'row_price' + random;
+
+                let totalPrice = ($('#'+amountId).val() * data.comp_valor);
+                $('#'+totalPriceId).val(totalPrice);
+
+                updateRowPrice(random);
+
+			});
+		}
+
+
+
+        function addResource(id) {
+            $('#modalResource').modal();
+
+            // $('#confirmResource').html('<a class="btn btn-primary" onclick="addResourceProcess(' + id + ')"><?= TRANS('BT_ADD_RESOURCE'); ?></a>');
+        }     
+        
+        function addResourceProcess(numero) {
+            var loading = $(".loading");
+            $(document).ajaxStart(function() {
+                loading.show();
+            });
+            $(document).ajaxStop(function() {
+                loading.hide();
+            });
+
+            $.ajax({
+                url: './add_resource_process.php',
+                method: 'POST',
+                dataType: 'json',
+                data: $('#form_resources').serialize(),
+            }).done(function(response) {
+                if (!response.success) {
+
+                    if (response.field_id != "") {
+                        $('#' + response.field_id).focus().addClass('is-invalid');
+                    }
+                    $('#divResultResource').html(response.message);
+                } else {
+                    $('#modalResource').modal('hide');
+                    location.reload();
+                }
+            });
+            return false;
+        }
+        
 
         function scheduleTicket(id) {
             $('#modalSchedule').modal();
@@ -2501,7 +3771,11 @@ $isResponsible = false;
                     } else {
                         $('#idLoad').show();
 
-                        var form = $('form').get(0);
+                        var formCount = document.forms.length;
+                        /* Quando existirem mais de um formulário - os comentários serão no último formulário */
+                        var formIndex = formCount - 1;
+
+                        var form = $('form').get(formIndex);
                         $("#bt_submit").prop("disabled", true);
 
                         $.ajax({
@@ -2515,6 +3789,7 @@ $isResponsible = false;
                             processData: false,
                             contentType: false,
                         }).done(function(response) {
+                            // console.log(response);
                             location.reload();
                         });
                     }
@@ -2608,11 +3883,30 @@ $isResponsible = false;
             }).done(function(data) {
 
                 $('.classDynRow').remove();
-                for (var i in data) {
+                for (var i in data.stages) {
                     //data[i].status | data[i].date_start | data[i].date_stop | data[i].freeze
 
-                    var fieldHTML = '<div class="col-3 classDynRow">' + data[i].status + '</div><div class="col-3 classDynRow">' + data[i].date_start + '</div><div class="col-3 classDynRow">' + data[i].absolute_time + '</div><div class="col-3 classDynRow">' + data[i].filtered_time + '</div><div class="w-100 classDynRow"></div>';
+                    let fieldHTML = '<div class="col-3 classDynRow ">' + data.stages[i].status + '</div><div class="col-3 classDynRow">' + data.stages[i].date_start + '</div><div class="col-3 classDynRow">' + data.stages[i].absolute_time + '</div><div class="col-3 classDynRow">' + data.stages[i].filtered_time + '</div><div class="w-100 classDynRow"></div>';
+                    
                     $(idStages).append(fieldHTML);
+                }
+
+                if (data.treaters) {
+
+                    let treatersContent = '<div class="row p-3 classDynRow"><div class="col"><p class="font-weight-bold"><?= TRANS('TIME_IN_DIRECT_QUEUE'); ?>:</p></div></div><div class="w-100"></div>';
+
+                    treatersContent += '<div class="row header px-3 bold classDynRow"><div class="col-4"><?= TRANS('WORKER'); ?></div><div class="col-4"><?= TRANS('CARDS_ABSOLUTE_TIME'); ?></div><div class="col-4"><?= TRANS('CARDS_FILTERED_TIME'); ?></div></div>';
+
+                    $('#idTreaters').append(treatersContent);
+
+                    // console.log (data.treaters);
+                    for (var i in data.treaters) {
+
+                        $('#idTreaters').append('<div class="row p-3 classDynRow"><div class="col-4">' + data.treaters[i].nome + '</div><div class="col-4">' + data[data.treaters[i].user_id].absolutetime + '</div><div class="col-4">' + data[data.treaters[i].user_id].fulltime + '</div></div> ' );
+                        // console.log(data.treaters[i].nome);
+                        //data[data.treaters[i].user_id].fulltime
+
+                    }
                 }
                 $('#modalStages').modal();
             }).fail(function() {
@@ -2757,6 +4051,77 @@ $isResponsible = false;
 		}
 
 
+        function loadNewResourceField() {
+            var loading = $(".loading");
+            $(document).ajaxStart(function() {
+                loading.show();
+            });
+            $(document).ajaxStop(function() {
+                loading.hide();
+            });
+
+            $.ajax({
+                url: './render_new_resource_fields.php',
+                method: 'POST',
+                data: {
+                    // measure_type: $('#measure_type').val(),
+                    random: Math.random().toString(16).substr(2, 8)
+                },
+                // dataType: 'json',
+            }).done(function(data) {
+                $('#new_resources_row').append(data);
+            });
+            return false;
+		}
+
+
+        function updateRowPrice (random = '') {
+            let amountId = 'amount' + random;
+            $('#' + amountId).on('change', function(){
+                
+                let row_price = $(this).val() * $('#unitary_price' + random).val();
+
+                if (row_price != 'NaN') {
+                    $('#row_price' + random).val(parseFloat(row_price).toFixed(2));
+                } else {
+                    $('#row_price' + random).val(0);
+                }
+                
+                updateSummary();
+            });
+            updateSummary();
+        }
+
+        /* function updateSummary_old() {
+            let row_price = 0;
+            $('.row-price').each(function(){
+                if (parseFloat($(this).val())) {
+                    row_price += parseFloat($(this).val()).toFixed(2);
+                }
+            })
+            $('#summary_rows_prices').val(row_price);
+        } */
+
+        function updateSummary(){
+            
+            if ($('#summary_rows_prices').length > 0) {
+            
+                var arr = document.querySelectorAll('.row-price');
+                var total=0;
+                arr.forEach(function(item){
+                
+                    if (parseFloat(item.value)) {
+                        total += parseFloat(item.value);
+                    } else {
+                        item.value = 0;
+                    }
+                });
+                // document.getElementById('summary_rows_prices').value = parseFloat(total).toFixed(2);
+                document.getElementById('summary_rows_prices').value = formatMoney(total);
+            }
+        }
+
+
         function controlEmailOptions(){
             if ($('#has_main_worker').val() != '' || $('#main_worker').val() != '') {
                 $('#mailWorkers').prop('disabled', false);
@@ -2844,6 +4209,17 @@ $isResponsible = false;
             let y = datepart.split('-')[0];
 
             return d + '/' + m + '/' + y + ' ' + timepart;
+        }
+
+        function formatMoney(n, c, d, t) {
+            c = isNaN(c = Math.abs(c)) ? 2 : c, d = d == undefined ? "," : d, t = t == undefined ? "." : t, s = n < 0 ? "-" : "", i = parseInt(n = Math.abs(+n || 0).toFixed(c)) + "", j = (j = i.length) > 3 ? j % 3 : 0;
+            return s + (j ? i.substr(0, j) + t : "") + i.substr(j).replace(/(\d{3})(?=\d)/g, "$1" + t) + (c ? d + Math.abs(n - i).toFixed(c).slice(2) : "");
+        }
+
+        function openProjectFullDetails(projectID) {
+
+            let location = 'project_details.php?project_id=' + projectID;
+            popup_alerta_wide(location);
         }
 
 

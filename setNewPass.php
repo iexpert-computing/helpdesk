@@ -36,18 +36,18 @@ $conn = ConnectPDO::getInstance();
 <html lang="pt-BR">
 
 <head>
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="description" content="<?= TRANS('TTL_OCOMON'); ?>">
 	<link rel="stylesheet" href="./includes/components/bootstrap/custom.css">
 	<link rel="stylesheet" href="./includes/components/fontawesome/css/all.min.css">
 	<link rel="stylesheet" type="text/css" href="./includes/css/estilos.css" />
-	<link rel="stylesheet" type="text/css" href="./includes/css/estilos_custom.css" />
 	<!-- <link rel="stylesheet" type="text/css" href="./includes/css/index_css.css" /> -->
 	<link rel="stylesheet" type="text/css" href="./includes/css/util.css" />
 	<link rel="stylesheet" type="text/css" href="./includes/css/login.css" />
-	<link rel="shortcut icon" href="./includes/icons/favicon.ico">
+	<link rel="stylesheet" type="text/css" href="./includes/css/estilos_custom.css" />
+	<link rel="shortcut icon" href="./includes/icons/favicon.webp">
 </head>
 
 <body style="background-color: #666666;">
@@ -118,7 +118,8 @@ $conn = ConnectPDO::getInstance();
 						<span class="login100-form-title ">
 							<!-- p-b-43 -->
 							<!-- topo-color -->
-							<img src="./MAIN_LOGO.svg" alt="logomarca iexpert">
+							<!-- <img src="./MAIN_LOGO.svg" alt="OcoMon"> -->
+							<span class="logo header-mainlogo"></span>
 						</span>
 						<span class="login100-form-title mt-5 text-secondary">
 							<?= TRANS('TTL_ALTER_PASS'); ?>
@@ -155,11 +156,14 @@ $conn = ConnectPDO::getInstance();
 					<!-- FOOTER -->
 					<div class="footer bg-light border-top text-center p-2 d-none d-sm-block">
 						<div class="txt1">
-							<a href="https://iexpert.net.br/" target="_blank">
-								HelpDesk
-							</a>&nbsp;-&nbsp;
-							<?= TRANS('OCOMON_ABSTRACT'); ?><br />
-							<?= TRANS('COL_VERSION') . ": " . VERSAO . " - " . TRANS('MNS_MSG_LIC') . " GPL"; ?>
+							<span>
+								<a href="<?= APP_URL; ?>" target="_blank">
+									<strong><?= APP_NAME; ?></strong>
+								</a>
+								&nbsp;-&nbsp;
+								<?= TRANS('OCOMON_ABSTRACT'); ?><br />
+								<?= TRANS('COL_VERSION') . ": <strong>" . VERSAO . "</strong> - " . TRANS('MNS_MSG_LIC') . " GPL"; ?>
+							</span>
 						</div>
 					</div>
 

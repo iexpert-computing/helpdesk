@@ -61,13 +61,21 @@ $columns = array(
 );
 
 // getting total number records without any search
-$sql = $QRY["ocorrencias_full_ini"] . " WHERE stat_ignored <> 1 AND o.oco_scheduled=1 and o.sistema in (" . $uareas . ") ORDER BY numero";
+$sql = $QRY["tickets_in_queues_count"] . " AND 
+            stat_ignored <> 1 AND 
+            o.oco_scheduled = 1 AND 
+            o.sistema in ({$uareas}) 
+        ";
 $sqlResult = $conn->query($sql);
-$totalData = $sqlResult->rowCount();
+// $totalData = $sqlResult->rowCount();
+$totalData = $sqlResult->fetch()['total'];
 $totalFiltered = $totalData;  // when there is no search parameter then total number rows = total number filtered rows.
 
 
-$sql = $QRY["ocorrencias_full_ini"] . " WHERE stat_ignored <> 1 AND o.oco_scheduled=1 and o.sistema in (" . $uareas . ") ";
+$sql = $QRY["tickets_in_queues"] . " AND 
+            stat_ignored <> 1 AND 
+            o.oco_scheduled = 1 AND 
+            o.sistema in ({$uareas})";
 
 if( !empty($requestData['search']['value']) ) {   // if there is a search parameter, $requestData['search']['value'] contains search parameter
 
@@ -146,6 +154,8 @@ foreach ($sqlResult->fetchAll() as $row){
         $cor_font = $row['cor_fonte'];
     }
 
+    $renderTicketStatus = "<span class='btn btn-sm text-wrap' style='color: " . $row['textcolor'] . "; background-color: " . ($row['bgcolor'] ?? '#FFFFFF') . "'>" . $row['chamado_status'] . "</span>";
+
     $referenceDate = (!empty($row['oco_real_open_date']) ? $row['oco_real_open_date'] : $row['data_abertura']);
     $dataAtendimento = $row['data_atendimento']; //data da primeira resposta ao chamado
     $dataFechamento = $row['data_fechamento'];
@@ -210,10 +220,10 @@ foreach ($sqlResult->fetchAll() as $row){
 	$nestedData[] = $linkImg."&nbsp;".$row['problema'] . $tags;
     $nestedData[] = $clientName . $row['contato'];
     $nestedData[] = $departmentName . $texto;
-    $nestedData[] = "<b>" . $row['chamado_status'] . "</b>";
+    $nestedData[] = $renderTicketStatus;
     $nestedData[] = $colTVNew;
     $nestedData[] = "<i class='fas fa-calendar-alt text-oc-teal fa-lg mb-1'></i>&nbsp;" . dateScreen($row['oco_scheduled_to']);
-    // $nestedData[] = "<span class='badge p-2' style='color: " . $cor_font . "; background-color: " . $COR . "'>" . $row['pr_descricao'] . "</span>";
+    // $nestedData[] = "<span class='btn btn-sm ' style='color: " . $cor_font . "; background-color: " . $COR . "'>" . $row['pr_descricao'] . "</span>";
     $nestedData[] = "<img height='20' src='" . $imgsPath . "" . $ledSlaResposta . "' title='" . TRANS('HNT_RESPONSE_LED') . "'>&nbsp;<img height='20' src='" . $imgsPath . "" . $ledSlaSolucao . "' title='" . TRANS('HNT_SOLUTION_LED') . "'>";
     $nestedData['DT_RowId'] = 'id_' . $row['numero']; //DT_RowId é reservado
     

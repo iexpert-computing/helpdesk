@@ -105,12 +105,17 @@ try {
 
     /* Tipo de assentamento: 2 - Edição para atendimento */
     $sql = "INSERT INTO assentamentos 
-                (ocorrencia, assentamento, `data`, responsavel, tipo_assentamento) 
+                (ocorrencia, assentamento, created_at, responsavel, tipo_assentamento) 
             values 
                 ({$numero}, '" . $data['entry'] . "', '{$now}', {$user}, 2 )";
 
     try {
         $result = $conn->exec($sql);
+
+        $notice_id = $conn->lastInsertId();
+        if ($_SESSION['s_uid'] != $row['aberto_por']) {
+            setUserTicketNotice($conn, 'assentamentos', $notice_id);
+        }
 
     } catch (Exception $e) {
         $exception .= '<hr>' .$e->getMessage();
@@ -127,8 +132,8 @@ try {
 }
 
 /* Gravação da data na tabela tickets_stages */
-$stopTimeStage = insert_ticket_stage($conn, $numero, 'stop', 2);
-$startTimeStage = insert_ticket_stage($conn, $numero, 'start', 2);
+$stopTimeStage = insert_ticket_stage($conn, $numero, 'stop', 2, $user);
+$startTimeStage = insert_ticket_stage($conn, $numero, 'start', 2, $user);
 
 
 

@@ -54,8 +54,9 @@ $imgsPath = "../../includes/imgs/";
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/Responsive-2.2.5/css/responsive.dataTables-custom.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/util.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <style>
 
@@ -230,6 +231,53 @@ $imgsPath = "../../includes/imgs/";
                     </div>
                 </div>
             </div>
+
+
+
+            <!-- Pendentes de autorização para atendimento com base no custo dos chamados -->
+            <div id="divNeedAuthorization">
+                <!-- class="mt-2" -->
+                <div class="accordion" id="accordionNeedAuthorization">
+                    <div class="card">
+                        <div class="card-header bg-oc-orange" id="showNeedAuthorization">
+                            <!-- style="background-color: teal;" -->
+                            <button id="idBtnNeedAuthorization" class="btn btn-block text-center text-white" type="button" data-toggle="collapse" data-target="#listNeedAuthorization" aria-expanded="true" aria-controls="listNeedAuthorization" onclick="this.blur();">
+                                <h4><i class="fas fa-user-check"></i>&nbsp;<?= TRANS('QUEUE_NEED_AUTHORIZATION_BY_MY_AREAS'); ?>&nbsp;<span id="idTotalNeedAuthorization" class="badge badge-light"></span></h4>
+                            </button>
+                        </div>
+
+                        <div id="listNeedAuthorization" class="collapse show" aria-labelledby="showNeedAuthorization" data-parent="#accordionNeedAuthorization">
+                            <div class="card-body" id="idCardNeedAuthorization">
+                                <div class="row">
+                                    <div class="col-12 ">
+                                        <table id="table_need_authorization" class="table stripe hover order-column row-border" width="100%">
+                                            <thead>
+                                                <tr class="header">
+                                                    <td class='line'></td>
+                                                    <td class='line'><?= TRANS('NUMBER_ABBREVIATE'); ?> / <?= TRANS('AREA'); ?></td>
+                                                    <td class='line' style='max-width:15%'><?= TRANS('ISSUE_TYPE'); ?></td>
+                                                    <td class='line'><?= TRANS('CONTACT'); ?> / <?= TRANS('COL_PHONE'); ?></td>
+                                                    <td class='line truncate_flag truncate descricao description'><?= TRANS('DEPARTMENT'); ?> / <?= TRANS('DESCRIPTION'); ?></td>
+                                                    <td class='line'><?= TRANS('COL_STATUS'); ?></td>
+                                                    <td class='line'><?= TRANS('COST'); ?></td>
+                                                    <td class='line'><?= TRANS('COL_SLA'); ?></td>
+                                                </tr>
+                                            </thead>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+
+
+
+
+
 
         <?php
             }
@@ -752,14 +800,137 @@ $imgsPath = "../../includes/imgs/";
 
 
 
+            /* Tabela de aguardando autorização */
+            if ($('#table_need_authorization').length > 0) {
+                var dataTableNeedAuthorization = $('#table_need_authorization').DataTable({
+                    "responsive": {
+                        details: {
+                            type: 'column',
+                            renderer: function(api, rowIdx, columns) {
+                                var data = $.map(columns, function(col, i) {
+                                    return col.hidden ?
+                                        '<tr data-dt-row="' + col.rowIndex + '" data-dt-column="' + col.columnIndex + '">' +
+                                        '<td>' + col.title + ':' + '</td> ' +
+                                        '<td>' + col.data + '</td>' +
+                                        '</tr>' :
+                                        '';
+                                }).join('');
+                                return data ? $('<table/>').append(data) : false;
+                            }
+                            // renderer: $.fn.dataTable.Responsive.renderer.tableAll()
+                        }
+                    },
+                    columnDefs: [{
+                            className: 'control',
+                            orderable: false,
+                            targets: 0
+                        },
+                        {
+                            className: 'truncate truncate_flag descricao description',
+                            targets: ['descricao'],
+                            /* render: function ( targets, type, row ) {
+                                return '$'+ targets;
+                            } */
+                            // render: $.fn.dataTable.render.text() //buidin helper
+                        },
+                        {
+                            className: 'table_lines',
+                            targets: '_all'
+                        },
+                        {
+                            targets: [6, 7],
+                            orderable: false
+                        }
+                    ],
+
+                    order: [1, 'desc'],
+                    "processing": true,
+                    "serverSide": true,
+                    "ajax": {
+                        url: "get_need_my_area_authorization.php", // json datasource
+                        type: "post", // method  , by default get
+                        /* data: {
+                            user_id: 1 
+                        }, */
+
+                        "dataSrc": function(json) { //aqui consigo trabalhar no response
+
+                            if (json.recordsTotal == 0) {
+                                $("#listNeedAuthorization").collapse('hide');
+                                $("#idBtnNeedAuthorization").attr('data-toggle', '');
+                            } else {
+                                $("#idBtnNeedAuthorization").attr('data-toggle', 'collapse');
+                            }
+
+                            if (json.recordsTotal == 0) {
+                                $('#divNeedAuthorization').hide();
+                            } else {
+                                $('#divNeedAuthorization').show();
+                            }
+                            $('#idTotalNeedAuthorization').html(json.recordsTotal);
+                            // You can also modify `json.data` if required
+                            return json.data;
+
+                        },
+
+                        error: function() { // error handling
+                            $(".users-grid-error").html("");
+                            $("#users-grid").append('<tbody class="users-grid-error"><tr><th colspan="3">Informações indisponíveis no momento</th></tr></tbody>');
+                            $("#users-grid_processing").css("display", "none");
+                        }
+                    },
+                    deferRender: true,
+                    "language": {
+                        "url": "../../includes/components/datatables/datatables.pt-br.json"
+                    }
+                });
+            }  
+
+            if ($('#table_need_authorization').length > 0) {
+                /* Redirecionamento para a tela de detalhes da ocorrencia */
+                $('#table_need_authorization').on('click', 'td', function() {
+
+                    var idFull = dataTableNeedAuthorization.row(this).id();
+                    var ticket = formatRowId(idFull, 'id_');
+                    var colIndex = $(this).index() + 1; /* coluna */
+
+                    //Quando for a primeira coluna (do responsivo) não há redirecionamento
+                    if (colIndex != 1) {
+                        redirect('ticket_show.php?numero=' + ticket);
+                    }
+                });
+
+                /* Popover da descriçao do chamado */
+                $('#table_need_authorization').on('mouseover', 'td', function() {
+
+                    if ($(this).hasClass('description')) {
+                        /* Popover */
+                        let content = dataTableNeedAuthorization.cell(this).data();
+                    
+                        $(this).attr('data-content', content);
+                        $(this).popover({
+                            html:true
+                        });
+                        $(this).popover('update');
+                        $(this).popover('show');
+                    }
+                });            
+            }
+
+
+
+
+
+
+
             /* Remoção dos popovers */
-            $('#table_my_inactive,#table_my_closure,#table_my_tickets,#table_need_approval').on('mouseout', 'td', function() {
+            $('#table_my_inactive,#table_my_closure,#table_my_tickets,#table_need_approval, #table_need_authorization').on('mouseout', 'td', function() {
                 $(this).popover('dispose');
                 $('.popover').remove();
             });
 
             /* Popovers para os indicadores de interação com o chamado (primeira coluna) */
-            $('#table_my_inactive,#table_my_closure,#table_my_tickets,#table_need_approval').on('mouseover', '.ticket-interaction', function() {
+            $('#table_my_inactive,#table_my_closure,#table_my_tickets,#table_need_approval, #table_need_authorization').on('mouseover', '.ticket-interaction', function() {
 
                 let content = $(this).attr('data-content');
                 
@@ -783,6 +954,10 @@ $imgsPath = "../../includes/imgs/";
 
                 if ($('#table_my_closure').length > 0) {
                     dataTableMyClosure.ajax.reload(null, false); // user paging is not reset on reload
+                }
+
+                if ($('#table_need_authorization').length > 0) {
+                    dataTableNeedAuthorization.ajax.reload(null, false);
                 }
                 
                 updateScheduled();

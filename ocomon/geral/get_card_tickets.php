@@ -45,15 +45,6 @@ foreach ($custom_fields_full as $cfield) {
 $custom_fields_classes_text = implode(",", $custom_fields_classes);
 
 
-$logo = '../../includes/logos/MAIN_LOGO.png';
-// Read image path, convert to base64 encoding
-$logoType = pathinfo($logo, PATHINFO_EXTENSION);
-$logoData = file_get_contents($logo);
-$imgData = base64_encode($logoData);
-// Format the image SRC:  data:{mime};base64,{data};
-$imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
-
-
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -67,8 +58,21 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/switch_radio.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
+
+    <style>
+            pre {
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                word-break: break-all;
+                font-size: 11px;
+                font-family: FreeSans, sans-serif;
+                line-height: 1.5em;
+        }
+    </style>
 
 </head>
 
@@ -89,7 +93,8 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
             </div>
         </div>
 
-
+        <input type="hidden" name="report-mainlogo" class="report-mainlogo" id="report-mainlogo"/>
+        <input type="hidden" name="logo-base64" id="logo-base64"/>
         <?php
 
             // $tag = ((isset($_GET['tag'])) ? nohtml($_GET['tag']) : "");
@@ -171,6 +176,8 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                 loading.hide();
             });
 
+            setLogoSrc();
+
             $.ajax({
                 // url: 'get_full_tickets_table.php',
                 url: '<?= $actionUrl;?>',
@@ -222,6 +229,16 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
             var obs = $.initialize("#table_tickets_queue", function() {
                 
                 var criterios = $('#divCriterios').text();
+
+                function setTitles() {
+                    var buttons = $( 'a.buttons-columnVisibility' );
+
+                    buttons.each(function( index ) {
+                        // console.log( index + ": " + $( this ).text() );
+                        var tooltip =  $( this ).text() ;
+                        $( this ).attr( 'title', tooltip );
+                    });
+                }
                 
                 var table = $('#table_tickets_queue').DataTable({
 
@@ -334,7 +351,8 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                                         columns: [
                                             {
                                                 margin: [20, 10, 0, 0],
-                                                image: '<?= $imgSrc; ?>'
+                                                image: getLogoSrc(),
+                                                width: getLogoWidth()
                                             } ,
                                             {
                                                 table: {
@@ -429,6 +447,10 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                 table.buttons().container()
                     .appendTo($('.display-buttons:eq(0)', table.table().container()));
 
+                table.on( 'buttons-action', function ( e, buttonApi, dataTable, node, config ) {
+                    setTitles();
+                });
+
 
             }, {
                 target: document.getElementById('divTicketsList')
@@ -512,8 +534,41 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
             $('#modal').modal();
 
 			// popup_alerta_wide(location);
+        }
 
+        function getLogoSrc() {
+            return $('#logo-base64').val() ?? '';
+        }
 
+        function setLogoSrc() {
+
+            let logoName = $('#report-mainlogo').css('background-image');
+
+            if (logoName == 'none') {
+                return;
+            }
+            logoName = logoName.replace(/.*\s?url\([\'\"]?/, '').replace(/[\'\"]?\).*/, '')
+            logoName = logoName.split('/').pop();
+
+            $.ajax({
+                url: './get_reports_logo.php',
+                method: 'POST',
+                data: {
+                    'logo_name': logoName
+                },
+                dataType: 'json',
+            }).done(function(data) {
+
+                if (!data.success) {
+                    return;
+                }
+                $('#logo-base64').val(data.logo);
+            });
+        }
+
+        function getLogoWidth() {
+            let logoWidth = $('#report-mainlogo').width() ?? 150;
+            return logoWidth;
         }
     </script>
 </body>

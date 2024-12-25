@@ -72,8 +72,9 @@ if (isAreasIsolated($conn) && $_SESSION['s_nivel'] != 1) {
     <!-- <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/Responsive-2.2.5/css/responsive.dataTables-custom.css" /> -->
     <link rel="stylesheet" type="text/css" href="../../includes/components/select2/dist-2/css/select2.min.css" />
     <!-- <link rel="stylesheet" type="text/css" href="../../includes/components/select2/dist-2/css/select2-bootstrap4.min.css" /> -->
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <style>
         .input-group>.input-group-prepend {

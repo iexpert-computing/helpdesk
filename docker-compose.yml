@@ -21,7 +21,7 @@ services:
       #- ./init-scripts:/docker-entrypoint-initdb.d
 
   app:
-    image: ocomon5.0-custom-iexpert:latest
+    image: ocomon6.0-custom-iexpert:latest
     #container_name: ocomon_container
     #restart: always
     ports:

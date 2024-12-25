@@ -120,7 +120,7 @@ if (isset($post['no_empty_' . $post_field_sufix]) && $post['no_empty_' . $post_f
 
 } elseif (isset($post[$post_field_sufix]) && !empty($post[$post_field_sufix])) {
     
-    $tmp = explode(',', $post[$post_field_sufix]);
+    $tmp = explode(',', (string)$post[$post_field_sufix]);
     // $treatValues = array_map('intval', $tmp);
     $treatValues = array_map('noHtml', $tmp);
     $tagIN = "";
@@ -270,7 +270,7 @@ if (isset($post['no_empty_' . $post_field_sufix]) && $post['no_empty_' . $post_f
 
 } elseif (isset($post[$post_field_sufix]) && !empty($post[$post_field_sufix])) {
     
-    $tmp = explode(',', $post[$post_field_sufix]);
+    $tmp = explode(',', (string)$post[$post_field_sufix]);
     // $treatValues = array_map('intval', $tmp);
     $treatValues = array_map('noHtml', $tmp);
     $tagIN = "";
@@ -303,7 +303,7 @@ if (isset($post['no_empty_' . $post_field_sufix]) && $post['no_empty_' . $post_f
 
 } elseif (isset($post[$post_field_sufix]) && !empty($post[$post_field_sufix])) {
     
-    $tmp = explode(',', $post[$post_field_sufix]);
+    $tmp = explode(',', (string)$post[$post_field_sufix]);
     // $treatValues = array_map('intval', $tmp);
     $treatValues = array_map('noHtml', $tmp);
     $tagIN = "";
@@ -490,7 +490,7 @@ if (isset($post['no_empty_' . $post_field_sufix]) && $post['no_empty_' . $post_f
 
 } elseif (isset($post[$post_field_sufix]) && !empty($post[$post_field_sufix])) {
     
-    $tmp = explode(',', $post[$post_field_sufix]);
+    $tmp = explode(',', (string)$post[$post_field_sufix]);
     // $treatValues = array_map('intval', $tmp);
     $treatValues = array_map('noHtml', $tmp);
     $tagIN = "";

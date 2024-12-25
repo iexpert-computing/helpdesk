@@ -30,7 +30,6 @@ include_once __DIR__ . "/" . "../../includes/functions/getWorktimeProfile.php";
 
 require_once __DIR__ . "/" . "../../includes/components/html2text-master/vendor/autoload.php";
 
-
 $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 1);
 
 use includes\classes\ConnectPDO;
@@ -45,6 +44,8 @@ $iconOutOfWorktime = "<span class='text-oc-teal' title='" . TRANS('HNT_TIMER_OUT
 $iconTicketClosed = "<span class='text-oc-teal' title='" . TRANS('HNT_TICKET_CLOSED') . "'><i class='fas fa-check fa-lg'></i></i></span>";
 $config = getConfig($conn);
 $percLimit = $config['conf_sla_tolerance']; 
+$costField = $config['tickets_cost_field'];
+
 
 $doneStatus = $config['conf_status_done'];
 $daysToApprove = $config['conf_time_to_close_after_done'];
@@ -53,6 +54,7 @@ $onlyBusinessDays = ($config['conf_only_weekdays_to_count_after_done'] ? true : 
 $hoje_start = date('Y-m-d 00:00:00');
 $hoje_end = date('Y-m-d 23:59:59');
 $mes_start = date('Y-m-01 00:00:00');
+$hoje = date('Y-m-d H:i:s');
 
 $post = $_POST;
 
@@ -102,19 +104,27 @@ $textSlaColumn = [
     'red-circle.svg' => TRANS('SMART_OUT_SLA'),
 ];
 
+$authorizationTypes = [
+    0 => '',
+    1 => TRANS('STATUS_WAITING_AUTHORIZATION'),
+    2 => TRANS('STATUS_AUTHORIZED'),
+    3 => TRANS('STATUS_REFUSED')
+];
 
 
 // $fromDashboard = (isset($_SESSION['s_app']) && $_SESSION['s_app'] == 'dashboard' ? true : false);
 $fromDashboard = (isset($post['app_from']) && $post['app_from'] == "dashboard" ? true : false);
+$fromTicketInfo = (isset($post['app_from']) && $post['app_from'] == "ticket_info" ? true : false);
 
 
 // $aliasAreasFilter = (isset($_SESSION['s_filter_is_requester_area']) && $_SESSION['s_filter_is_requester_area'] ? "ua.AREA" : "o.sistema");
 $aliasAreasFilter = (isset($post['is_requester_area']) && $post['is_requester_area'] ? "ua.AREA" : "o.sistema");
+// $aliasAreasFilter = (isset($post['is_requester_area']) && $post['is_requester_area'] ? "ua.AREA" : "a.sis_id");
 
 
 if ($fromDashboard) {
 
-    $render_custom_fields = $post['render_custom_fields'];
+    $render_custom_fields = (isset($post['render_custom_fields']) && !empty($post['render_custom_fields']) ? $post['render_custom_fields'] : "");
 
     $filter_areas = "";
     $areas_names = "";
@@ -185,7 +195,7 @@ if (isset($post['ticket']) && !empty($post['ticket'])) {
     $ignoreStatus = false;
     
     $maxNumberOfTickets = 30; /* número máximo de ocorrências para a consulta */
-    $tmp = explode(',', $post['ticket']);
+    $tmp = explode(',', (string)$post['ticket']);
     
     $treatValues = array_map('intval', $tmp);
     $ticketIN = "";
@@ -341,6 +351,11 @@ if (isset($post['data_fechamento_to']) && !empty($post['data_fechamento_to'])) {
 }
 
 
+if (isset($post['auto_close_due_inacticity']) && $post['auto_close_due_inacticity'] == 1) {
+    $terms .= " AND te.auto_closed = 1 ";
+    $criterText = TRANS('ONLY_CLOSED_DUE_INACTIVITY') . "<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
+}
 
 
 if (isset($post['no_empty_contact_email']) && $post['no_empty_contact_email'] == 1) {
@@ -388,7 +403,8 @@ if ($fromDashboard) {
         if ($isAdmin) {
             $criterText = TRANS("OCO_SEL_ANY");
         } else {
-            $terms .= " AND (" . $aliasAreasFilter . " IN ({$u_areas}) OR ".$aliasAreasFilter." = '-1')";
+            // $terms .= " AND (" . $aliasAreasFilter . " IN ({$u_areas}) OR ".$aliasAreasFilter." = '-1')";
+            $terms .= " AND " . $aliasAreasFilter . " IN ({$u_areas}, -1) ";
 
             $sqlCriter = "SELECT sistema FROM sistemas WHERE sis_id in ({$u_areas}) ORDER BY sistema";
             $resCriter = $conn->query($sqlCriter);
@@ -428,12 +444,13 @@ if ($fromDashboard) {
 
         if (isset($post['no_empty_area']) && $post['no_empty_area'] == 1) {
             $terms .= " AND ( o.sistema IN ({$u_areas}) ) ";
-            // $criterText = TRANS('SERVICE_AREA') . ": " . TRANS('SMART_NOT_EMPTY') . "<br />";
+            // $terms .= " AND ( a.sis_id IN ({$u_areas}) ) ";
             $criterText = TRANS('SERVICE_AREA') . ": " . $areas_names . "<br />";
             $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
         
         } elseif (isset($post['no_area']) && $post['no_area'] == 1) {
-            $terms .= " AND ( o.sistema = '-1' OR o.sistema = '0') ";
+            // $terms .= " AND ( o.sistema = '-1' OR o.sistema = '0') ";
+            $terms .= " AND o.sistema IN (-1, 0) ";
             $criterText = TRANS('SERVICE_AREA') . ": " . TRANS('SMART_EMPTY') . "<br />";
             $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
         
@@ -444,6 +461,7 @@ if ($fromDashboard) {
                 $areaIN .= $area;
             }
             $terms .= " AND o.sistema IN ({$areaIN}) ";
+            // $terms .= " AND a.sis_id IN ({$areaIN}) ";
         
             $criterText = "";
             $sqlCriter = "SELECT sistema FROM sistemas WHERE sis_id in ({$areaIN}) ORDER BY sistema";
@@ -456,7 +474,8 @@ if ($fromDashboard) {
             $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
         } else {
             /* Se nada for informado para a área, então considera apenas as áreas do usuário e chamados sem área definida*/
-            $terms .= " AND ( o.sistema IN ({$u_areas}) OR (o.sistema = '-1' OR o.sistema = '0') ) "; 
+            $terms .= " AND o.sistema IN ({$u_areas}, -1, 0) "; 
+            // $terms .= " AND a.sis_id IN ({$u_areas}, -1, 0) "; 
             $criterText = TRANS('SERVICE_AREA') . ": " . $areas_names . " " . TRANS('OPERATOR_OR') . " " . TRANS('SMART_EMPTY') . "<br />";
 
             $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
@@ -465,12 +484,16 @@ if ($fromDashboard) {
     } else
 
     if (isset($post['no_empty_area']) && $post['no_empty_area'] == 1) {
-        $terms .= " AND ( o.sistema != '-1' AND o.sistema != '0' ) ";
+        // $terms .= " AND ( o.sistema != '-1' AND o.sistema != '0' ) ";
+        $terms .= " AND o.sistema not in (-1, 0) ";
+        // $terms .= " AND a.sis_id not in (-1, 0) ";
         $criterText = TRANS('SERVICE_AREA') . ": " . TRANS('SMART_NOT_EMPTY') . "<br />";
         $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
 
     } elseif (isset($post['no_area']) && $post['no_area'] == 1) {
-        $terms .= " AND ( o.sistema = '-1' OR o.sistema = '0') ";
+        // $terms .= " AND ( o.sistema = '-1' OR o.sistema = '0') ";
+        $terms .= " AND o.sistema in (-1, 0) ";
+        // $terms .= " AND a.sis_id in (-1, 0) ";
         $criterText = TRANS('SERVICE_AREA') . ": " . TRANS('SMART_EMPTY') . "<br />";
         $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
 
@@ -482,6 +505,7 @@ if ($fromDashboard) {
             $areaIN .= $area;
         }
         $terms .= " AND o.sistema IN ({$areaIN}) ";
+        // $terms .= " AND a.sis_id IN ({$areaIN}) ";
 
         $criterText = "";
         $sqlCriter = "SELECT sistema FROM sistemas WHERE sis_id in ({$areaIN}) ORDER BY sistema";
@@ -494,6 +518,25 @@ if ($fromDashboard) {
         $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
     }
 
+}
+
+
+
+/* Filtro por Área Solicitante */
+if (isset($post['requester_area']) && !empty($post['requester_area'])) {
+    $criterText = "";
+    
+    $requesterAreaIN = implode(",", $post['requester_area']);
+    $terms .= " AND asol.sis_id IN ({$requesterAreaIN}) ";
+
+    $requestAreas = getAreas($conn, 0, 1, null, $post['requester_area']);
+    $arrayCriterRequestAreasNames = [];
+    foreach ($requestAreas as $requestArea) {
+        $arrayCriterRequestAreasNames[] = $requestArea['sistema'];
+    }
+    
+    $criterText = TRANS('REQUESTER_AREA') . ": " . implode(", ", $arrayCriterRequestAreasNames) ."<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
 }
 
 
@@ -531,7 +574,7 @@ if (isset($post['no_empty_client']) && $post['no_empty_client'] == 1) {
 
 
 
-
+/* Filtro por tipo de solicitação */
 if (isset($post['no_empty_problema']) && $post['no_empty_problema'] == 1) {
     $terms .= " AND ( o.problema != '-1' AND o.problema != '0' ) ";
     $criterText = TRANS('ISSUE_TYPE') . ": " . TRANS('SMART_NOT_EMPTY') . "<br />";
@@ -562,7 +605,7 @@ if (isset($post['no_empty_problema']) && $post['no_empty_problema'] == 1) {
 }
 
 
-
+/* Unidades */
 if (isset($post['no_empty_unidade']) && $post['no_empty_unidade'] == 1) {
     $terms .= " AND ( o.instituicao != '-1' AND o.instituicao != '0' AND o.instituicao IS NOT NULL ) ";
     $criterText = TRANS('COL_UNIT') . ": " . TRANS('SMART_NOT_EMPTY') . "<br />";
@@ -613,7 +656,7 @@ if (isset($post['no_empty_etiqueta']) && $post['no_empty_etiqueta'] == 1) {
 
 } elseif (isset($post['etiqueta']) && !empty($post['etiqueta'])) {
     
-    $tmp = explode(',', $post['etiqueta']);
+    $tmp = explode(',', (string)$post['etiqueta']);
     // $treatValues = array_map('intval', $tmp);
     $treatValues = array_map('noHtml', $tmp);
     $tagIN = "";
@@ -687,7 +730,7 @@ if (isset($post['end_user_only']) && $post['end_user_only'] == 1) {
         if (strlen((string)$criterText)) $criterText .= ", ";
         $criterText .= $rowCriter['nome'];
     }
-    $criterText = TRANS('OPENED_BY') . ": " . $criterText ."<br />";
+    $criterText = TRANS('REQUESTER') . ": " . $criterText ."<br />";
     $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
 }
 
@@ -732,7 +775,7 @@ if (isset($post['prioridade']) && !empty($post['prioridade'])) {
     $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
 }
 
-
+/* Status do chamado */
 if (isset($post['time_freeze_status_only']) && $post['time_freeze_status_only'] == 1) {
     $terms .= " AND s.stat_time_freeze = 1 AND s.stat_id NOT IN (4,12) "; /* desconsidera os status fixos de encerramento e cancelamento */
     $criterText = TRANS('SMART_NOT_CLOSED_PAUSED_STATUS') . "<br />";
@@ -765,6 +808,64 @@ if (isset($post['time_freeze_status_only']) && $post['time_freeze_status_only'] 
 }
 
 
+
+$limitToHavingCost = false;
+/* Filtro por status de autorização do atendimento */
+if (isset($post['totalCostNotRejected']) && $post['totalCostNotRejected'] == 1) {
+    $terms .= " AND ( o.authorization_status <> 3 OR o.authorization_status IS NULL ) ";
+    $criterText = TRANS('AUTHORIZATION_STATUS') . ": " . TRANS('WITHOUT_AUTHORIZATION_REFUSE') . "<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
+
+    $limitToHavingCost = true;
+
+} elseif (isset($post['totalCostRejected']) && $post['totalCostRejected'] == 1) {
+    $terms .= " AND o.authorization_status = 3 ";
+    $criterText = TRANS('AUTHORIZATION_STATUS') . ": " . TRANS('WITH_AUTHORIZATION_REFUSED') . "<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
+
+    $limitToHavingCost = true;
+
+} elseif (isset($post['no_empty_authorization_status']) && $post['no_empty_authorization_status'] == 1) {
+    $terms .= " AND ( o.authorization_status IS NOT NULL ) ";
+    $criterText = TRANS('AUTHORIZATION_STATUS') . ": " . TRANS('SMART_NOT_EMPTY') . "<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
+
+    $limitToHavingCost = true;
+
+} elseif (isset($post['no_authorization_status']) && $post['no_authorization_status'] == 1) {
+    $terms .= " AND ( o.authorization_status IS NULL) ";
+    $criterText = TRANS('AUTHORIZATION_STATUS') . ": " . TRANS('SMART_EMPTY') . "<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
+
+    $limitToHavingCost = true;
+
+} elseif (isset($post['authorization_status']) && !empty($post['authorization_status'])) {
+    
+    $criterText = "";
+    
+    $authorizationIn = "";
+    foreach ($post['authorization_status'] as $authorization_status) {
+        if (strlen((string)$authorizationIn)) $authorizationIn .= ",";
+        $authorizationIn .= $authorization_status;
+
+        if (strlen((string)$criterText)) $criterText .= ", ";
+        $criterText .= $authorizationTypes[$authorization_status];
+    }
+    $terms .= " AND o.authorization_status IN ({$authorizationIn}) ";
+
+    $criterText = TRANS('AUTHORIZATION_STATUS') . ": " . $criterText ."<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
+
+    $limitToHavingCost = true;
+}
+
+if ($limitToHavingCost && $fromDashboard) {
+    /* Se a consulta for a partir do dashboard, Limitará os resultados a apenas chamados que tenham custo definido */
+    $costFieldInfo = getCustomFields($conn, $costField);
+    $post['no_empty_' . $costFieldInfo['field_name']] = 1;
+}
+
+
 /* Exibição dos critérios para Avaliação do chamado */
 if (isset($post['no_empty_rate']) && !empty($post['no_empty_rate'])) {
 
@@ -789,6 +890,33 @@ if (isset($post['no_empty_rate']) && !empty($post['no_empty_rate'])) {
 } 
 
 
+
+
+/* Exibição dos critérios sobre filtro de recursos */
+if (isset($post['no_empty_resources']) && !empty($post['no_empty_resources'])) {
+
+    $criterText = TRANS('SMART_ONLY_WITH_RESOURCES') . "<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
+    $terms .= " ";
+} elseif (isset($post['no_resources']) && !empty($post['no_resources'])) {
+
+    $criterText = TRANS('SMART_ONLY_WITHOUT_RESOURCES') . "<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
+    $terms .= " ";
+} elseif (isset($post['resources']) && !empty($post['resources'])) {
+    $criterText = "";
+    foreach ($post['resources'] as $res) {
+        if (strlen((string)$criterText)) $criterText .= ", ";
+
+        $modelInfo = getAssetsModels($conn, $res);
+        $modelText = $modelInfo['tipo'] . ' ' . $modelInfo['fabricante'] . ' ' . $modelInfo['modelo'];
+        $criterText .= $modelText;
+    }
+
+    $criterText = TRANS('RESOURCES') . ": " . $criterText ."<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
+    $terms .= " ";
+} 
 
 
 
@@ -919,6 +1047,11 @@ if (isset($post['has_tags']) && !empty($post['has_tags'])) {
 }
 if (strlen((string)$tagTerms)) {
     $terms .= " AND MATCH(oco_tag) AGAINST('{$tagTerms}' IN BOOLEAN MODE)";
+    if ($fromTicketInfo) {
+        /* Se for a partir de um chamado, mostrar Apenas dos últimos 6 meses */
+        $criteria[] = "<span class='{$badgeClass}'>". TRANS('LAST_6_MONTHS') ."</span>";
+        $terms .= " AND o.data_abertura >= DATE_SUB('{$hoje}', INTERVAL 6 MONTH) ";
+    }
 }
 
 
@@ -986,8 +1119,6 @@ if ($ignoreStatus) {
 } else {
     $sql = $QRY["ocorrencias_full_ini"] . " WHERE 1 = 1 {$terms} ORDER BY numero";
 }
-
-// dump($sql); exit;
 
 $sqlResult = $conn->query($sql);
 $totalFiltered = $sqlResult->rowCount();
@@ -1182,13 +1313,14 @@ $criterios = "";
                     <td class='line area_solicitante'><?= TRANS('REQUESTER_AREA'); ?></td>
                     <td class='line area'><?= TRANS('SERVICE_AREA'); ?></td>
                     <td class='line problema'><?= TRANS('ISSUE_TYPE'); ?></td>
-                    <td class='line aberto_por'><?= TRANS('OPENED_BY'); ?></td>
+                    <td class='line aberto_por'><?= TRANS('REQUESTER'); ?></td>
                     <td class='line canal'><?= TRANS('CHANNEL'); ?></td>
                     <td class='line contato'><?= TRANS('CONTACT'); ?></td>
                     <td class='line contato_email'><?= TRANS('CONTACT_EMAIL'); ?></td>
                     <td class='line telefone'><?= TRANS('COL_PHONE'); ?></td>
                     <td class='line departamento'><?= TRANS('DEPARTMENT'); ?></td>
                     <td class='line descricao truncate_flag truncate' style='max-width:15% !important; '><?= TRANS('DESCRIPTION'); ?></td>
+                    <td class='line resources'><?= TRANS('RESOURCES'); ?></td>
                     <td class='line tech_description truncate_flag truncate' style='max-width:15% !important; '><?= TRANS('TXT_DESC_TEC_PROB'); ?></td>
                     <td class='line solution truncate_flag truncate' style='max-width:15% !important; '><?= TRANS('SOLUTION'); ?></td>
                     <td class='line funcionarios'><?= TRANS('WORKERS'); ?></td>
@@ -1201,6 +1333,7 @@ $criterios = "";
                     <td class='line unidade'><?= TRANS('COL_UNIT'); ?></td>
                     <td class='line etiqueta'><?= TRANS('ASSET_TAG'); ?></td>
                     <td class='line status'><?= TRANS('COL_STATUS'); ?></td>
+                    <td class='line authorization_status'><?= TRANS('AUTHORIZATION_STATUS'); ?></td>
                     <td class='line tempo_absoluto'><?= TRANS('ABSOLUTE_TIME'); ?></td>
                     <td class='line tempo'><?= TRANS('FILTERED_TIME'); ?></td>
                     <td class='line duracao_abs' title="<?= TRANS('ABS_SERVICE_TIME'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover"><?= TRANS('COL_SERVICE_TIME_ABS'); ?></td>
@@ -1236,6 +1369,8 @@ $criterios = "";
 foreach ($sqlResult->fetchAll() as $row){
     $nestedData = array(); 
     $showRecord = true;
+    $resourcesList = '';
+    
     
     /* Operadores - Responsável e Auxiliares (se existirem) */
     $workers = getTicketWorkers($conn, $row['numero']);
@@ -1285,6 +1420,28 @@ foreach ($sqlResult->fetchAll() as $row){
             }
         } 
     }
+
+
+    if ($showRecord) {
+        /* Sobre recursos alocados no chamado */
+        if (isset($post['no_empty_resources']) && !empty($post['no_empty_resources'])) {
+            $showRecord = hasResources($conn, $row['numero']);
+        }
+
+        if (isset($post['no_resources']) && !empty($post['no_resources'])) {
+            $showRecord = !hasResources($conn, $row['numero']);
+        }
+
+        if (isset($post['resources']) && !empty($post['resources'])) {
+            $showRecord = false;
+            
+            if (hasResources($conn, $row['numero'], $post['resources'])) {
+                $showRecord = true;
+            }
+        } 
+    }
+
+
 
     /* Caso o filtro seja por chamados aguardando aprovação */
     if ($showRecord && isset($post['waitingRate']) && $post['waitingRate'] == 1) {
@@ -1505,7 +1662,7 @@ foreach ($sqlResult->fetchAll() as $row){
                         } elseif ($operation == "IN") {
                             /* valor do post */
 
-                            $expMultiValues = (!empty($ticketFieldValue) ? explode(',', $ticketFieldValue) : []);
+                            $expMultiValues = (!empty($ticketFieldValue) ? explode(',', (string)$ticketFieldValue) : []);
                             foreach ($expMultiValues as $SepValue) {
                                 if ($SepValue == $value) {
                                     $foundOne = true;
@@ -1558,7 +1715,7 @@ foreach ($sqlResult->fetchAll() as $row){
                                         $showRecord = false;
                                     }
 
-                                    if (!(strtotime($baseDate) <= strtotime($ticketFieldValue))) {
+                                    if (!(strtotime((string)$baseDate) <= strtotime((string)$ticketFieldValue))) {
                                         $showRecord = false;
                                     }
                                 } else {
@@ -1599,7 +1756,7 @@ foreach ($sqlResult->fetchAll() as $row){
                                         $showRecord = false;
                                     }
 
-                                    if (!(strtotime($baseDate) >= strtotime($ticketFieldValue))) {
+                                    if (!(strtotime((string)$baseDate) >= strtotime((string)$ticketFieldValue))) {
                                         $showRecord = false;
                                     }
                                 } else {
@@ -1615,7 +1772,7 @@ foreach ($sqlResult->fetchAll() as $row){
                                         $showRecord = false;
                                     }
 
-                                    if (!(strtotime($baseDate) >= strtotime($ticketFieldValue))) {
+                                    if (!(strtotime((string)$baseDate) >= strtotime((string)$ticketFieldValue))) {
                                         $showRecord = false;
                                     }
                                 } else {
@@ -1653,6 +1810,40 @@ foreach ($sqlResult->fetchAll() as $row){
                     $showRecord = true;
             }
         } 
+    }
+    
+    if ($showRecord) {
+        // Recursos do chamado
+        $resources = getResourcesFromTicket($conn, $row['numero']);
+        $resources_info = [];
+        if (!empty($resources)) {
+            foreach ($resources as $resource) {
+                $modelInfo = getAssetsModels($conn, $resource['model_id'], null, null, 1, ['t.tipo_nome']);
+                
+                $resources_info[$resource['model_id']]['model_id'][] = $resource['model_id'];
+                $resources_info[$resource['model_id']]['modelo_full'][] = $modelInfo['tipo'] . ' ' . $modelInfo['fabricante'] . ' ' . $modelInfo['modelo'];
+                $resources_info[$resource['model_id']]['categoria'][] = $modelInfo['cat_name'];
+                $resources_info[$resource['model_id']]['amount'][] = $resource['amount'];
+                $resources_info[$resource['model_id']]['unitary_price'][] = $resource['unitary_price'];
+            }
+        
+            foreach ($resources_info as $key => $value) {
+                $resources_info[$key]['model_id'] = implode(', ', $resources_info[$key]['model_id']);
+                $resources_info[$key]['modelo_full'] = implode(', ', $resources_info[$key]['modelo_full']);
+                $resources_info[$key]['categoria'] = implode(', ', $resources_info[$key]['categoria']);
+                $resources_info[$key]['amount'] = implode(', ', $resources_info[$key]['amount']);
+                $resources_info[$key]['unitary_price'] = implode(', ', $resources_info[$key]['unitary_price']);
+            }
+
+            $resources_info = arraySortByColumn($resources_info, 'modelo_full');
+
+            /* Recursos do chamado em lista */
+            if (!empty($resources_info)) {
+                foreach ($resources_info as $resInfo) {
+                    $resourcesList .= '<li class="list-resources">' . $resInfo['modelo_full'] . ' (' . $resInfo['amount'] . ')</li>';
+                }
+            }
+        }
     }
     
 
@@ -1701,11 +1892,12 @@ foreach ($sqlResult->fetchAll() as $row){
             <td class="line"><?= "<b>" . $row['telefone'] . "</b>"; ?></td>
             <td class="line"><?= "<b>" . $row['setor'] . "</b>"; ?></td>
             <td class="line"><?= $texto; ?></td>
+            <td class="line"><?= $resourcesList; ?></td>
             <td class="line"><?= $tech_description; ?></td>
             <td class="line"><?= $solution; ?></td>
             <td class="line"><?= "<b>" . $listWorkers . "</b>"; ?></td>
             <?php
-                $mydate = strtotime($row['oco_real_open_date']);
+                $mydate = strtotime((string)$row['oco_real_open_date']);
             ?>
             <td class="line" data-sort="<?= $mydate; ?>"><?= "<b>" . dateScreen($row['oco_real_open_date']) . "</>"; ?></td>
             <td class="line"><?= "<b>" . transbool($row['oco_scheduled']) . "</>"; ?></td>
@@ -1715,6 +1907,7 @@ foreach ($sqlResult->fetchAll() as $row){
             <td class="line"><?= "<b>" . $row['unidade'] . "</b>"; ?></td>
             <td class="line"><?= "<b>" . $row['etiqueta'] . "</b>"; ?></td>
             <td class="line"><?= "<b>" . $row['chamado_status'] . "</b>"; ?></td>
+            <td class="line"><?= "<b>" . $authorizationTypes[$row['authorization_status'] ?? 0] . "</b>"; ?></td>
             <td class="line"><?= $absoluteTime; ?></td>
             <td class="line" data-sort="<?= $ticketTimeInfo['solution']['seconds']; ?>"><?= $colTVNew; ?></td>
             <td class="line"><?= $absServiceTime; ?></td>

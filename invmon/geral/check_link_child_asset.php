@@ -42,7 +42,7 @@ if (empty($data['child_model']) || empty($data['parent_id'])) {
     return json_encode([]);
 }
 
-$model = getAssetsModels($conn, $data['child_model']);
+$model = getAssetsModels($conn, $data['child_model'], null, null, false);
 
 $data['asset_type'] = $model['tipo'];
 $data['manufacturer'] = $model['fabricante'];

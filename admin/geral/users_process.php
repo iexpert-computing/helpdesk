@@ -37,7 +37,6 @@ $config = getConfig($conn);
 
 $post = $_POST; 
 
-// var_dump($post);
 $exception = "";
 
 $erro = false;
@@ -53,6 +52,7 @@ $data['profile'] = false;
 
 $data['login_name'] = (isset($post['login_name']) ? noHtml($post['login_name']) : "");
 $data['user_client'] = (isset($post['user_client']) ? noHtml($post['user_client']) : "");
+$data['user_department'] = (isset($post['user_department']) ? noHtml($post['user_department']) : "");
 $data['password'] = (isset($post['password']) && !empty($post['password']) ? $post['password'] : "");
 $data['password2'] = (isset($post['password2']) && !empty($post['password2']) ? $post['password2'] : "");
 
@@ -69,6 +69,12 @@ $data['phone'] = (isset($post['phone']) ? noHtml($post['phone']) : "");
 $data['primary_area'] = (isset($post['primary_area']) ? noHtml($post['primary_area']) : "");
 
 $data['area_admin'] = (isset($post['area_admin']) ? ($post['area_admin'] == "yes" ? 1 : 0) : 0);
+$data['max_cost_authorizing'] = (isset($post['max_cost_authorizing']) ? priceDB(noHtml($post['max_cost_authorizing'])) : 0);
+
+/* Se não for gerente de área o valor de aprovação será zero */
+if (!$data['area_admin']) {
+    $data['max_cost_authorizing'] = 0;
+}
 
 
 /** 
@@ -278,9 +284,16 @@ if ($data['action'] == 'edit') {
     }
 
 
+    /* Checa se o usuário possui ativos vinculados/alocados */
+    $user_assets = getAssetsFromUser($conn, $data['cod']);
+    /* Checar se houve mudança de departamento a fim de atualizar os ativos alocados, caso existam */
+    $userInfo = getUserInfo($conn, $data['cod']);
+    $oldDepartment = $userInfo['user_department'];
+
     $sql = "UPDATE usuarios SET 
 				nome= '" . $data['fullname'] . "', 
                 user_client = " . dbField($data['user_client']) . ", 
+                user_department = " . dbField($data['user_department']) . ", 
                 {$terms}
 				data_admis = " . dbField($data['hire_date'],'date') . ", 
 				email = '" . $data['email'] . "', 
@@ -288,6 +301,7 @@ if ($data['action'] == 'edit') {
 				nivel = '" . $data['level'] . "', 
 				AREA = '" . $data['primary_area'] . "', 
 				user_admin = " . $data['area_admin'] . ",
+				max_cost_authorizing = '" . $data['max_cost_authorizing'] . "',
                 can_route = {$data['can_route']},
                 can_get_routed = {$data['can_get_routed']},
                 user_bgcolor = '" . $data['bgcolor'] . "',
@@ -296,6 +310,17 @@ if ($data['action'] == 'edit') {
 				WHERE user_id = " . $data['cod'] . " ";
     try {
         $conn->exec($sql);
+
+
+        if ($data['level'] == 5) {
+            /* Usuário desabilitado */
+            /* Desvincula os ativos e atualiza o departamento se a configuração existir */
+            $newDepartment = getConfigValue($conn, 'ASSETS_AUTO_DEPARTMENT');
+            $updateAssets = updateAssetsTookOffUser($conn, $data['cod'], $_SESSION['s_uid'], $newDepartment);
+        } elseif (count($user_assets) && $oldDepartment != $data['user_department'] && !empty($data['user_department'])) {
+            /* Caso possua ativos e for alterado de departamento, atualizar */
+            $updateAssetsDepartment = updateUserAssetsDepartment($conn, $data['cod'], $_SESSION['s_uid'] , $data['user_department']);
+        }
 
         /* Se a senha foi alterada - então checo se é necessário atualizar token */
         if (!empty($data['password'])){
@@ -413,7 +438,11 @@ if ($data['action'] == 'edit') {
         $terms .= " nivel = " . $data['level'] . ", ";
         $terms .= " AREA = " . $data['primary_area'] . ", ";
         $terms .= " user_admin = " . $data['area_admin'] . ", ";
+        $terms .= " max_cost_authorizing = " . $data['max_cost_authorizing'] . ", ";
         $terms .= " can_get_routed = " . $data['can_get_routed'] . ", ";
+    } elseif ($data['area_admin']) {
+        /* Gerente de área pode alterar o limite de autorização */
+        $terms .= " max_cost_authorizing = " . $data['max_cost_authorizing'] . ", ";
     }
 
     $sql = "UPDATE usuarios SET 
@@ -422,6 +451,7 @@ if ($data['action'] == 'edit') {
 				email = '" . $data['email'] . "', 
 				fone = '" . $data['phone'] . "' 
 			WHERE user_id = " . $_SESSION['s_uid'] . " ";
+
     try {
         $conn->exec($sql);
 
@@ -497,15 +527,22 @@ if ($data['action'] == 'edit') {
 
     $sql = "INSERT INTO usuarios 
             (
-                login, nome, user_client, hash, data_inc, data_admis, email, 
-                fone, nivel, AREA, user_admin, can_route, can_get_routed, user_bgcolor, user_textcolor
+                login, nome, user_client, user_department, hash, data_inc, data_admis, email, 
+                fone, nivel, AREA, user_admin, max_cost_authorizing, can_route, can_get_routed, user_bgcolor, user_textcolor
             ) 
             VALUES 
             (
-                '" . $data['login_name'] . "', '" . $data['fullname'] . "', " . dbField($data['user_client']) . ", '" . $data['hash'] . "', 
+                '" . $data['login_name'] . "', 
+                '" . $data['fullname'] . "', 
+                " . dbField($data['user_client']) . ", 
+                " . dbField($data['user_department']) . ",
+                '" . $data['hash'] . "', 
                 '" . $data['subscribe_date'] . "', 
                 " . dbField($data['hire_date'],'date') . ", '" . $data['email'] . "', '" . $data['phone'] . "', '" . $data['level'] . "', 
-                '" . $data['primary_area'] . "', " . $data['area_admin'] . ", {$data['can_route']}, {$data['can_get_routed']},
+                '" . $data['primary_area'] . "', 
+                " . $data['area_admin'] . ", 
+                '" . $data['max_cost_authorizing'] . "', 
+                {$data['can_route']}, {$data['can_get_routed']},
                 '{$data['bgcolor']}', '{$data['textcolor']}' 
             )";
 
@@ -569,6 +606,20 @@ if ($data['action'] == 'edit') {
         return false;
     }
 
+    // $sql = "SELECT * FROM users_x_assets WHERE user_id = '" . $data['cod'] . "' AND is_current = 1";
+    // $res = $conn->query($sql);
+    // $achou = $res->rowCount();
+
+    // if ($achou) {
+    //     $data['success'] = false; 
+    //     $data['message'] = TRANS('MSG_CANT_DEL_USER_WITH_ASSETS');
+    //     $_SESSION['flash'] = message('danger', '', $data['message'], '');
+    //     echo json_encode($data);
+    //     return false;
+    // }
+
+
+
     $sql = "SELECT id FROM access_tokens WHERE user_id = '" . $data['cod'] . "'";
     $res = $conn->query($sql);
     $achou = $res->rowCount();
@@ -581,6 +632,9 @@ if ($data['action'] == 'edit') {
         return false;
     }
 
+    /* Desvincula os ativos e atualiza o departamento se a configuração existir */
+    $newDepartment = getConfigValue($conn, 'ASSETS_AUTO_DEPARTMENT');
+    $updateAssets = updateAssetsTookOffUser($conn, $data['cod'], $_SESSION['s_uid'], $newDepartment);
 
     
     $sql =  "DELETE FROM usuarios WHERE user_id = '".$data['cod']."'";

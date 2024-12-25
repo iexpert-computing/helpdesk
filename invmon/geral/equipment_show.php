@@ -41,7 +41,9 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 3, 2);
     <!--     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/css/bootstrap.min.css" /> -->
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" /> <!-- custom bootstrap v4.5 -->
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
+
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
     <style>
         .navbar-nav>.nav-link:hover {
             background-color: #3a4d56 !important;
@@ -104,7 +106,7 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 3, 2);
     if ($unit != '-1') {
         $query .= " AND (inst.inst_cod IN (" . $unit . "))";
     }
-    $query .= $QRY["full_detail_fim"];
+    // $query .= $QRY["full_detail_fim"];
 
     $resultado = $conn->query($query);
     $row = $resultado->fetch();

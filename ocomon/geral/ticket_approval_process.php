@@ -30,9 +30,9 @@ if (!isset($post['numero'])) {
     return false;
 }
 
-$ticket_id = (isset($post['ticket_id']) && !empty($post['ticket_id']) && $post['ticket_id'] == getGlobalTicketId($conn, $post['numero']) ? noHtml($post['ticket_id']) : '');
+$ticket_id = (isset($post['ticket_id']) && !empty($post['ticket_id']) && asEquals($post['ticket_id'], getGlobalTicketId($conn, $post['numero'])) ? noHtml($post['ticket_id']) : '');
 
-$rating_id = (isset($post['rating_id']) && !empty($post['rating_id']) && $post['rating_id'] == getGlobalTicketRatingId($conn, $post['numero']) ? noHtml($post['rating_id']) : '');
+$rating_id = (isset($post['rating_id']) && !empty($post['rating_id']) && asEquals($post['rating_id'], getGlobalTicketRatingId($conn, $post['numero'])) ? noHtml($post['rating_id']) : '');
 
 $bypassAuth = ($ticket_id && $rating_id);
 
@@ -60,6 +60,8 @@ $config = getConfig($conn);
 $rowconfmail = getMailConfig($conn);
 
 $ticketInfo = getTicketData($conn, $data['numero']);
+
+$treater = $ticketInfo['operador'];
 
 $hasRatingRow = hasRatingRow($conn, $data['numero']);
 
@@ -227,12 +229,15 @@ try {
     
     
     $sql = "INSERT INTO assentamentos 
-                (ocorrencia, assentamento, `data`, responsavel, tipo_assentamento) 
+                (ocorrencia, assentamento, created_at, responsavel, tipo_assentamento) 
             values 
                 ({$data['numero']}, '{$data['service_done_comment']}', '".date('Y-m-d H:i:s')."', {$user}, {$data['entry_type']} )";
 
     try {
         $result = $conn->exec($sql);
+
+        $notice_id = $conn->lastInsertId();
+        setUserTicketNotice($conn, 'assentamentos', $notice_id);
     }
     catch (Exception $e) {
         $exception .= "<hr>" . $e->getMessage();
@@ -241,12 +246,12 @@ try {
 
     /* Gravação da data na tabela tickets_stages */
     /* A primeira entrada serve apenas para gravar a conclusão do status anterior ao encerramento */
-    $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'stop', $data['new_status']);
+    $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'stop', $data['new_status'], $treater);
     /* As duas próximas entradas servem para lançar o status de encerramento - o tempo nao será contabilizado */
-    $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'start', $data['new_status']);
+    $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'start', $data['new_status'], $treater);
     
     if ($data['new_status'] == 4) {
-        $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'stop', $data['new_status']);
+        $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'stop', $data['new_status'], $treater);
     }
 
     /* Array para a função recordLog */

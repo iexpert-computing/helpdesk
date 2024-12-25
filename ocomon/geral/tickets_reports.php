@@ -95,7 +95,7 @@ $listItem[TRANS('DEPARTMENTS_MOST_ACTIVES')] = "relatorio_setores_areas.php";
 $listItem[TRANS('TLT_REPORT_SLAS')] = "relatorio_slas_worktime.php";
 $listItem[TRANS('TLT_REPORT_CALL_FOR_EQUIP')] = "chamados_x_etiqueta.php";
 // $listItem[TRANS('TREATINGS_BY_TECHNITIAN')] = "relatorio_operadores_areas.php";
-$listItem[TRANS('TREATINGS_BY_TECHNITIAN')] = "report_workers.php";
+// $listItem[TRANS('TREATINGS_BY_TECHNITIAN')] = "report_workers.php";
 $listItem[TRANS('TOP_10_CONTACTS')] = "relatorio_usuarios_areas.php";
 $listItem[TRANS('TTL_REP_QTD_CALL_AREA_PERIOD')] = "relatorio_chamados_area.php";
 $listItem[TRANS('TTL_REP_CALL_OPEN_USER_FINISH')] = "relatorio_usuario_final.php";
@@ -103,18 +103,20 @@ $listItem[TRANS('PROBLEM_TYPES_CATEGORIES')] = "relatorio_chamados_categorias.ph
 $listItem[TRANS('TICKETS_BY_STATUS')] = "relatorio_chamados_status.php";
 $listItem[TRANS('TAGGING_CLOUD_REPORT')] = "tagCloud.php";
 $listItem[TRANS('REPORT_CLIENTS')] = "report_clients.php";
-$listItem[TRANS('CLOSURES_BY_TECHNITIAN')] = "report_main_workers.php";
+// $listItem[TRANS('CLOSURES_BY_TECHNITIAN')] = "report_main_workers.php";
 $listItem[TRANS('REPORT_TICKETS_BY_RATE')] = "report_tickets_rates.php";
 // $listItem[TRANS('TICKETS_IN_PERIOD')] = "report_tickets_holistic.php";
 $listItem[TRANS('TTL_REP_QTD_CALL_AREA_PERIOD_PLUS')] = "relatorio_chamados_area_plus.php";
-
+$listItem[TRANS('REPORT_BY_RESOURCES')] = "report_by_resources.php";
+$listItem[TRANS('REPORT_STATUS_CHANGES')] = "report_status_changes.php";
+$listItem[TRANS('TREATING_TIMES')] = "report_treating_times.php";
 
 
 $itemIcon[TRANS('REP_PROB_AREA')] = "<i class='fas fa-exclamation-circle text-secondary'></i>";
 $itemIcon[TRANS('DEPARTMENTS_MOST_ACTIVES')] = "<i class='fas fa-building text-secondary'></i>";
 $itemIcon[TRANS('TLT_REPORT_SLAS')] = "<i class='fas fa-handshake text-secondary'></i>";
 $itemIcon[TRANS('TLT_REPORT_CALL_FOR_EQUIP')] = "<i class='fas fa-barcode text-secondary'></i>";
-$itemIcon[TRANS('TREATINGS_BY_TECHNITIAN')] = "<i class='fas fa-user-md text-secondary'></i>";
+// $itemIcon[TRANS('TREATINGS_BY_TECHNITIAN')] = "<i class='fas fa-user-md text-secondary'></i>";
 $itemIcon[TRANS('TOP_10_CONTACTS')] = "<i class='fas fa-user-plus text-secondary'></i>";
 $itemIcon[TRANS('TTL_REP_QTD_CALL_AREA_PERIOD')] = "<i class='fas fa-headset text-secondary'></i>";
 $itemIcon[TRANS('TTL_REP_CALL_OPEN_USER_FINISH')] = "<i class='fas fa-user text-secondary'></i>";
@@ -122,10 +124,24 @@ $itemIcon[TRANS('PROBLEM_TYPES_CATEGORIES')] = "<i class='fas fa-tags text-secon
 $itemIcon[TRANS('TICKETS_BY_STATUS')] = "<i class='fas fa-percentage text-secondary'></i>";
 $itemIcon[TRANS('TAGGING_CLOUD_REPORT')] = "<i class='fas fa-hashtag text-secondary'></i>";
 $itemIcon[TRANS('REPORT_CLIENTS')] = "<i class='fas fa-user-tie text-secondary'></i>";
-$itemIcon[TRANS('CLOSURES_BY_TECHNITIAN')] = "<i class='fas fa-user-md text-secondary'></i>";
+// $itemIcon[TRANS('CLOSURES_BY_TECHNITIAN')] = "<i class='fas fa-user-md text-secondary'></i>";
 $itemIcon[TRANS('REPORT_TICKETS_BY_RATE')] = "<i class='fas fa-star-half-alt text-secondary'></i>";
 // $itemIcon[TRANS('TICKETS_IN_PERIOD')] = "<i class='fas fa-ticket-alt text-secondary'></i>";
 $itemIcon[TRANS('TTL_REP_QTD_CALL_AREA_PERIOD_PLUS')] = "<i class='fas fa-ticket-alt text-secondary'></i>";
+$itemIcon[TRANS('REPORT_BY_RESOURCES')] = "<i class='fas fa-plus-square text-secondary'></i>";
+$itemIcon[TRANS('REPORT_STATUS_CHANGES')] = "<i class='fas fa-exchange-alt text-secondary'></i>";
+$itemIcon[TRANS('TREATING_TIMES')] = "<i class='fas fa-user-clock text-secondary'></i>";
+
+
+
+$listItem[TRANS('CUSTOM_FIELD_REPORT')] = "report_custom_fields.php";
+$itemIcon[TRANS('CUSTOM_FIELD_REPORT')] = "<i class='fas fa-pencil-ruler text-secondary'></i>";
+
+$listItem[TRANS('REPORT_TICKETS_TREATING_TIMES')] = "report_tickets_times.php";
+$itemIcon[TRANS('REPORT_TICKETS_TREATING_TIMES')] = "<i class='fas fa-clock text-secondary'></i>";
+
+$listItem[TRANS('REPORT_TREATINGS_AND_PARTICIPATIONS')] = "report_ultimate_treatings_by_operators.php";
+$itemIcon[TRANS('REPORT_TREATINGS_AND_PARTICIPATIONS')] = "<i class='fas fa-user-md text-secondary'></i>";
 
 ?>
 <!DOCTYPE html>
@@ -137,7 +153,9 @@ $itemIcon[TRANS('TTL_REP_QTD_CALL_AREA_PERIOD_PLUS')] = "<i class='fas fa-ticket
     <link rel="stylesheet" type="text/css" href="../../includes/css/estilos.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
+
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
     <style>
         #loadSmartSearch {
             cursor: pointer;

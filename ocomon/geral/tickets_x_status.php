@@ -38,15 +38,29 @@ if (empty($filtered_areas)) {
 }
 
 
+/* Chamado mais antigo em aberto */
+$ticketStart = getOlderTicketInProgress($conn);
+$ticketInfo = getTicketData($conn, $ticketStart, ['data_abertura']);
+$limitDateFrom = (!empty($ticketInfo['data_abertura']) ? " o.data_abertura >= '{$ticketInfo['data_abertura']}' AND " : "");
+
 $sql = "SELECT s.status as status, count(o.status) AS quantidade 
-        FROM status s, ocorrencias o, usuarios ua 
+        FROM 
+            status s, 
+            ocorrencias o,
+            usuarios ua 
         WHERE 
-            s.stat_id = o.status AND s.stat_painel NOT IN (3) 
-            AND s.stat_ignored <> 1 
-            AND o.aberto_por = ua.user_id 
+            {$limitDateFrom}
+            s.stat_id = o.status AND 
+            -- s.stat_painel NOT IN (3) AND
+            -- s.stat_ignored <> 1 AND 
+            s.not_done = 1 AND
+            o.aberto_por = ua.user_id 
             {$qry_filter_clients}
             {$qry_filter_areas}
-        GROUP BY status ORDER BY quantidade DESC";
+        GROUP BY 
+            status 
+        ORDER BY 
+            quantidade DESC";
 
 $sql = $conn->query($sql);
 

@@ -37,14 +37,30 @@ $config = getConfig($conn);
 $rowconfmail = getMailConfig($conn);
 
 $data['success'] = true;
+$isRequester = false;
+
+$arrayStatusToMonitor = [];
+$textStatusToMonitor = "";
+$statusToMonitor = $config['stats_to_close_by_inactivity'];
+$statusOutInactivity = $config['stat_out_inactivity'];
+
+if (!empty($statusToMonitor)) {
+	$arrayStatusToMonitor = explode(',', (string)$statusToMonitor);
+	$textStatusToMonitor = implode(', ', $arrayStatusToMonitor);
+}
+
 
 
 if (isset($_POST['onlyOpen']) && $_POST['onlyOpen'] == 1) {
 
-	// dump($_POST); exit();
+	$ticketInfo = getTicketData($conn, (int)$_POST['numero']);
+	if ($_SESSION['s_uid'] == $ticketInfo['aberto_por']) {
+		$isRequester = true;
+	}
+
 	$exception = "";
 	$mailNotification = "";
-	$numero = noHtml($_POST['numero']);
+	$numero = (int)$_POST['numero'];
 	$data = [];
 	$data['numero'] = $numero;
 	$comment = (isset($_POST['add_comment']) ? noHtml($_POST['add_comment']) : "");
@@ -69,7 +85,7 @@ if (isset($_POST['onlyOpen']) && $_POST['onlyOpen'] == 1) {
 				(
 					ocorrencia, 
 					assentamento, 
-					data, 
+					created_at, 
 					responsavel, 
 					asset_privated, 
 					tipo_assentamento
@@ -78,7 +94,7 @@ if (isset($_POST['onlyOpen']) && $_POST['onlyOpen'] == 1) {
 				(
 					:numero,
 					:comment,
-					:date,
+					:created_at,
 					:responsavel,
 					0,
 					8
@@ -88,20 +104,66 @@ if (isset($_POST['onlyOpen']) && $_POST['onlyOpen'] == 1) {
 		$now = date("Y-m-d H:i:s");
 		$res->bindParam(':numero', $numero, PDO::PARAM_INT);
 		$res->bindParam(':comment', $comment, PDO::PARAM_STR);
-		$res->bindParam(':date', $now, PDO::PARAM_STR);
+		$res->bindParam(':created_at', $now, PDO::PARAM_STR);
 		$res->bindParam(':responsavel', $_SESSION['s_uid'], PDO::PARAM_INT);
 		$res->execute();
+
+		$notice_id = $conn->lastInsertId();
+        // if ($_SESSION['s_uid'] != $data['aberto_por']) {
+            setUserTicketNotice($conn, 'assentamentos', $notice_id);
+        // }
 		
 		$data['message'] = TRANS('TICKET_ENTRY_SUCCESS_ADDED');
+		
+		/**
+		 * Se for o solicitante e o status do chamado for um dos status monitorados quanto a inatividade, 
+		 * então será necessário atualizar o status do chamado
+		 */
+		if ($isRequester && !empty($arrayStatusToMonitor) && in_array($ticketInfo['status'], $arrayStatusToMonitor)) {
+
+			/* Atualizar o status do chamado */
+			$sql = "UPDATE ocorrencias SET `status` = :status WHERE numero = :numero";
+			
+			try {
+				$exec = $conn->prepare($sql);
+				$exec->bindParam(':status', $statusOutInactivity);
+				$exec->bindParam(':numero', $numero);
+				$exec->execute();
+
+				/* Atualiza o tickets_stages */
+				$stopTimeStage = insert_ticket_stage($conn, $numero, 'stop', $statusOutInactivity);
+				$startTimeStage = insert_ticket_stage($conn, $numero, 'start', $statusOutInactivity);
+
+
+				/* Array para a funcao recordLog - estágio anterior à modificação */
+				$arrayBeforePost = [];
+				$arrayBeforePost['status_cod'] = $ticketInfo['status'];
+
+				/* Array para a função recordLog - estágio posterior à modificação */
+				$afterPost = [];
+				$afterPost['status'] = $statusOutInactivity;
+
+				$operationType = 21; /* OPT_OPERATION_REQUESTER_IS_ALIVE */
+				/* Função que grava o registro de alterações do chamado */
+				$recordLog = recordLog($conn, $numero, $arrayBeforePost, $afterPost, $operationType); 
+
+			}
+			catch (Exception $e) {
+						$exception .= "<hr>" . $e->getMessage();
+				$data['success'] = false; 
+				// $data['sql'] = $sql;
+				$exception .= "<hr>" . $e->getMessage() . "<hr />" . $sql;
+				$data['message'] = TRANS('MSG_SOMETHING_GOT_WRONG') . $exception;
+				$_SESSION['flash'] = message('warning', 'Ooops!', $data['message'], '');
+				echo json_encode($data);
+				return false;
+			}
+		}
+	
 	}
 	catch (Exception $e) {
-		$data['success'] = false; 
-		// $data['sql'] = $sql;
-		$exception .= "<hr>" . $e->getMessage() . "<hr />" . $sql;
+		$exception .= "<hr>" . $e->getMessage();
 		$data['message'] = TRANS('MSG_SOMETHING_GOT_WRONG') . $exception;
-		$_SESSION['flash'] = message('warning', 'Ooops!', $data['message'], '');
-		echo json_encode($data);
-		return false;
 	}
 			
 
@@ -196,6 +258,10 @@ if (isset($_POST['onlyOpen']) && $_POST['onlyOpen'] == 1) {
 	/* Final do upload de arquivos */
 
 
+
+	/* Checa se o chamado possui um ID de mensagem, quando aberto por e-mail */
+	$references_info = getTicketEmailReferences($conn, $data['numero']);
+
 	/* Variáveis de ambiente para envio de e-mail: todos os actions */
 	$VARS = getEnvVarsValues($conn, $data['numero']);
 
@@ -204,24 +270,24 @@ if (isset($_POST['onlyOpen']) && $_POST['onlyOpen'] == 1) {
 		$mailSendMethod = 'queue';
 	}
 
-	$event = 'edita-para-area';
-	$eventTemplate = getEventMailConfig($conn, $event);
+	$event = 'edita-para-usuario';
+	$to = $VARS['%contato_email%'];
+	if ($isRequester) {
+		$event = 'edita-para-area';
+		$to = $VARS['%area_email%'];
+	}
 
-	// $mailSent = send_mail($event, $VARS['%area_email%'], $rowconfmail, $eventTemplate, $VARS);
-	// if (!$mailSent) {
-	// 	$mailNotification .= "<hr>" . TRANS('EMAIL_NOT_SENT');
-	// }
+	$eventTemplate = getEventMailConfig($conn, $event);
 
 	/* Disparo do e-mail (ou fila no banco) para a área de atendimento */
 	$mail = (new Email())->bootstrap(
 		transvars($eventTemplate['msg_subject'], $VARS),
 		transvars($eventTemplate['msg_body'], $VARS),
-		$VARS['%area_email%'],
+		$to,
 		$eventTemplate['msg_fromname'],
 		$data['numero']
 	);
 
-	// if (!$mail->queue()) {
 	if (!$mail->{$mailSendMethod}()) {
 		$mailNotification .= "<hr>" . TRANS('EMAIL_NOT_SENT') . "<hr>" . $mail->message()->getText();
 	}

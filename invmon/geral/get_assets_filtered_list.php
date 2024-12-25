@@ -66,8 +66,9 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/switch_radio.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
 </head>
 
@@ -88,7 +89,8 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
             </div>
         </div>
 
-
+        <input type="hidden" name="report-mainlogo" class="report-mainlogo" id="report-mainlogo"/>
+        <input type="hidden" name="logo-base64" id="logo-base64"/>
         <?php
 
             if (empty($_GET)) {
@@ -161,6 +163,8 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                 loading.hide();
             });
 
+            setLogoSrc();
+
             $.ajax({
                 url: '<?= $actionUrl;?>',
                 method: 'POST',
@@ -211,6 +215,16 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
             var obs = $.initialize("#table_tickets_queue", function() {
                 
                 var criterios = $('#divCriterios').text();
+
+                function setTitles() {
+                    var buttons = $( 'a.buttons-columnVisibility' );
+
+                    buttons.each(function( index ) {
+                        // console.log( index + ": " + $( this ).text() );
+                        var tooltip =  $( this ).text() ;
+                        $( this ).attr( 'title', tooltip );
+                    });
+                }
                 
                 var table = $('#table_tickets_queue').DataTable({
 
@@ -323,7 +337,8 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                                         columns: [
                                             {
                                                 margin: [20, 10, 0, 0],
-                                                image: '<?= $imgSrc; ?>'
+                                                image: getLogoSrc(),
+                                                width: getLogoWidth()
                                             } ,
                                             {
                                                 table: {
@@ -418,6 +433,10 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                 table.buttons().container()
                     .appendTo($('.display-buttons:eq(0)', table.table().container()));
 
+                table.on( 'buttons-action', function ( e, buttonApi, dataTable, node, config ) {
+                    setTitles();
+                });
+
 
             }, {
                 target: document.getElementById('divAssetsList')
@@ -498,6 +517,41 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
             let location = 'asset_show.php?asset_id=' + assetId;
             $("#assetInfo").attr('src',location)
             $('#modal').modal();
+        }
+
+        function getLogoSrc() {
+            return $('#logo-base64').val() ?? '';
+        }
+
+        function setLogoSrc() {
+
+            let logoName = $('#report-mainlogo').css('background-image');
+
+            if (logoName == 'none') {
+                return;
+            }
+            logoName = logoName.replace(/.*\s?url\([\'\"]?/, '').replace(/[\'\"]?\).*/, '')
+            logoName = logoName.split('/').pop();
+
+            $.ajax({
+                url: './get_reports_logo.php',
+                method: 'POST',
+                data: {
+                    'logo_name': logoName
+                },
+                dataType: 'json',
+            }).done(function(data) {
+
+                if (!data.success) {
+                    return;
+                }
+                $('#logo-base64').val(data.logo);
+            });
+        }
+
+        function getLogoWidth() {
+            let logoWidth = $('#report-mainlogo').width() ?? 150;
+            return logoWidth;
         }
 
     </script>

@@ -8,6 +8,7 @@ const reportAllColumns = [
     'type_of',
     'manufacturer',
     'model',
+    'allocated_to',
     'serial_number',
     'part_number',
     'department',
@@ -27,6 +28,7 @@ const reportAllColumns = [
 ];
 
 const reportDefaultHiddenColumns = [
+    'allocated_to',
     'serial_number', 
     'part_number',
     'state',

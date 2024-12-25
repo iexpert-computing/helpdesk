@@ -11,37 +11,13 @@ if ($_SESSION['s_logado'] != 1 || ($_SESSION['s_nivel'] != 1 && $_SESSION['s_niv
 $conn = ConnectPDO::getInstance();
 
 
-
+$hoje = date("Y-m-d H:i:s");
 $isAdmin = $_SESSION['s_nivel'] == 1;
 $aliasAreasFilter = ($_SESSION['requester_areas'] ? "ua.AREA" : "o.sistema");
 
 $filtered_areas = $_SESSION['dash_filter_areas'];
 $filtered_clients = $_SESSION['dash_filter_clients'];
 $qry_filter_areas = "";
-
-// $u_areas = (!empty($filtered_areas) ? $filtered_areas : $_SESSION['s_uareas']);
-
-// $allAreasInfo = getAreas($conn, 0, 1, null);
-// $arrayAllAreas = [];
-// foreach ($allAreasInfo as $sigleArea) {
-//     $arrayAllAreas[] = $sigleArea['sis_id'];
-// }
-// $allAreas = implode(",", $arrayAllAreas);
-
-// if ($isAdmin) {
-//     $u_areas = (!empty($filtered_areas) ? $filtered_areas : $allAreas);
-
-//     if (empty($filtered_areas) && !$_SESSION['requester_areas']) {
-//         /* Padrão, não precisa filtrar por área - todas as áreas de destino */
-//         $qry_filter_areas = "";
-
-//     } else {
-//         $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$u_areas}) ";
-//     } 
-// } else {
-//     $u_areas = (!empty($filtered_areas) ? $filtered_areas : $_SESSION['s_uareas']);
-//     $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$u_areas}) ";
-// }
 
 
 /* Controle para limitar os resultados com base nos clientes selecionados */
@@ -56,7 +32,7 @@ if (empty($filtered_areas)) {
     if ($isAdmin) {
         $qry_filter_areas = "";
     } else {
-        $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$_SESSION['s_uareas']}) OR " . $aliasAreasFilter . " = '-1')";
+        $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$_SESSION['s_uareas']})";
     }
 } else {
     $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$filtered_areas}))";
@@ -71,6 +47,7 @@ $sql = "SELECT
             s.sis_id = {$aliasAreasFilter} AND
             o.aberto_por = ua.user_id AND 
             o.status = st.stat_id AND
+            o.data_abertura >= DATE_SUB('{$hoje}', INTERVAL 1 YEAR) AND
             st.stat_ignored <> 1 
             {$qry_filter_clients}
             {$qry_filter_areas}

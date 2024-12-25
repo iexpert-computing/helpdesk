@@ -27,6 +27,7 @@ require_once __DIR__ . "/" . "../../includes/include_geral_new.inc.php";
 require_once __DIR__ . "/" . "../../includes/classes/ConnectPDO.php";
 require_once __DIR__ . "/" . "../../includes/components/html2text-master/vendor/autoload.php";
 
+
 use includes\classes\ConnectPDO;
 
 $conn = ConnectPDO::getInstance();
@@ -39,6 +40,9 @@ $sysConfig = getConfig($conn);
 $mailConfig = getMailConfig($conn);
 $isAdmin = $_SESSION['s_nivel'] == 1;
 
+
+$tickets_cost_field = (!empty($sysConfig['tickets_cost_field']) ? $sysConfig['tickets_cost_field'] : "");
+
 $formatBar = $_SESSION['s_formatBarOco'];
 
 $version4 = $sysConfig['conf_updated_issues'];
@@ -50,7 +54,7 @@ $version4 = $sysConfig['conf_updated_issues'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <link rel="stylesheet" type="text/css" href="../../includes/css/estilos.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/jquery/datetimepicker/jquery.datetimepicker.css" />
@@ -59,6 +63,7 @@ $version4 = $sysConfig['conf_updated_issues'];
     <link rel="stylesheet" type="text/css" href="../../includes/components/jquery/jquery.amsify.suggestags-master/css/amsify.suggestags.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
     <style>
         .oc-cursor {
@@ -87,8 +92,20 @@ $version4 = $sysConfig['conf_updated_issues'];
         $numero = (int)$_GET['numero'];
 
         $row = getTicketData($conn, $numero);
+        $need_authorization = false;
+
+        if (!empty($row['problema']) && $row['problema'] != -1) {
+            $need_authorization = getIssueById($conn, (int)$row['problema'])['need_authorization'];
+        }
+
         $issue_selected_data = [];
         $issue_selected = "";
+
+        /* Posicionamento do campo de descrição do chamado: default | top | bottom */
+        $fieldDescriptionPosition = getConfigValue($conn, 'TICKET_DESCRIPTION_POS') ?? 'default';
+        $description = trim(noHtml($row['descricao']));
+        $description = (new \Html2Text\Html2Text($description))->getText();
+
 
 
         $isRequester = false;
@@ -230,6 +247,17 @@ $version4 = $sysConfig['conf_updated_issues'];
 
                 <div class="form-group row my-4">
 
+                <?php
+                    if ($fieldDescriptionPosition == "top") {
+                        ?>
+                        <!-- Descrição posição top -->
+                        <label for="idDescricao" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('DESCRIPTION'); ?></label>
+                        <div class="form-group col-md-10">
+                            <textarea class="form-control " id="idDescricao" name="descricao" rows="4" disabled><?= $description; ?></textarea>
+                        </div>
+                        <?php
+                    }
+                ?>
 
                     <!-- Cliente -->
                     <label for="client" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CLIENT'); ?></label>
@@ -303,15 +331,18 @@ $version4 = $sysConfig['conf_updated_issues'];
                     <div id="issueDescription"></div>
 
 
-                    <!-- Descrição -->
                     <?php
-                        $description = trim(noHtml($row['descricao']));
-                        $description = (new \Html2Text\Html2Text($description))->getText();
+                    if ($fieldDescriptionPosition == "default") {
+                        ?>
+                        <!-- Descrição posição default -->
+                        <div class="w-100"></div>
+                        <label for="idDescricao" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('DESCRIPTION'); ?></label>
+                        <div class="form-group col-md-10">
+                            <textarea class="form-control " id="idDescricao" name="descricao" rows="4" disabled><?= $description; ?></textarea>
+                        </div>
+                        <?php
+                    }
                     ?>
-                    <label for="idDescricao" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('DESCRIPTION'); ?></label>
-                    <div class="form-group col-md-10">
-                        <textarea class="form-control " id="idDescricao" name="descricao" rows="4" disabled><?= $description; ?></textarea>
-                    </div>
 
 
                     <!-- Tags/Labels -->
@@ -495,7 +526,7 @@ $version4 = $sysConfig['conf_updated_issues'];
                         <label class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('OCO_FIELD_SEND_MAIL_TO'); ?></label>
                         <div class="form-group col-md-4">
                             <div class="form-check form-check-inline">
-                                <input class="form-check-input " type="checkbox" name="mailAR" value="ok" id="defaultCheck1" checked>
+                                <input class="form-check-input " type="checkbox" name="mailAR" value="ok" id="defaultCheck1">
                                 <legend class="col-form-label col-form-label-sm"><?= TRANS('RESPONSIBLE_AREA'); ?></legend>
                             </div>
                             <div class="form-check form-check-inline">
@@ -503,7 +534,7 @@ $version4 = $sysConfig['conf_updated_issues'];
                                 <legend class="col-form-label col-form-label-sm"><?= TRANS('TECHNICIAN'); ?></legend>
                             </div>
                             <div class="form-check form-check-inline">
-                                <input class="form-check-input " type="checkbox" name="mailUS" value="ok" <?= $habilita; ?> id="mailUS">
+                                <input class="form-check-input " type="checkbox" name="mailUS" value="ok" <?= $habilita; ?> id="mailUS" checked>
                                 <legend class="col-form-label col-form-label-sm"><?= TRANS('CONTACT'); ?></legend>
                             </div>
                         </div>
@@ -616,16 +647,30 @@ $version4 = $sysConfig['conf_updated_issues'];
                             ?>
                         </select>
                     </div>
+                    
                     <?php
-
-
-
+                    if ($fieldDescriptionPosition == "bottom") {
+                        ?>
+                        <!-- Descrição posição bottom -->
+                        <div class="w-100"></div>
+                        <label for="idDescricao" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('DESCRIPTION'); ?></label>
+                        <div class="form-group col-md-10">
+                            <textarea class="form-control " id="idDescricao" name="descricao" rows="4" disabled><?= $description; ?></textarea>
+                        </div>
+                        <?php
+                    }
+                    
 
                     /* Campos personalizados */
                     $labelColSize = 2;
                     $fieldColSize = 4;
                     $fieldRowSize = 10;
                     $custom_fields = getCustomFields($conn, null, 'ocorrencias');
+
+                    if (!empty($tickets_cost_field) && $need_authorization) {
+                        insertCfieldCaseNotExists($conn, $row['numero'], $tickets_cost_field);
+                    }
+
 
                     if (!empty($custom_fields) && (!$sysConfig['conf_cfield_only_opened'] || hasCustomFields($conn, $row['numero']))) {
                     ?>
@@ -636,7 +681,7 @@ $version4 = $sysConfig['conf_updated_issues'];
                     }
 
                     foreach ($custom_fields as $cfield) {
-                        
+
                         $maskType = ($cfield['field_mask_regex'] ? 'regex' : 'mask');
                     	$fieldMask = "data-inputmask-" . $maskType . "=\"" . $cfield['field_mask'] . "\"";
                         $inlineAttributes = keyPairsToHtmlAttrs($cfield['field_attributes']);
@@ -766,7 +811,7 @@ $version4 = $sysConfig['conf_updated_issues'];
                                     <a class="nav-link <?= $classDisabledFiles; ?>" id="divFiles-tab" data-toggle="pill" href="#divFiles" role="tab" aria-controls="divFiles" aria-selected="true" aria-disabled="<?= $ariaDisabledFiles; ?>"><i class="fas fa-paperclip"></i>&nbsp;<?= TRANS('FILES'); ?>&nbsp;<span class="badge badge-light"><?= $hasFiles; ?></span></a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link <?= $classDisabledSubs; ?>" id="divSubs-tab" data-toggle="pill" href="#divSubs" role="tab" aria-controls="divSubs" aria-selected="true" aria-disabled="<?= $ariaDisabledSubs; ?>"><i class="fas fa-stream"></i>&nbsp;<?= TRANS('TICKETS_REFERENCED'); ?>&nbsp;<span class="badge badge-light"><?= $hasRelatives; ?></span></a>
+                                    <a class="nav-link <?= $classDisabledSubs; ?>" id="divSubs-tab" data-toggle="pill" href="#divSubs" role="tab" aria-controls="divSubs" aria-selected="true" aria-disabled="<?= $ariaDisabledSubs; ?>"><i class="fas fa-stream"></i>&nbsp;<?= TRANS('TICKETS_DIRECTLY_REFERENCED'); ?>&nbsp;<span class="badge badge-light"><?= $hasRelatives; ?></span></a>
                                 </li>
                             </ul>
                         </div>
@@ -816,7 +861,7 @@ $version4 = $sysConfig['conf_updated_issues'];
                                                             <!-- <th scope="row"><?= $i; ?></th> -->
                                                             <th><input type="checkbox" name="asset<?= $printCont; ?>" value="<?= $rowAsset['numero']; ?>" <?= $checked; ?>></th>
                                                             <td><?= $author; ?></td>
-                                                            <td><?= formatDate($rowAsset['data']); ?></td>
+                                                            <td><?= formatDate($rowAsset['created_at']); ?></td>
                                                             <td><?= getEntryType($rowAsset['tipo_assentamento']); ?></td>
                                                             <td><?= nl2br($rowAsset['assentamento']); ?></td>
                                                         </tr>
@@ -925,6 +970,9 @@ $version4 = $sysConfig['conf_updated_issues'];
                                                     $label = "";
                                                     // $contSub = 0;
                                                     foreach ($relatives as $rowSubPai) {
+
+                                                        $label = "";
+
                                                         $contSub++;
                                                         $key = $rowSubPai['dep_filho'];
                                                         $label = "<span class='badge badge-oc-wine p-2 mt-2'>" . TRANS('CHILD_TICKET') . "</span>";
@@ -1304,7 +1352,7 @@ $version4 = $sysConfig['conf_updated_issues'];
 				styleBase: "form-control input-select-multi",
 			});
 
-            $('#client').selectpicker({
+            $('#client, #idStatus').selectpicker({
 				/* placeholder */
 				title: "<?= TRANS('SEL_SELECT', '', 1); ?>",
 				liveSearch: true,
@@ -1491,6 +1539,9 @@ $version4 = $sysConfig['conf_updated_issues'];
                         html += '<td><?= $sysConfig['conf_prob_tipo_1']; ?></td>';
                         html += '<td><?= $sysConfig['conf_prob_tipo_2']; ?></td>';
                         html += '<td><?= $sysConfig['conf_prob_tipo_3']; ?></td>';
+                        html += '<td><?= $sysConfig['conf_prob_tipo_4']; ?></td>';
+                        html += '<td><?= $sysConfig['conf_prob_tipo_5']; ?></td>';
+                        html += '<td><?= $sysConfig['conf_prob_tipo_6']; ?></td>';
                         html += '</tr>';
                         html += '</thead>';
                         for (var i in response) {
@@ -1509,6 +1560,9 @@ $version4 = $sysConfig['conf_updated_issues'];
                             html += '<td>' + (response[i].probt1_desc ?? '') + '</td>';
                             html += '<td>' + (response[i].probt2_desc ?? '') + '</td>';
                             html += '<td>' + (response[i].probt3_desc ?? '') + '</td>';
+                            html += '<td>' + (response[i].probt4_desc ?? '') + '</td>';
+                            html += '<td>' + (response[i].probt5_desc ?? '') + '</td>';
+                            html += '<td>' + (response[i].probt6_desc ?? '') + '</td>';
                             html += '</tr>';
                         }
                         html += '</table>';

@@ -51,6 +51,40 @@ $data['field_id'] = "";
 $data['lang_file'] = (isset($post['lang_file']) ? noHtml(getLastPartOfPath($post['lang_file'])) : "");
 $data['date_format'] = (isset($post['date_format']) ? noHtml($post['date_format']) : "");
 $data['site'] = (isset($post['site']) ? noHtml($post['site']) : "");
+$data['show_deprecated'] = (isset($post['show_deprecated']) ? ($post['show_deprecated'] == "yes" ? 1 : 0) : 0);
+$data['allow_assets_btw_clients'] = (isset($post['allow_assets_btw_clients']) ? ($post['allow_assets_btw_clients'] == "yes" ? 1 : 0) : 0);
+$data['allow_only_ops_assets_btw_clients'] = (isset($post['allow_only_ops_assets_btw_clients']) ? ($post['allow_only_ops_assets_btw_clients'] == "yes" ? 1 : 0) : 0);
+if (!$data['allow_assets_btw_clients']) {
+    $data['allow_only_ops_assets_btw_clients'] = 0;
+}
+
+$allowed_positions = ['default', 'top', 'bottom'];
+$data['description_position'] = (isset($post['description_position']) && !empty($post['description_position']) ? noHtml($post['description_position']) : "default");
+
+if (!in_array($data['description_position'], $allowed_positions)) {
+    $data['description_position'] = 'default';
+}
+
+
+
+/** Tratamento para os pré filtros de categorias para tipos de solicitações */
+$textPreFilters = "";
+$data['pre_filters'] = (isset($post['pre_filters']) ? noHtml($post['pre_filters']) : "");
+if (!empty($data['pre_filters'])) {
+    $array_pre_filters = explode(',', $data['pre_filters']);
+    // percorrer o array e verificar se cada elemento é um inteiro entre 1 e 6 (número de categorias existentes)
+    foreach ($array_pre_filters as $pre_filter) {
+        $pre_filter = intval($pre_filter);
+        if ($pre_filter > 0 && $pre_filter <= 6) {
+            if (strlen($textPreFilters) > 0)
+                $textPreFilters .= ",";
+            $textPreFilters .= $pre_filter;
+        }
+    }
+    $data['pre_filters'] = $textPreFilters;
+}
+
+
 $data['allow_self_register'] = (isset($post['allow_self_register']) ? ($post['allow_self_register'] == "yes" ? 1 : 0) : 0);
 $data['treat_own_ticket'] = (isset($post['treat_own_ticket']) ? ($post['treat_own_ticket'] == "yes" ? 1 : 0) : 0);
 $data['isolate_areas'] = (isset($post['isolate_areas']) ? ($post['isolate_areas'] == "yes" ? 1 : 0) : 0);
@@ -74,6 +108,21 @@ $data['only_weekdays_to_count'] = (isset($post['only_weekdays_to_count']) ? 1 : 
 
 $data['default_automatic_rate'] = (isset($post['default_automatic_rate']) ? noHtml($post['default_automatic_rate']) : 'great');
 
+/* Campo para custo e status para fluxo de autorização */
+$data['tickets_cost_field'] = (isset($post['tickets_cost_field']) && !empty($post['tickets_cost_field']) ? (int)$post['tickets_cost_field'] : "");
+$data['status_waiting_cost_auth'] = (isset($post['status_waiting_cost_auth']) && !empty($post['status_waiting_cost_auth']) ? (int)$post['status_waiting_cost_auth'] : "");
+$data['status_cost_authorized'] = (isset($post['status_cost_authorized']) && !empty($post['status_cost_authorized']) ? (int)$post['status_cost_authorized'] : "");
+$data['status_cost_refused'] = (isset($post['status_cost_refused']) && !empty($post['status_cost_refused']) ? (int)$post['status_cost_refused'] : "");
+$data['status_cost_updated'] = (isset($post['status_cost_updated']) && !empty($post['status_cost_updated']) ? (int)$post['status_cost_updated'] : "");
+
+$data['status_to_monitor'] = (isset($post['status_to_monitor']) && !empty($post['status_to_monitor']) ? array_map('intval', $post['status_to_monitor']) : []);
+$data['status_to_monitor'] = (!empty($data['status_to_monitor']) ? implode(",", $data['status_to_monitor']) : "");
+$data['days_to_close_by_inactivity'] = (isset($post['days_to_close_by_inactivity']) ? intval($post['days_to_close_by_inactivity']) : 7);
+$data['only_weekdays_to_count_inactivity'] = (isset($post['only_weekdays_to_count_inactivity']) ? 1 : 0);
+$data['default_inactivity_automatic_rate'] = (isset($post['default_inactivity_automatic_rate']) ? noHtml($post['default_inactivity_automatic_rate']) : 'great');
+$data['status_out_inactivity'] = (isset($post['status_out_inactivity']) ? (int)$post['status_out_inactivity'] : 1);
+
+
 
 $data['forward_status'] = (isset($post['forward_status']) ? noHtml($post['forward_status']) : "");
 $data['justificativa'] = (isset($post['justificativa']) ? ($post['justificativa'] == "yes" ? 1 : 0) : 0);
@@ -92,6 +141,11 @@ $data['max_number_attachs'] = (isset($post['max_number_attachs']) ? intval($post
 $data['days_before_expire'] = (isset($post['days_before_expire']) ? intval($post['days_before_expire']) : 0);
 
 $data['area_to_alert'] = (isset($post['area_to_alert']) ? noHtml($post['area_to_alert']) : "");
+$data['max_amount_batch_assets_record'] = (isset($post['max_amount_batch_assets_record']) && ($post['max_amount_batch_assets_record'] > 0) ? (int)$post['max_amount_batch_assets_record'] : 1);
+$data['basic_users_can_request_as_others'] = (isset($post['basic_users_can_request_as_others']) ? ($post['basic_users_can_request_as_others'] == "yes" ? 1 : 0) : 0);
+
+$data['assets_auto_department'] = (isset($post['assets_auto_department']) ? (int)$post['assets_auto_department'] : "");
+
 
 // $data['label_prob_tipo_1'] = (isset($post['label_prob_tipo_1']) ? noHtml($post['label_prob_tipo_1']) : "");
 // $data['label_prob_tipo_2'] = (isset($post['label_prob_tipo_2']) ? noHtml($post['label_prob_tipo_2']) : "");
@@ -109,6 +163,7 @@ $fileTypes .= (isset($post['upld_mso']) ? ($post['upld_mso'] == "yes" ? "MSO%" :
 $fileTypes .= (isset($post['upld_nmso']) ? ($post['upld_nmso'] == "yes" ? "NMSO%" : "") : "");
 $fileTypes .= (isset($post['upld_rtf']) ? ($post['upld_rtf'] == "yes" ? "RTF%" : "") : "");
 $fileTypes .= (isset($post['upld_html']) ? ($post['upld_html'] == "yes" ? "HTML%" : "") : "");
+$fileTypes .= (isset($post['upld_wav']) ? ($post['upld_wav'] == "yes" ? "WAV%" : "") : "");
 $data['fileTypes'] = $fileTypes;
 
 $formatBar = "%%";
@@ -145,9 +200,36 @@ if ($data['action'] == "edit") {
     } elseif ($data['forward_status'] == "") {
         $data['success'] = false; 
         $data['field_id'] = "forward_status";
-    } elseif ($data['sla_tolerance'] == "") {
+    } 
+    
+    // elseif ($data['tickets_cost_field'] == "") {
+    //     $data['success'] = false; 
+    //     $data['field_id'] = "tickets_cost_field";
+    // } 
+    elseif ($data['status_waiting_cost_auth'] == "" && !empty($data['tickets_cost_field'])) {
         $data['success'] = false; 
-        $data['field_id'] = "sla_tolerance";
+        $data['field_id'] = "status_waiting_cost_auth";
+    }
+    
+    elseif ($data['status_cost_authorized'] == "" && !empty($data['tickets_cost_field'])) {
+        $data['success'] = false; 
+        $data['field_id'] = "status_cost_authorized";
+    }
+    
+    elseif ($data['status_cost_refused'] == "" && !empty($data['tickets_cost_field'])) {
+        $data['success'] = false; 
+        $data['field_id'] = "status_cost_refused";
+    }
+    
+    elseif ($data['status_cost_updated'] == "" && !empty($data['tickets_cost_field'])) {
+        $data['success'] = false; 
+        $data['field_id'] = "status_cost_updated";
+    }
+    
+    
+    elseif ($data['sla_tolerance'] == "") {
+        $data['success'] = false; 
+    $data['field_id'] = "sla_tolerance";
     } elseif ($data['img_max_size'] == "") {
         $data['success'] = false; 
         $data['field_id'] = "img_max_size";
@@ -195,6 +277,46 @@ if ($data['action'] == "edit") {
     }
 
 
+    if (!empty($data['tickets_cost_field'])) {
+        /* Testar para garantir que o campo customizado possui máscara adequada para moeda */
+        $valuesNotPassed = [];
+        $valuesToTest = [
+            '1,00',
+            '1,55',
+            '10,00',
+            '100,00',
+            '1.000,00',
+            '10.000,00',
+            '100.000,00',
+            '1.000.000,00',
+            '10.000.000,00'
+        ];
+
+        $validField = true;
+        $cost_field_info = getCustomFields($conn, $data['tickets_cost_field']);
+        if ($cost_field_info['field_mask'] && $cost_field_info['field_mask_regex']) {
+            foreach ($valuesToTest as $value) {
+                if (!preg_match('/' . $cost_field_info['field_mask'] . '/i', $value)) {
+                    $validField = false;
+                    // $valuesNotPassed[] = $value;
+                    break;
+                }
+            }
+        } else {
+            $validField = false;
+        }
+
+        if (!$validField) {
+            $data['success'] = false; 
+            $data['field_id'] = "tickets_cost_field";
+            $data['message'] = message('warning', '', TRANS('MSG_COST_MUST_BE_WITH_MASK'), '');
+            echo json_encode($data);
+            return false;
+        }
+    }
+
+
+
     if (!is_numeric($data['sla_tolerance'])) {
         $data['success'] = false; 
         $data['field_id'] = "sla_tolerance";
@@ -213,8 +335,8 @@ if ($data['action'] == "edit") {
 
 
     /* Confere o tamanho máximo da imagem */
-    if ($data['img_max_size'] > (1024 * 1024 * 10)) {
-        /* 10mb */
+    if ($data['img_max_size'] > (1024 * 1024 * 20)) {
+        /* 20mb */
         $data['success'] = false; 
         $data['field_id'] = "img_max_size";
         $data['message'] = message('warning', '', TRANS('FILE_TOO_HEAVY_IN_CONFIG'), '');
@@ -289,7 +411,18 @@ if ($data['action'] == "edit") {
                 conf_status_done_rejected = '" . $data['status_done_rejected'] . "', 
                 conf_time_to_close_after_done = '" . $data['time_to_close_after_done'] . "',
                 conf_only_weekdays_to_count_after_done = '" . $data['only_weekdays_to_count'] . "',
-                conf_rate_after_deadline = '" . $data['default_automatic_rate'] . "'
+                conf_rate_after_deadline = '" . $data['default_automatic_rate'] . "',
+                conf_cat_chain_at_opening = " . dbField($data['pre_filters'], "text") . ",
+                tickets_cost_field = " . dbField($data['tickets_cost_field'], "text") . ",
+                status_waiting_cost_auth = " . dbField($data['status_waiting_cost_auth'], "text") . ",
+                status_cost_authorized = " . dbField($data['status_cost_authorized'], "text") . ",
+                status_cost_refused = " . dbField($data['status_cost_refused'], "text") . ",
+                status_cost_updated = " . dbField($data['status_cost_updated'], "text") . ",
+                stats_to_close_by_inactivity = " . dbField($data['status_to_monitor'], 'text') . ",
+                days_to_close_by_inactivity = '" . $data['days_to_close_by_inactivity'] . "',
+                stat_out_inactivity = '" . $data['status_out_inactivity'] . "', 
+                only_weekdays_to_count_inactivity = '" . $data['only_weekdays_to_count_inactivity'] . "',
+                rate_after_close_by_inactivity = '" . $data['default_inactivity_automatic_rate'] . "'    
                 ";
 		
     try {
@@ -318,6 +451,25 @@ if ($data['action'] == "edit") {
         }
         
 
+        /* Configurações extras - a partir da versão 6 todas as novas configurações serão gravadas em config_keys */
+        $dataConfigKeys = [];
+        $dataConfigKeys['SHOW_DEPRECATED'] = $data['show_deprecated'];
+        $dataConfigKeys['ALLOW_BASIC_USERS_REQUEST_AS_OTHERS'] = $data['basic_users_can_request_as_others'];
+        $dataConfigKeys['MAX_AMOUNT_BATCH_ASSETS_RECORD'] = $data['max_amount_batch_assets_record'];
+        $dataConfigKeys['ALLOW_USER_GET_ASSETS_BTW_CLIENTS'] = $data['allow_assets_btw_clients'];
+        $dataConfigKeys['ALLOW_ONLY_OPS_GET_ASSETS_BTW_CLIENTS'] = $data['allow_only_ops_assets_btw_clients'];
+        $dataConfigKeys['TICKET_DESCRIPTION_POS'] = $data['description_position'];
+        $dataConfigKeys['ASSETS_AUTO_DEPARTMENT'] = $data['assets_auto_department'];
+
+        $configKeysErrors = [];
+        /* Atualização da configuração geral */
+        foreach ($dataConfigKeys as $key => $value) {
+            
+            if (!setConfigValue($conn, $key, $value)) {
+                $configKeysErrors[] = $key;
+            }
+        }
+
         
     } catch (Exception $e) {
         $data['success'] = false; 
@@ -329,7 +481,8 @@ if ($data['action'] == "edit") {
 
 } 
 
-if (!empty($exception)) {
+if (!empty($exception) || !empty($configKeysErrors)) {
+    $exception .= "<hr>" . implode("<hr>", $configKeysErrors);
     $data['message'] = $data['message'] . "<hr>" . $exception;
 }
 

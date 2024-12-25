@@ -74,6 +74,30 @@ function loadMenuObserver() {
   /* jQuery.initialize plugin is created to help maintain dynamically created elements on the
   page.  */
   var obs = $.initialize("#sidebar-loaded", function () {
+    
+    
+    /* Fazer um loop para percorrer todos os elementos do tipo "a", comparar o atributo "data-app" de cada elemento com o basename do src da url carregada no iframe (sem o sufixo ".php"). Se forem iguais, adicionar a classe active-link */
+    $('.sidebar-submenu > ul > li > a, .li-link > a').each(function(){
+      var dataApp = $(this).attr('data-app');
+      var iframeSrc = $('#iframeMain').attr('src').split('/').pop().replace('.php', '');
+      if (dataApp == iframeSrc) {
+        $(this).addClass('active-link');
+
+        let parentDropDown = $(this).parent().parent().parent().parent();
+        
+        if (parentDropDown.hasClass("sidebar-dropdown")){
+          parentDropDown.addClass("folder-item-active");
+          parentDropDown.addClass("active");
+
+          let targetSubmenu = parentDropDown.find('.sidebar-submenu');
+          targetSubmenu.attr("style", "display: block;");
+        }
+
+      }
+    });
+    
+    
+    
     // Dropdown menu
     $(".sidebar-dropdown > a").click(function () {
       $(".sidebar-submenu").slideUp(200);
@@ -86,13 +110,21 @@ function loadMenuObserver() {
         $(this).parent().addClass("active");
       }
 
-      // var href = $(this).attr('href');
-      // alert (href);
+
       // obs.disconnect();
     });
 
     $(".sidebar-submenu > ul > li > a, .li-link > a").click(function (e) {
       e.preventDefault();
+
+      // /* Remover a classe active para todos os links */
+      $(".sidebar-submenu > ul > li > a, .li-link > a").removeClass("active-link");
+      $(this).addClass("active-link");
+
+      $(".sidebar-dropdown").removeClass("folder-item-active");
+      $(this).parent().parent().parent().parent().addClass("folder-item-active");
+      
+
       var path = $(this).attr("data-path");
       var app = $(this).attr("data-app");
       var params = $(this).attr("data-params");
@@ -114,8 +146,6 @@ function loadMenuObserver() {
 
 
       // obs.disconnect();
-      // alert (path+app+'.php');
-      // loadPage(path+app+'.php');
     });
 
     //toggle sidebar
@@ -244,7 +274,23 @@ function loadMenuObserver() {
 
 function loadMenu() {
 
+  $('.sidebar-submenu > ul > li > a, .li-link > a').each(function(){
+    var dataApp = $(this).attr('data-app');
+    var iframeSrc = $('#iframeMain').attr('src').split('/').pop().replace('.php', '');
+    if (dataApp == iframeSrc) {
+      $(this).addClass('active-link');
 
+      let parentDropDown = $(this).parent().parent().parent().parent();
+        
+        if (parentDropDown.hasClass("sidebar-dropdown")){
+          parentDropDown.addClass("folder-item-active");
+          parentDropDown.addClass("active");
+
+          let targetSubmenu = parentDropDown.find('.sidebar-submenu');
+          targetSubmenu.attr("style", "display: block;");
+        }
+    }
+  });
   
     // Dropdown menu
     $(".sidebar-dropdown > a").click(function () {
@@ -257,15 +303,17 @@ function loadMenu() {
         $(this).next(".sidebar-submenu").slideDown(200);
         $(this).parent().addClass("active");
       }
-
-      // var href = $(this).attr('href');
-      // alert (href);
     });
 
     $(".sidebar-submenu > ul > li > a, .li-link > a").click(function (e) {
       e.preventDefault();
 
-      // $(this).addClass("active");
+      $(".sidebar-submenu > ul > li > a, .li-link > a").removeClass("active-link");
+      $(this).addClass("active-link");
+
+      $(".sidebar-dropdown").removeClass("folder-item-active");
+      $(this).parent().parent().parent().parent().addClass("folder-item-active");
+
       
       var path = $(this).attr("data-path");
       var app = $(this).attr("data-app");

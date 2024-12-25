@@ -44,26 +44,12 @@ $conn = ConnectPDO::getInstance();
     <link rel="stylesheet" type="text/css" href="../../includes/css/estilos.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/switch_radio.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
+    <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <style>
-        .dataTables_filter input,
-        .dataTables_length select {
-            border: 1px solid gray;
-            border-radius: 4px;
-            background-color: white;
-            height: 25px;
-        }
-
-        .dataTables_filter {
-            float: left !important;
-        }
-
-        .dataTables_length {
-            float: right !important;
-        }
-    </style>
+    
 </head>
 
 <body>

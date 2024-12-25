@@ -35,4 +35,17 @@ class Tickets extends OcomonApi
 
         return $this;
     }
+
+    public function comment(array $fields): Tickets
+    // public function create(array $fields)
+    {
+        $this->request(
+            "POST",
+            "/tickets/entry",
+            $fields
+        );
+
+        return $this;
+    }
+
 }

@@ -88,8 +88,9 @@ $selectAuxWorkersJs = json_encode($selectAuxWorkers);
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
     <link href="../../includes/components/fullcalendar/lib/main.css" rel="stylesheet" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_fullcalendar.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <style>
         .modal-1000 {

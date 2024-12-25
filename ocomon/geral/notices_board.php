@@ -59,13 +59,14 @@ $userAreas = explode(',', $_SESSION['s_uareas']);
 
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
-    <link rel="stylesheet" type="text/css" href="../../includes/components/summernote/summernote-bs4.css" />
-    <!-- <link rel="stylesheet" type="text/css" href="../../includes/components/jodit/build/jodit.min.css" /> -->
-    <!-- <link rel="stylesheet" type="text/css" href="../../includes/css/my_jodit.css" /> -->
+    <!-- <link rel="stylesheet" type="text/css" href="../../includes/components/summernote/summernote-bs4.css" /> -->
+    <link rel="stylesheet" type="text/css" href="../../includes/components/suneditor/node_modules/suneditor/dist/css/suneditor.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../includes/components/suneditor/node_modules/suneditor/src/assets/css/suneditor-contents.css" />
 
     <link rel="stylesheet" type="text/css" href="../../includes/css/util.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <style>
         li.areas_target {
@@ -261,8 +262,8 @@ $userAreas = explode(',', $_SESSION['s_uareas']);
                         ?>
                             <tr>
                                 <td class="line"><?= $badgeType; ?></td>
-                                <td class="line"><?= trim($row['title']); ?></td>
-                                <td class="line"><?= trim($row['avisos']); ?></td>
+                                <td class="line"><?= trim((string)$row['title']); ?></td>
+                                <td class="line"><?= trim((string)$row['avisos']); ?></td>
                                 <td class="line"><?= $row['nome']; ?></td>
                                 <td class="line"><?= $areaDestiny; ?></td>
                                 <td class="line"><?= $noticeType; ?></td>
@@ -300,12 +301,11 @@ $userAreas = explode(',', $_SESSION['s_uareas']);
 
 
                     <label for="notice" class="col-sm-2 col-md-2 col-form-label text-md-right"><?= TRANS('NOTICE'); ?></label>
-                    <div class="form-group col-md-10">
-                        <textarea class="form-control" id="notice" name="notice" required></textarea>
+                    <div class="form-group col-md-10" id="suneditor">
+                        <textarea name="notice" id="notice" class="form-control"></textarea>
                         <div class="invalid-feedback">
                             <?= TRANS('MANDATORY_FIELD'); ?>
                         </div>
-                        <small class="text-mute"><?= TRANS('HELPER_NOTICE'); ?></small>
                     </div>
 
 
@@ -424,13 +424,22 @@ $userAreas = explode(',', $_SESSION['s_uareas']);
                         </div>
                     </div>
 
-                    <label for="notice" class="col-sm-2 col-md-2 col-form-label text-md-right"><?= TRANS('NOTICE'); ?></label>
+                    <!-- <label for="notice" class="col-sm-2 col-md-2 col-form-label text-md-right"><?= TRANS('NOTICE'); ?></label>
                     <div class="form-group col-md-10">
                         <textarea class="form-control" id="notice" name="notice" required><?= toHtml($row['avisos']); ?></textarea>
                         <div class="invalid-feedback">
                             <?= TRANS('MANDATORY_FIELD'); ?>
                         </div>
+                    </div> -->
+
+                    <label for="notice" class="col-sm-2 col-md-2 col-form-label text-md-right"><?= TRANS('NOTICE'); ?></label>
+                    <div class="form-group col-md-10" id="suneditor">
+                        <textarea name="notice" id="notice" class="form-control"><?= $row['avisos']; ?></textarea>
+                        <div class="invalid-feedback">
+                            <?= TRANS('MANDATORY_FIELD'); ?>
+                        </div>
                     </div>
+
 
                     <label for="type" class="col-md-2 col-form-label text-md-right"><?= TRANS('COL_TYPE'); ?></label>
                     <div class="form-group col-md-10">
@@ -560,9 +569,11 @@ $userAreas = explode(',', $_SESSION['s_uareas']);
     <script src="../../includes/components/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../../includes/components/bootstrap-select/dist/js/bootstrap-select.min.js"></script>
     <script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables.js"></script>
-    <script src="../../includes/components/summernote/summernote-bs4.js"></script>
-    <script src="../../includes/components/summernote/lang/summernote-pt-BR.min.js"></script>
-    <!-- <script src="../../includes/components/jodit/build/jodit.min.js"></script> -->
+    <!-- <script src="../../includes/components/summernote/summernote-bs4.js"></script> -->
+    <!-- <script src="../../includes/components/summernote/lang/summernote-pt-BR.min.js"></script> -->
+    <script src="../../includes/components/suneditor/node_modules/suneditor/dist/suneditor.min.js"></script>
+    <script src="../../includes/components/suneditor/node_modules/suneditor/src/lang/pt_br.js"></script>
+    <script src="../../includes/javascript/format_bar.js"></script>
     <script type="text/javascript">
         $(function() {
 
@@ -589,48 +600,13 @@ $userAreas = explode(',', $_SESSION['s_uareas']);
             });
 
             var bar = '<?php print $_SESSION['s_formatBarMural']; ?>';
+            
+
+            
             if ($('#notice').length > 0 && bar == 1) {
-                $('#notice').summernote({
-                    // placeholder: 'Hello Bootstrap 4',
-                    toolbar: [
-                        ['style', ['style']],
-                        ['font', ['bold', 'underline', 'clear']],
-                        ['fontname', ['fontname']],
-                        ['fontsize', ['fontsize']],
-                        ['color', ['color']],
-                        ['para', ['ul', 'ol', 'paragraph']],
-                        ['table', ['table']],
-                        ['insert', ['link']],
-                        ['view', ['fullscreen']],
-                    ],
-                    lang: 'pt-BR', // default: 'en-US'
-                    tabsize: 2,
-                    // height: 100,
-                    height: 100, // set editor height
-                    minHeight: null, // set minimum height of editor
-                    maxHeight: null, // set maximum height of editor
-                    // focus: true // set focus to editable area after initializing summernote
-                });
+                var editor = render_format_bar('notice', 100, 'basic');
             }
-
-
-            // if ($('#notice').length > 0 && bar == 1) {
-            //     var editor = new Jodit('#notice' ,{
-            //         "language": "pt_br",
-            //         "uploader": {
-            //             "insertImageAsBase64URI": true
-            //         },
-            //         height: 200,
-            //         "defaultActionOnPaste": "insert_as_text",
-            //         // "defaultActionOnPaste": "insert_clear_html",
-            //         // "enter": "BR",
-            //         "askBeforePasteHTML": true,
-            //         "askBeforePasteFromWord": true,
-            //         // "toolbarSticky": false,
-
-            //         "buttons": "bold,italic,underline,strikethrough,eraser,ul,ol,indent,outdent,left,font,fontsize,paragraph,image,copyformat,paste,hr,preview,fullsize",
-            //     });
-            // }
+            
 
 
             /* Idioma global para os calendários */
@@ -689,6 +665,9 @@ $userAreas = explode(',', $_SESSION['s_uareas']);
                 });
 
                 $("#idSubmit").prop("disabled", true);
+                if (bar == 1) {
+                    editor.save();
+                }
                 $.ajax({
                     url: './notices_process.php',
                     method: 'POST',

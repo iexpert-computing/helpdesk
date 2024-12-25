@@ -41,6 +41,35 @@ $config = getConfig($conn);
 $version4 = $config['conf_updated_issues'];
 $issues_app = ($version4 ? 'issues_by_area_4.0.php' : 'issues_by_area.php');
 
+$categoriesLabels = [
+	1 => $config['conf_prob_tipo_1'],
+	2 => $config['conf_prob_tipo_2'],
+	3 => $config['conf_prob_tipo_3'],
+	4 => $config['conf_prob_tipo_4'],
+	5 => $config['conf_prob_tipo_5'],
+	6 => $config['conf_prob_tipo_6']
+];
+
+
+$categories[] = ["tag" => $config['conf_prob_tipo_1'], "value" => 1];
+$categories[] = ["tag" => $config['conf_prob_tipo_2'], "value" => 2];
+$categories[] = ["tag" => $config['conf_prob_tipo_3'], "value" => 3];
+$categories[] = ["tag" => $config['conf_prob_tipo_4'], "value" => 4];
+$categories[] = ["tag" => $config['conf_prob_tipo_5'], "value" => 5];
+$categories[] = ["tag" => $config['conf_prob_tipo_6'], "value" => 6];
+$categories = json_encode($categories);	
+
+$categories_setted = $config['conf_cat_chain_at_opening'];
+$textCategoriesSetted = TRANS('NO_PRE_FILTERS_DEFINED');
+if (!empty($categories_setted)) {
+	$textCategoriesSetted = "<ol class='categories_setted'>";
+	$array_categories_setted = explode(',', $categories_setted);
+	foreach ($array_categories_setted as $cat) {
+		$textCategoriesSetted .= "<li>" . $categoriesLabels[$cat] . "</li>";
+	}
+	$textCategoriesSetted .= "</ol>";
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -49,14 +78,16 @@ $issues_app = ($version4 ? 'issues_by_area_4.0.php' : 'issues_by_area.php');
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/switch_radio.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
-	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/jquery/jquery.amsify.suggestags-master/css/amsify.suggestags.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
+
 
 	<style>
 		li.area_admins {
@@ -99,7 +130,7 @@ $issues_app = ($version4 ? 'issues_by_area_4.0.php' : 'issues_by_area.php');
 		} */
 	</style>
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -146,13 +177,6 @@ $issues_app = ($version4 ? 'issues_by_area_4.0.php' : 'issues_by_area.php');
 			}
 
 			$arrayUsers = [];
-			// $sqlUsers = "SELECT user_id, nome FROM usuarios WHERE AREA = '{$COD}'  ORDER BY nome";
-			// $resUsers = $conn->query($sqlUsers);
-			// if ($resUsers->rowCount()) {
-			// 	foreach ($resUsers->fetchall() as $user) {
-			// 		$arrayUsers[] = ["tag" => $user['nome'], "value" => $user['user_id']];
-			// 	}
-			// }
 
 			$areaInfo = getAreaInfo($conn, $COD);
 			$onlyOpenArea = (!empty($areaInfo) && $areaInfo['atende'] == 0 ? true: false);
@@ -227,7 +251,6 @@ $issues_app = ($version4 ? 'issues_by_area_4.0.php' : 'issues_by_area.php');
 							<td class="line col_check" width="8%"><?= TRANS('PROCESS_TICKETS'); ?></td>
 							<td class="line dynamic_mode"><?= TRANS('OPENING_MODE_DYNAMIC'); ?></td>
 							<td class="line subject"><?= TRANS('ACCESS_MODULES'); ?></td>
-							<!-- <td class="line email"><?= TRANS('COL_EMAIL'); ?></td> -->
 							<td class="line admins" width="15%"><?= TRANS('MANAGERS'); ?></td>
 							<td class="line screen_profile"><?= TRANS('COL_SCREEN_PROFILE'); ?></td>
 							<td class="line wc_profile"><?= TRANS('WORKTIME_PROFILE'); ?></td>
@@ -406,6 +429,29 @@ $issues_app = ($version4 ? 'issues_by_area_4.0.php' : 'issues_by_area.php');
 						</div>
 					</div>
 
+
+
+					<label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('USE_OWN_CATEGORIES_FILTERS_CONFIG'); ?>"><?= firstLetterUp(TRANS('USE_OWN_CATEGORIES_FILTERS_CONFIG')); ?></label>
+					<div class="form-group col-md-10 ">
+						<div class="switch-field">
+							<?php
+							$yesChecked = "";
+							$noChecked = "checked";
+							?>
+							<input type="radio" id="pre_filters_own_config" name="pre_filters_own_config" value="yes" <?= $yesChecked; ?> />
+							<label for="pre_filters_own_config"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="pre_filters_own_config_no" name="pre_filters_own_config" value="no" <?= $noChecked; ?> />
+							<label for="pre_filters_own_config_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
+
+					<label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_OPENING_PRE_FILTERS_TO_ISSUES'); ?>"><?= TRANS('OPENING_PRE_FILTERS_TO_ISSUES'); ?></label>
+					<div class="form-group col-md-10">
+						<input type="text" class="form-control " id="pre_filters" name="pre_filters" value="" placeholder="<?= TRANS('ADD_OR_REMOVE'); ?>" />
+						<small class="form-text text-muted"><?= TRANS('LEAVE_BLANK_TO_IGNORE_PRE_FILTERS'); ?></small>
+					</div>
+
 					<h6 class="w-100 mt-5 mb-4 ml-5 border-top p-4"><i class="fas fa-project-diagram text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('ACCESS_MODULES')); ?></h6>
 					<label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('MOD_TICKETS'); ?>"><?= TRANS('MOD_TICKETS'); ?></label>
 					<div class="form-group col-md-4 ">
@@ -459,6 +505,9 @@ $issues_app = ($version4 ? 'issues_by_area_4.0.php' : 'issues_by_area.php');
 					<div class="form-group col-12 col-md-2 ">
 
 						<input type="hidden" name="action" id="action" value="new">
+						<input type="hidden" name="pre_filters_hidden" id="pre_filters_hidden" value="">
+						<input type="hidden" name="prefilter_global" id="prefilter_global" value="<?= TRANS('PLACEHOLDER_GLOBAL_PRE_FILTER_CONFIG'); ?>">
+						<input type="hidden" name="prefilter_placeholder" id="prefilter_placeholder" value="<?= TRANS('ADD_OR_REMOVE'); ?>">
 						<button type="submit" id="idSubmit" name="submit" class="btn btn-primary btn-block"><?= TRANS('BT_OK'); ?></button>
 					</div>
 					<div class="form-group col-12 col-md-2">
@@ -588,6 +637,26 @@ $issues_app = ($version4 ? 'issues_by_area_4.0.php' : 'issues_by_area.php');
 						</div>
 					</div>
 
+					<label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('USE_OWN_CATEGORIES_FILTERS_CONFIG'); ?>"><?= firstLetterUp(TRANS('USE_OWN_CATEGORIES_FILTERS_CONFIG')); ?></label>
+					<div class="form-group col-md-10 ">
+						<div class="switch-field">
+							<?php
+							$yesChecked = ($row['use_own_config_cat_chain'] == 1 ? "checked" : "");
+							$noChecked = (!($row['use_own_config_cat_chain'] == 1) ? "checked" : "");
+							?>
+							<input type="radio" id="pre_filters_own_config" name="pre_filters_own_config" value="yes" <?= $yesChecked; ?> />
+							<label for="pre_filters_own_config"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="pre_filters_own_config_no" name="pre_filters_own_config" value="no" <?= $noChecked; ?> />
+							<label for="pre_filters_own_config_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
+					<label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_OPENING_PRE_FILTERS_TO_ISSUES'); ?>"><?= TRANS('OPENING_PRE_FILTERS_TO_ISSUES'); ?></label>
+					<div class="form-group col-md-10">
+						<input type="text" class="form-control " id="pre_filters" name="pre_filters" value="<?= $areaInfo['sis_cat_chain_at_opening']; ?>" placeholder="<?= TRANS('ADD_OR_REMOVE'); ?>" />
+						<small class="form-text text-muted"><?= TRANS('LEAVE_BLANK_TO_IGNORE_PRE_FILTERS'); ?></small>
+					</div>
+
 
 					<div class="h6 w-100 my-4 border-top p-4"><i class="fa fa-project-diagram text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('ACCESS_MODULES')); ?>:</div>
 					<label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('MOD_TICKETS'); ?>"><?= TRANS('MOD_TICKETS'); ?></label>
@@ -691,7 +760,7 @@ $issues_app = ($version4 ? 'issues_by_area_4.0.php' : 'issues_by_area.php');
 
 				<div class="form-group row my-4">
 
-					<!-- Managers -->
+					<!-- Managers | Gerentes -->
 					<div class="h6 w-100 my-4 border-top p-4 help-tip" title="<?= TRANS('MANAGERS'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_AREA_ADMINS_AREAS'); ?>"><i class="fas fa-user-tie text-secondary"></i>&nbsp;<?= TRANS('MANAGERS'); ?>:</div>
 					
 					<label class="col-md-2 col-form-label col-form-label-sm text-md-right" ><?= TRANS('MNL_USUARIOS'); ?></label>
@@ -710,6 +779,10 @@ $issues_app = ($version4 ? 'issues_by_area_4.0.php' : 'issues_by_area.php');
 
 
 					<input type="hidden" name="cod" id="cod" value="<?= $COD; ?>">
+					<input type="hidden" name="prefilter_global" id="prefilter_global" value="<?= TRANS('PLACEHOLDER_GLOBAL_PRE_FILTER_CONFIG'); ?>">
+					<input type="hidden" name="prefilter_placeholder" id="prefilter_placeholder" value="<?= TRANS('ADD_OR_REMOVE'); ?>">
+
+					<input type="hidden" name="pre_filters_hidden" id="pre_filters_hidden" value="">
 					<input type="hidden" name="action" id="action" value="edit">
 
 					<div class="row w-100"></div>
@@ -785,6 +858,29 @@ $issues_app = ($version4 ? 'issues_by_area_4.0.php' : 'issues_by_area.php');
 				});
 			}
 
+			setPreFiltersControl(preFiltersOwnConfigValue());
+			setPreFiltersOwnConfigControl();
+
+			$('input[name="dynamic_mode"]').on('change', function() {
+				setPreFiltersOwnConfigControl();
+				setPreFiltersControl(preFiltersOwnConfigValue());
+			});
+
+			$('input[name="pre_filters_own_config"]').on('change', function() {
+				setPreFiltersControl($(this).val());
+				// setPreFiltersOwnConfigControl();
+			});
+
+
+			// $('#pre_filters').on('change', function() {
+			// 	console.log($(this).val());
+			// 	$('#pre_filters_hidden').val($(this).val());
+			// });
+
+			// $('input[name="pre_filters"]').on('change', function() {
+			// 	console.log($(this).val());
+			// 	$('#pre_filters_hidden').val($(this).val());
+			// });
 
 			$(function() {
 				$('[data-toggle="popover"]').popover({
@@ -1094,6 +1190,64 @@ $issues_app = ($version4 ? 'issues_by_area_4.0.php' : 'issues_by_area.php');
 		});
 
 
+		function dynamicModeValue () {
+			if ($('#dynamic_mode').is(':checked')) {
+				return "yes";
+			} else {
+				return "no";
+			}
+		}
+
+		function preFiltersOwnConfigValue () {
+			if ($('#pre_filters_own_config').is(':checked')) {
+				return "yes";
+			} else {
+				return "no";
+			}
+		}
+
+
+		function setPreFiltersOwnConfigControl () {
+			
+			if ($('#dynamic_mode').is(':checked')) {
+				$('#pre_filters_own_config').prop('disabled', false);
+				$('#pre_filters_own_config_no').prop('disabled', false);
+			} else {
+				$('#pre_filters_own_config').prop('disabled', true).prop('checked', false);
+				$('#pre_filters_own_config_no').prop('disabled', true).prop('checked', true);
+			}
+		}
+
+		function setPreFiltersControl (value) {
+
+			if (value == "yes") {
+				$('#pre_filters').attr('placeholder', $('#prefilter_placeholder').val());
+				$('input[name="pre_filters"]').amsifySuggestags({
+					type : 'bootstrap',
+					defaultTagClass: 'badge bg-secondary text-white p-2 m-1',
+					tagLimit: 6,
+					printValues: false,
+					showPlusAfter: 6,
+					showAllSuggestions: true,
+					keepLastOnHoverTag: false,
+					
+					suggestions: <?= $categories; ?>,
+					whiteList: true,
+					// afterAdd : function(value) {
+					// 	console.info(value); // Parameter will be value
+					// },
+				}).on('suggestags.change', function(e){
+					// Do something while add/remove tag
+					// console.log('change: ' + $('#pre_filters').val());
+					$('#pre_filters_hidden').val($('#pre_filters').val());
+				});
+
+				
+			} else {
+				$('input[name="pre_filters"]').amsifySuggestags({}, 'destroy');
+				$('#pre_filters').val('').attr('placeholder', $('#prefilter_global').val()).prop('disabled', true);
+			}
+		}
 
 
 		function renderNewClients() {

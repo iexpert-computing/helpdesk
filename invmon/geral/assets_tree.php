@@ -54,9 +54,10 @@ $uareas = $_SESSION['s_uareas'];
     <link rel="stylesheet" type="text/css" href="../../includes/css/util.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <style>
 
@@ -179,6 +180,18 @@ $uareas = $_SESSION['s_uareas'];
         TRANS('COL_MANUFACTURER') => 'manufacturer'
     ];
 
+    $optionsForAvailability = [
+        1 => TRANS('ANY_AVAILABILITY'),
+        2 => TRANS('AVAILABLES'),
+        3 => TRANS('IN_USE')
+    ];
+    
+    $optionsForTypes = [
+        1 => TRANS('ALL_TYPES'),
+        2 => TRANS('ONLY_ASSETS'),
+        3 => TRANS('ONLY_RESOURCES')
+    ];
+
     ?>
 
     <div class="container-fluid">
@@ -195,6 +208,42 @@ $uareas = $_SESSION['s_uareas'];
 
         <form method="post" action="<?= $_SERVER['PHP_SELF']; ?>" id="form">
             
+
+            <div class="form-group row mb-0"> <!-- Abertura row nova -->
+
+            <div class="form-group col-md-4">
+                    <select class="form-control form-control-sm bs-select " id="group_00" name="group_00">
+                        <?php
+                            foreach ($optionsForAvailability as $key => $type) {
+                                ?>
+                                    <option value="<?= $key; ?>"
+                                    <?= ($key == 1 ? ' selected' : ''); ?>
+                                    ><?= $type; ?></option>
+                                <?php
+                            }
+                        ?>
+                    </select>
+                    <small class="form-text text-muted"><?= TRANS('AVAILABILITY'); ?></small>
+                </div>
+
+                <div class="form-group col-md-4">
+                    <select class="form-control form-control-sm bs-select " id="group_0" name="group_0">
+                        <?php
+                            foreach ($optionsForTypes as $key => $type) {
+                                ?>
+                                    <option value="<?= $key; ?>"
+                                    <?= ($key == 2 ? ' selected' : ''); ?>
+                                    ><?= $type; ?></option>
+                                <?php
+                            }
+                        ?>
+                    </select>
+                    <small class="form-text text-muted"><?= TRANS('ALL_TYPES'); ?></small>
+                </div>
+                
+            </div> <!-- fechamento row nova -->
+
+
             <div class="row mb-0">
                 <div class="col-md-12 mb-0">
                     <?= TRANS('LEVELS_TO_AGROUP'); ?>
@@ -202,10 +251,11 @@ $uareas = $_SESSION['s_uareas'];
             </div>
             
             <div class="row mt-0">
-                <div class="col-md-12 mt-0">
+                <!-- <div class="col-md-12 mt-0"> -->
+                <div class="col-md-8 mt-0">
 
                     <div class="form-group row my-4">
-                        <div class="form-group col-md-2">
+                        <div class="form-group col-md-3">
                             <select class="form-control form-control-sm bs-select sel-control" id="group_1" name="group_1">
                                 <option value=""><?= TRANS('BT_CLEAR'); ?></option>
                                 <?php
@@ -219,7 +269,7 @@ $uareas = $_SESSION['s_uareas'];
                                 ?>
                             </select>
                         </div>
-                        <div class="form-group col-md-2">
+                        <div class="form-group col-md-3">
                             <select class="form-control form-control-sm bs-select sel-control" id="group_2" name="group_2" >
                                 <option value=""><?= TRANS('SEL_SELECT'); ?></option>
                                 <?php
@@ -268,15 +318,18 @@ $uareas = $_SESSION['s_uareas'];
                                     }
                                 ?>
                             </select>
-                        
                         </div>
-
-                        <div class="form-group col-md-2">
-                            <button type="submit" id="idSubmit" name="submit" class="btn btn-primary btn-sm btn-block"><?= TRANS('BT_AGROUP'); ?></button>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group row my-4">
+                        <div class="form-group col-md-4 align-baseline">
+                            <button type="submit" id="idSubmit" name="submit" class="btn btn-primary btn-sm btn-block"><i class="fas fa-sync-alt text-white"></i>&nbsp;<?= TRANS('BT_AGROUP'); ?></button>
                         </div>
                     </div>
                 </div>
             </div>
+
         </form>
         
         
@@ -293,9 +346,19 @@ $uareas = $_SESSION['s_uareas'];
         <SCRIPT LANGUAGE="javaScript">
             $(function() {
 
+
+                $('#idLoad').css('display', 'block');
+                $( document ).ready(function() {
+                    $('#idLoad').css('display', 'none');
+                });
+
                 var tableObj = {};
                 /* Agrupamento padrão - carregado na inicialização do script */
                 agroup();
+
+                $('#group_0, #group_00').on('change', function() {
+                    agroup();
+                });
 
                 /* Adicionei o mutation observer em função dos elementos que são adicionados após o carregamento do DOM */
                 var obs = $.initialize("#assets_group", function() {
@@ -353,54 +416,6 @@ $uareas = $_SESSION['s_uareas'];
                             });
                         }
                     })
-
-                    // var table = $('table').each(function() {
-
-                    //     if ( !$.fn.DataTable.isDataTable($(this)) ) {
-                    //         $(this).DataTable({
-                    //             paging: true,
-                    //             deferRender: true,
-                    //             // retrieve: true,
-                    //             columnDefs: [{
-                    //                 targets: ["slas"],
-                    //                 searchable: false,
-                    //                 orderable: false
-                    //             },{
-                    //                 targets: ["abs_time"],
-                    //                 searchable: false,
-                    //             }],
-
-                    //             "language": {
-                    //                 "url": "../../includes/components/datatables/datatables.pt-br.json"
-                    //             }
-                    //         });
-                    //     }
-                    // });
-
-                    // var table = $('.lista_agrupamento').DataTable({
-                        
-                    //     paging: true,
-                    //     deferRender: true,
-                    //     retrieve: true,
-                    //     columnDefs: [{
-                    //         targets: ["slas"],
-                    //         searchable: false,
-                    //         orderable: false
-                    //     },{
-                    //         targets: ["abs_time"],
-                    //         searchable: false,
-                    //     }],
-
-                    //     "language": {
-                    //         "url": "../../includes/components/datatables/datatables.pt-br.json"
-                    //     }
-                    // });
-
-
-                    // setInterval(function() {
-                    //     table.ajax.reload(null, false); // user paging is not reset on reload
-                    // }, 60000); //a cada 1 minuto
-
 
 
                     $(function() {

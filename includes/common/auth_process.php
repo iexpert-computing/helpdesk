@@ -20,48 +20,57 @@ session_start();
 
 include "../../includes/include_geral_new.inc.php";
 
+require __DIR__ . '/../components/oidc-connect/vendor/autoload.php';
+use Jumbojett\OpenIDConnectClient;
+
 require_once __DIR__ . "/" . "../../includes/classes/ConnectPDO.php";
 use includes\classes\ConnectPDO;
 $conn = ConnectPDO::getInstance();
 
-// $post = $_POST;
-$post = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+$authType = getConfigValue($conn, 'AUTH_TYPE');
+$authType = (!empty($authType) ? $authType : 'SYSTEM');
 
-$screenNotification = "";
+$_SESSION['s_auth_type'] = $authType;
+
 $exception = "";
 $now = date("Y-m-d H:i:s");
+$screenNotification = "";
 $data = [];
 $data['success'] = true;
 $data['message'] = "";
 $data['field_id'] = "";
 
-$data['user'] = (isset($post['user']) ? noHtml($post['user']) : "");
-$data['pass'] = (isset($post['pass']) ? $post['pass'] : "");
-$data['remember_user'] = (isset($post['remember_user']) && $post['remember_user'] == "1" ? true : false);
 
-$_SESSION['session_expired'] = 0;
-$data['max_tries'] = 5; /* Número de tentativas mal sucedidas até o bloqueio */
-$data['time_to_wait'] = 60; /* Tempo de espera, em segundos, após o número máximo de tentativas ser atingido*/
+if ($authType != "OIDC") {
+    $post = filter_input_array(INPUT_POST, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    
+    $data['user'] = (isset($post['user']) ? noHtml($post['user']) : "");
+    $data['pass'] = (isset($post['pass']) ? $post['pass'] : "");
+    $data['remember_user'] = (isset($post['remember_user']) && $post['remember_user'] == "1" ? true : false);
 
-/* Validações */
-if (empty($data['user']) || empty($data['pass'])) {
-    $data['success'] = false; 
-    $data['field_id'] = (empty($data['user']) ? 'user' : 'pass');
-    $data['message'] = message('warning', 'Ooops!', TRANS('MSG_EMPTY_DATA'),'');
-    echo json_encode($data);
-    return false;
+    $_SESSION['session_expired'] = 0;
+    $data['max_tries'] = 5; /* Número de tentativas mal sucedidas até o bloqueio */
+    $data['time_to_wait'] = 60; /* Tempo de espera, em segundos, após o número máximo de tentativas ser atingido*/
+
+    /* Validações */
+    if (empty($data['user']) || empty($data['pass'])) {
+        $data['success'] = false; 
+        $data['field_id'] = (empty($data['user']) ? 'user' : 'pass');
+        $data['message'] = message('warning', 'Ooops!', TRANS('MSG_EMPTY_DATA'),'');
+        echo json_encode($data);
+        return false;
+    }
+
+    if (!valida(TRANS('FIELD_USER'), $data['user'], 'MAIL', 1, $ERRO) && !valida(TRANS('FIELD_USER'), $data['user'], 'USUARIO', 1, $ERRO)) {
+        $data['success'] = false; 
+        $data['field_id'] = "user";
+        $data['message'] = message('warning', '', $ERRO, '');
+        echo json_encode($data);
+        return false;
+    }
 }
 
-if (!valida(TRANS('FIELD_USER'), $data['user'], 'MAIL', 1, $ERRO) && !valida(TRANS('FIELD_USER'), $data['user'], 'USUARIO', 1, $ERRO)) {
-    $data['success'] = false; 
-    $data['field_id'] = "user";
-    $data['message'] = message('warning', '', $ERRO, '');
-    echo json_encode($data);
-    return false;
-}
 
-$authType = getConfigValue($conn, 'AUTH_TYPE');
-$authType = (!empty($authType) ? $authType : 'SYSTEM');
 
 
 if ($authType == "SYSTEM") {
@@ -189,6 +198,125 @@ if ($authType == "SYSTEM") {
 
 
     
+} elseif ($authType == "OIDC") {
+
+    /* Configurações OIDC */
+    $configValues = getConfigValues($conn);
+    $oidcConfig = [
+        'OIDC_ISSUER' => $configValues['OIDC_ISSUER'] ?? '',
+        'OIDC_CLIENT_ID' => $configValues['OIDC_CLIENT_ID'] ?? '',
+        'OIDC_CLIENT_SECRET' => $configValues['OIDC_CLIENT_SECRET'] ?? '',
+        'OIDC_FIELD_USERNAME' => $configValues['OIDC_FIELD_USERNAME'] ?? 'preferred_username',
+        'OIDC_FIELD_FULLNAME' => $configValues['OIDC_FIELD_FULLNAME'] ?? 'name',
+        'OIDC_FIELD_EMAIL' => $configValues['OIDC_FIELD_EMAIL'] ?? 'email',
+        'OIDC_FIELD_PHONE' => $configValues['OIDC_FIELD_PHONE'] ?? '',
+    ];
+
+    $oidc = new OpenIDConnectClient(
+        $oidcConfig['OIDC_ISSUER'],
+        $oidcConfig['OIDC_CLIENT_ID'],
+        $oidcConfig['OIDC_CLIENT_SECRET']
+    );
+    
+    // $sid = $oidc->getSidFromBackChannel();
+    // $_SESSION['s_oidc_sid'] = $sid;
+    
+
+    if (isLocalhost()) {
+        $oidc->setVerifyHost(false);    //dev only
+        $oidc->setVerifyPeer(false);    //dev only
+        $oidc->setHttpUpgradeInsecureRequests(false);   //dev only
+    }
+    // $oidc->setCertPath('/path/to/my.cert');
+    
+    // Configure a proxy
+    //$oidc->setHttpProxy("http://my.proxy.com:80/");
+
+    // Sets redirect URL for auth flow
+    // $oidc->setRedirectURL($oidcConfig['OIDC_REDIRECT_URL']);
+
+    try {
+        $oidc->authenticate();
+    } catch (Exception $e) {
+        $data['success'] = false;
+        $data['message'] = message('danger', 'Ooops!', TRANS('MSG_CANT_CONNECT_TO_IDENTITY_PROVIDER') . $e->getMessage(), '', '', true);
+        echo $data['message'];
+        // echo json_encode($data);
+        return false;
+    }
+
+
+    
+    
+    $accessToken = $oidc->getAccessToken();
+    $idToken = $oidc->getIdToken();
+    $refreshToken = $oidc->getRefreshToken();
+    $_SESSION['s_oidc_id_token'] = $idToken;
+    $_SESSION['s_oidc_access_token'] = $accessToken;
+    $_SESSION['s_oidc_refresh_token'] = $refreshToken;
+
+    $tokenResp = $oidc->getTokenResponse();
+    $_SESSION['s_token_response'] = $tokenResp;
+
+    // var_dump($accessToken); exit;
+
+    // $_SESSION['s_oidc_issuer'] = $oidcConfig['OIDC_ISSUER'];
+    // $_SESSION['s_oidc_client_id'] = $oidcConfig['OIDC_CLIENT_ID'];
+    // $_SESSION['s_oidc_client_secret'] = $oidcConfig['OIDC_CLIENT_SECRET'];
+    // var_dump($oidc);
+    
+    
+    $userData = $oidc->requestUserInfo();
+
+    $data['user'] = $userData->{$oidcConfig['OIDC_FIELD_USERNAME']};
+    /* 
+    $oidc->name
+    $oidc->email
+    $oidc->phone
+    $oidc->preferred_username
+    */
+
+
+    /* Checa se o usuário existe na base local */
+    if (!isLocalUser($conn, $data['user'])) {
+        
+        /* Caso o usuário não exista localmente, deverá ser criado */
+        $data['hash'] = pass_hash(md5($userData->sub));
+        $data['fullname'] = $userData->{$oidcConfig['OIDC_FIELD_FULLNAME']};
+        $data['email'] = $userData->{$oidcConfig['OIDC_FIELD_EMAIL']};
+        $data['phone'] = (isset($userData->{$oidcConfig['OIDC_FIELD_PHONE']}) ? $userData->{$oidcConfig['OIDC_FIELD_PHONE']} : "");
+
+        $data['client_to_bind'] = (array_key_exists('OIDC_CLIENT_TO_BIND_NEWUSERS', $configValues) ? $configValues['OIDC_CLIENT_TO_BIND_NEWUSERS'] : "");
+
+        $sql = "INSERT INTO usuarios 
+                (
+                login, user_client, nome, hash, data_inc, data_admis, email, 
+                fone, nivel, AREA, user_admin
+                ) 
+                VALUES 
+                (
+                    '" . $data['user'] . "', 
+                    " . dbField($data['client_to_bind']) . ",
+                    '" . $data['fullname'] . "', '" . $data['hash'] . "', 
+                    '" . $now . "', 
+                    NULL, '" . $data['email'] . "', '" . $data['phone'] . "', '3', 
+                    '" . $configValues['OIDC_AREA_TO_BIND_NEWUSERS'] . "', 0 
+                )";
+        try {
+            $conn->exec($sql);
+        }
+        catch (Exception $e) {
+            $exception .= "<hr>" . $e->getMessage();
+            $data['success'] = false;
+            $data['field_id'] = (empty($data['user']) ? 'user' : 'pass');
+            $data['message'] = message('danger', 'Ooops!', TRANS('LDAP_FAIL_NEW_USER') . $exception, '');
+            echo json_encode($data);
+            return false;
+        }
+    }
+
+
+
 } else {
     $data['success'] = false;
     $data['field_id'] = (empty($data['user']) ? 'user' : 'pass');
@@ -214,7 +342,7 @@ if ($userInfo['nivel'] > 3 || (!empty($userClient) && $userClient['is_active'] =
 $_SESSION['attempt']['try'] = 0;
 
 /* Cookie para o nome de usuário : 30 dias */
-if ($data['remember_user']) {
+if (isset($data['remember_user']) && !empty($data['remember_user'])) {
     setcookie("oc_login", $data['user'], time() + 60 * 60 * 24 * 30, "/");
 } else {
     setcookie("oc_login", "", time() - 60 * 60 * 24 * 30, "/");
@@ -264,13 +392,19 @@ $_SESSION['s_invmon'] = $mod_inventory;
 
 /* Variáveis básicas para os relatórios */
 $_SESSION['s_rep_filters']['client'] = '';
+$_SESSION['s_rep_filters']['units'] = [];
 $_SESSION['s_rep_filters']['area'] = $userInfo['area_id'];
 $_SESSION['s_rep_filters']['d_ini'] = date("01/m/Y");
 $_SESSION['s_rep_filters']['d_fim'] = date("d/m/Y");
+$_SESSION['s_rep_filters']['issue'] = -1;
+$_SESSION['s_rep_filters']['resource'] = -1;
 $_SESSION['s_rep_filters']['state'] = 1;
 $_SESSION['s_rep_filters']['cat1'] = -1;
 $_SESSION['s_rep_filters']['cat2'] = -1;
 $_SESSION['s_rep_filters']['cat3'] = -1;
+$_SESSION['s_rep_filters']['cat4'] = -1;
+$_SESSION['s_rep_filters']['cat5'] = -1;
+$_SESSION['s_rep_filters']['cat6'] = -1;
 
     
 
@@ -293,8 +427,10 @@ if ($userInfo['nivel'] != 1 && !empty($allowedClients)) {
 }
 
 
+// $_SESSION['s_screen'] = $userInfo['sis_screen'] ?? 2; /* Segundo registro - criado no install */
 $defaultScreenProfile = getDefaultScreenProfile($conn);
-$_SESSION['s_screen'] = $userInfo['sis_screen'] ?? $defaultScreenProfile ; 
+$_SESSION['s_screen'] = $userInfo['sis_screen'] ?? $defaultScreenProfile ;
+
 
 // $_SESSION['s_screen'] = $userInfo['sis_screen'];
 $_SESSION['s_wt_areas'] = $config['conf_wt_areas']; //1: origem , 2: destino
@@ -342,4 +478,9 @@ if (empty($userInfo['hash'])) {
 $data['success'] = true; 
 $message = ($firstLogon ? TRANS('MSG_WELCOME') : TRANS('MSG_WELCOME_BACK'));
 $_SESSION['flash'] = message('success', TRANS('MSG_HELLO') . " " . firstLetterUp(firstWord($userInfo['nome'])) . "!", $message . $exception, '');
+
+if ($authType == "OIDC") {
+    redirect('../../login.php');
+}
+
 echo json_encode($data);

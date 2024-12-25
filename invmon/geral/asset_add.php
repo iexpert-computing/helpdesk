@@ -35,10 +35,15 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 2);
 
 $config = getConfig($conn);
 
-$asset_type = (isset($_GET['asset_type']) ? $_GET['asset_type'] : "");
-$asset_manufacturer = (isset($_GET['asset_manufacturer']) ? $_GET['asset_manufacturer'] : "");
-$asset_model = (isset($_GET['asset_model']) ? $_GET['asset_model'] : "");
-$profile_id = (isset($_GET['profile_id']) ? $_GET['profile_id'] : "");
+$asset_type = (isset($_GET['asset_type']) ? (int)$_GET['asset_type'] : "");
+$asset_manufacturer = (isset($_GET['asset_manufacturer']) ? (int)$_GET['asset_manufacturer'] : "");
+$asset_model = (isset($_GET['asset_model']) ? (int)$_GET['asset_model'] : "");
+// $profile_id = (isset($_GET['profile_id']) ? (int)$_GET['profile_id'] : "");
+$is_product = (isset($_GET['is_product']) ? (int)$_GET['is_product'] : "");
+
+
+$asset_amount = (isset($_GET['asset_amount']) && (int)$_GET['asset_amount'] > 0 ? (int)$_GET['asset_amount'] : 1);
+$profile_id = (isset($_GET['profile_id']) ? (int)$_GET['profile_id'] : 0);
 
 
 if (empty($asset_type) || empty($asset_manufacturer) || empty($asset_model)) {
@@ -51,10 +56,15 @@ $asset_manufacturer_info = getManufacturers($conn, $asset_manufacturer);
 $asset_model_info = getAssetsModels($conn, $asset_model);
 
 /* Para saber se esse ativo pode ser vinculado a outro ativo */
-$possibleParents = getAssetsTypesPossibleParents($conn, $asset_type);
-$hasPossibleParents = !empty($possibleParents);
+$hasPossibleParents = false;
+if ($asset_amount == 1) {
+    /* Se for cadastro em lote, não será possível vincular a outros ativos */
+    $possibleParents = getAssetsTypesPossibleParents($conn, $asset_type);
+    $hasPossibleParents = !empty($possibleParents);
+}
 
-if ($profile_id != "0") {
+
+if ($profile_id != 0) {
     $default_profile = getAssetsProfiles($conn, $profile_id);
 } else {
     $default_profile = setBasicProfile();
@@ -65,7 +75,7 @@ $parent_tag = "";
 $parent_unit = "";
 $parent_department = "";
 $parent_client = "";
-$parent_id = (isset($_GET['parent_id']) && !empty($_GET['parent_id']) ? noHtml($_GET['parent_id']) : '');
+$parent_id = (isset($_GET['parent_id']) && !empty($_GET['parent_id']) ? (int)$_GET['parent_id'] : '');
 if (!empty($parent_id)) {
      /* Indica que o ativo será filho de outro ativo */
     $parent_info = getEquipmentInfo($conn, null, null, $parent_id);
@@ -107,6 +117,7 @@ if ($loadSavedSpecs) {
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
     <style>
         .input-group-append, .input-group-prepend {
@@ -119,7 +130,7 @@ if ($loadSavedSpecs) {
 
     </style>
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -132,7 +143,13 @@ if ($loadSavedSpecs) {
 
 
     <div class="container-fluid">
-        <h4 class="my-4"><i class="fas fa-qrcode text-secondary"></i>&nbsp;<?= TRANS('ASSET_REGISTER'); ?></h4>
+
+        <?php
+            $page_title = ( $is_product ? TRANS('RESOURCE_REGISTER') : TRANS('ASSET_REGISTER') );
+            $tag_label = ( $is_product ? TRANS('REFERENCE_TAG') : TRANS('ASSET_TAG') );
+        ?>
+        <h4 class="my-4"><i class="fas fa-qrcode text-secondary"></i>&nbsp;<?= $page_title; ?></h4>
+        
         <div class="modal" id="modalAssetNew" tabindex="-1" style="z-index:9001!important">
             <div class="modal-dialog modal-xl">
                 <div class="modal-content">
@@ -141,8 +158,45 @@ if ($loadSavedSpecs) {
                 </div>
             </div>
         </div>
-
         <?php
+        if ($asset_amount > 1) {
+            $default_prefix = "VIRT-";
+            ?>
+            <div class="modal" id="modalGenerateTags" tabindex="-1" style="z-index:9001!important">
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div id="divResultGenerateTags"></div>
+                        <div class="modal-header text-center bg-light">
+                            <h4 class="modal-title w-100 font-weight-bold text-secondary"><i class="fas fa-magic"></i>&nbsp;<?= TRANS('GENERATING_TAGS'); ?></h4>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+
+                        <div class="row mx-2 mt-4 mb-0">
+                            <div class="form-group col-md-12">
+                                <?= message('info', '', TRANS('TEXT_HELPER_TAGS_PREFIX_INFO'), '', '', true); ?>
+                            </div>
+                        </div>
+                        <div class="row mx-2 mt-0">
+                            <div class="form-group col-md-12">
+                                <input type="text" name="tags_prefix" id="tags_prefix" class="form-control" placeholder="<?= TRANS('TAGS_PREFIX'); ?>" value="<?= $default_prefix; ?>" />
+                                <small class="form-text text-muted"><?= TRANS('HELPER_TAGS_PREFIX'); ?></small>
+                            </div>
+                        </div>
+                        
+                        <div class="modal-footer d-flex justify-content-end bg-light">
+                            <button id="confirmGenerateTags" class="btn btn-primary"><?= TRANS('BT_GENERATE_TAGS') ?></button>
+                            <button id="cancelGenerateTags" class="btn btn-secondary" data-dismiss="modal" aria-label="Close"><?= TRANS('BT_CANCEL'); ?></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php
+        }
+        
+        
+        
         if (isset($_SESSION['flash']) && !empty($_SESSION['flash'])) {
             echo $_SESSION['flash'];
             $_SESSION['flash'] = '';
@@ -174,8 +228,13 @@ if ($loadSavedSpecs) {
                 $info_model_specs .= '</ul>';
                 $info_model_specs .= '</div>';
             }
+
+            $info_amount = '<li class="list-type-of-record ml-5">' . TRANS('COL_AMOUNT') . ': <strong>' . $asset_amount . '</strong></li>';
+            if ($is_product) {
+                $info_amount = "";
+            }
         ?>
-            <?= message('info', $info_html_title, $info_html . $info_model_specs, '', '', true, 'fas fa-plus'); ?>
+            <?= message('info', $info_html_title, $info_html . $info_model_specs . $info_amount, '', '', true, 'fas fa-plus'); ?>
 
             <form name="form" method="post" action="<?= $_SERVER['PHP_SELF']; ?>" id="form" enctype="multipart/form-data">
                 <?= csrf_input(); ?>
@@ -187,6 +246,7 @@ if ($loadSavedSpecs) {
                     <input type="hidden" name="asset_type" id="asset_type" value="<?=  $asset_type_info['tipo_cod']; ?>" />
                     <input type="hidden" name="manufacturer" value="<?=  $asset_manufacturer_info['fab_cod']; ?>" />
                     <input type="hidden" name="model" value="<?=  $asset_model_info['codigo']; ?>" />
+                    <input type="hidden" name="asset_amount" id="asset_amount" value="<?=  $asset_amount; ?>" />
                     <input type="hidden" name="profile_id" id="profile_id" value="<?=  $profile_id; ?>" />
                     <input type="hidden" name="parent_id" id="parent_id" value="<?=  $parent_id; ?>" />
                     <input type="hidden" name="parent_unit" id="parent_unit" value="<?=  $parent_unit; ?>" />
@@ -224,19 +284,16 @@ if ($loadSavedSpecs) {
                         </select>
                     </div>
 
-                    <label for="asset_tag" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('ASSET_TAG'); ?></label>
-                    <div class="form-group col-md-4">
-                        <input type="text" class="form-control " id="asset_tag" name="asset_tag" required />
-                    </div>
+                    <?php
+                    // $labelForTag = ($is_product ? TRANS('') : TRANS('ASSET_TAG'));
+                    if ($asset_amount == 1) {
+                    ?>
+                        <label for="asset_tag" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= $tag_label; ?></label>
+                        <div class="form-group col-md-4">
+                            <input type="text" class="form-control " id="asset_tag" name="asset_tag" required />
+                        </div>
 
-
-
-
-
-
-                    <div class="w-100"></div>
-
-
+                        <div class="w-100"></div>
                     <?php
                         /* Os campos a seguir dependem de estarem habilitados no perfil de cadastro */
                         
@@ -283,8 +340,8 @@ if ($loadSavedSpecs) {
                                 <input type="hidden" name="net_name" value=""/>
                             <?php
                         }
-
-
+                    }
+                        /* Os campos a seguir dependem de estarem habilitados no perfil de cadastro */
 
                         /* Nota fiscal */
                         if ($default_profile['invoice_number']) {
@@ -299,6 +356,84 @@ if ($loadSavedSpecs) {
                                 <input type="hidden" name="invoice_number" value=""/>
                             <?php
                         }
+
+
+                    if ($asset_amount > 1) {
+                        /* Cadastro em lote */
+                        ?>
+                            
+                            <div class="w-100"></div>
+                            <label for="helper_tags" class="col-md-2 col-form-label col-form-label-sm text-md-right"></label>
+                            <div class="form-group col-md-10">
+                                <?= message('info', '', TRANS('TXT_MULTI_ASSET_TAGS'), '', '', true); ?>
+                            </div>
+
+                            <label for="asset_tags" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('ASSET_TAGS'); ?></label>
+                            <div class="form-group col-md-10">
+                                <textarea class="form-control " id="asset_tags" name="asset_tags" placeholder="<?= TRANS('PLACEHOLTER_TAGS_TEXTAREA'); ?>"></textarea>
+                            </div>
+
+                            <label for="txt_file" class="col-md-2 col-form-label col-form-label-sm text-md-right"></label>
+                            <div class="form-group col-md-10">
+                                <div class="field_wrapper" id="field_wrapper">
+                                    <div class="input-group">
+                                        <div class="input-group-prepend">
+                                            <div id="btn_modal_generate_tags" class="input-group-text">
+                                                <i class="fa fa-magic"></i>&nbsp;<?= TRANS('BT_GENERATE_TAGS'); ?>
+                                            </div>
+                                        </div>
+                                        <div class="custom-file">
+                                            <input type="file" class="custom-file-input" name="txt_file" id="txt_file" lang="br">
+                                            <label class="custom-file-label text-truncate" for="txt_file"><?= TRANS('LOAD_ASSETS_TAGS_FILE'); ?></label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="load_txt_file_text" id="load_txt_file_text" value="<?= TRANS('LOAD_ASSETS_TAGS_FILE'); ?>" />
+                            <div class="w-100"></div>
+
+                            
+                        <?php
+
+
+                        /* Para cadastro em lote, se o número de série estiver habilitado no perfil, então será lido
+                        em uma caixa de texto */
+                        if ($default_profile['serial_number']) {
+                            ?>
+                                
+                                <label for="serial_numbers" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('SERIAL_NUMBERS'); ?></label>
+                                <div class="form-group col-md-10">
+                                <textarea class="form-control " id="serial_numbers" name="serial_numbers" placeholder="<?= TRANS('PLACEHOLTER_SERIAL_NUMBERS_TEXTAREA'); ?>"></textarea>
+                                </div>
+                                
+                                <label for="serials_txt_file" class="col-md-2 col-form-label col-form-label-sm text-md-right"></label>
+                                <div class="form-group col-md-10">
+                                    <div class="field_wrapper" id="field_wrapper">
+                                        <div class="input-group">
+                                            <div class="input-group-prepend">
+                                                <div class="input-group-text">
+                                                    <i class="fa fa-file-import"></i>
+                                                </div>
+                                            </div>
+                                            <div class="custom-file">
+                                                <input type="file" class="custom-file-input" name="serials_txt_file" id="serials_txt_file" lang="br">
+                                                <label class="custom-file-label text-truncate" for="serials_txt_file"><?= TRANS('LOAD_ASSETS_SERIALS_FILE'); ?></label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <input type="hidden" name="load_serials_txt_file_text" id="load_serials_txt_file_text" value="<?= TRANS('LOAD_ASSETS_SERIALS_FILE'); ?>" />
+                                <div class="w-100"></div>
+                            
+                            <?php
+                        } else {
+                            ?>
+                                <input type="hidden" name="serial_numbers" value=""/>
+                            <?php
+                        }
+
+                    }
+
 
 
                         /* Centro de Custo */
@@ -478,6 +613,9 @@ if ($loadSavedSpecs) {
                         ?>
                             <div class="w-100"></div>
 
+                        <?php
+                        if ($asset_amount == 1) {
+                        ?>
                             <label class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('ATTACH_FILE'); ?></label>
                             <div class="form-group col-md-4">
                                 <div class="field_wrapper" id="field_wrapper">
@@ -495,6 +633,7 @@ if ($loadSavedSpecs) {
                                 </div>
                             </div>
                         <?php
+                        }
 
                         /* Informação extra */
                         if ($default_profile['extra_info']) {
@@ -517,7 +656,7 @@ if ($loadSavedSpecs) {
                             ?>
                                 <h6 class="w-100 mt-5 ml-5 border-top p-4"><i class="fas fa-puzzle-piece text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('INFO_ASSET_CONFIG')); ?></h6>
                             <?php
-                            $spec_ids = explode(',', $default_profile['field_specs_ids']);
+                            $spec_ids = explode(',', (string)$default_profile['field_specs_ids']);
 
                             foreach ($spec_ids as $type_id) {
                                 $type_info = getAssetsTypes($conn, $type_id);
@@ -537,7 +676,7 @@ if ($loadSavedSpecs) {
                                                         $subtext .= $spec['mt_name'] . ': ' . $spec['spec_value'] . '' . $spec['unit_abbrev'];
                                                     }
                                                 ?>
-                                                    <option data-subtext="<?= $subtext; ?>" value="<?= $model['codigo']; ?>"><?= $model['modelo']; ?></option>
+                                                    <option data-subtext="<?= $subtext; ?>" value="<?= $model['codigo']; ?>"><?= $model['fabricante'] . ' ' . $model['modelo']; ?></option>
                                                 <?php
                                                 }
                                                 ?>
@@ -575,7 +714,7 @@ if ($loadSavedSpecs) {
                                                 ?>
                                                     <option data-subtext="<?= $subtext; ?>" value="<?= $model['codigo']; ?>"
                                                     <?= ($model['codigo'] == $saved['codigo'] ? ' selected' : ''); ?>
-                                                    ><?= $model['modelo']; ?></option>
+                                                    ><?= $model['fabricante'] . ' ' . $model['modelo']; ?></option>
                                                 <?php
                                                 }
                                                 ?>
@@ -626,7 +765,7 @@ if ($loadSavedSpecs) {
                         ?>
                             <h6 class="w-100 mt-5 ml-5 border-top p-4"><i class="fas fa-pencil-ruler text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('CUSTOM_FIELDS')); ?></h6>
                         <?php
-						$fields_id = explode(',', $default_profile['field_custom_ids']);
+						$fields_id = explode(',', (string)$default_profile['field_custom_ids']);
 
 						$labelColSize = 2;
 						$fieldColSize = 4;
@@ -670,7 +809,7 @@ if ($loadSavedSpecs) {
 									?>
 										<select class="form-control custom_field_select_multi" name="<?= $row['field_name']; ?>[]" id="<?= $row['field_name']; ?>" multiple="multiple" placeholder="<?= $row['field_placeholder']; ?>" <?= $inlineAttributes; ?>>
 											<?php
-											$defaultSelections = explode(',', $row['field_default_value']);
+											$defaultSelections = explode(',', (string)$row['field_default_value']);
 											$options = [];
 											$options = getCustomFieldOptionValues($conn, $row['id']);
 											?>
@@ -726,7 +865,7 @@ if ($loadSavedSpecs) {
 
 
                     /* Se o tipo de ativo puder ser parte de outros ativos maiores */
-                    if ($hasPossibleParents) {
+                    if ($hasPossibleParents && !$is_product) {
                         ?>
                             <h6 class="w-100 mt-4 ml-5 border-top p-4"><i class="fas fa-link text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('LINKED_ASSET')); ?></h6>
 
@@ -769,6 +908,13 @@ if ($loadSavedSpecs) {
                     <div class="form-group col-md-8 d-none d-md-block"></div>
                     <div class="form-group col-12 col-md-2 ">
 
+                        <?php
+                            if ($is_product) {
+                                ?>
+                                    <input type="hidden" name="is_product" id="is_product" value="1">
+                                <?php
+                            }
+                        ?>
                         <input type="hidden" name="action" id="action" value="new">
                         <input type="hidden" name="model_selected" id="model_selected" value="">
                         <button type="submit" id="idSubmit" name="submit" class="btn btn-primary btn-block"><?= TRANS('BT_OK'); ?></button>
@@ -811,6 +957,30 @@ if ($loadSavedSpecs) {
 				style: "",
 				styleBase: "form-control input-select-multi",
 			});
+
+            $('.custom-file-input').on('change', function() {
+                let fileName = $(this).val().split('\\').pop();
+                $(this).next('.custom-file-label').addClass("selected").html(fileName);
+            });
+
+            
+            $('#btn_modal_generate_tags').on('click', function() {
+                $('#modalGenerateTags').modal();
+            });
+
+            $('#confirmGenerateTags').on('click', function() {
+                generateTags();
+            });
+
+
+            $('#txt_file').on('change', function(e) {
+                e.preventDefault;
+                loadTxtFile();
+            });
+            $('#serials_txt_file').on('change', function(e) {
+                e.preventDefault;
+                loadSerialsTxtFile();
+            });
 
 
             $('.manage_popups').css('cursor', 'pointer').on('click', function() {
@@ -1303,7 +1473,7 @@ if ($loadSavedSpecs) {
                     
                     if (data.length > 0) {
                         for (i in data) {
-                            html += '<option data-subtext="' + data[i].spec + '" value="' + data[i].codigo + '">' + data[i].modelo + '</option>';
+                            html += '<option data-subtext="' + data[i].spec + '" value="' + data[i].codigo + '">' + data[i].fabricante + ' ' + data[i].modelo + '</option>';
                         }
                     }
 					/* Para conseguir mapear os ids que vêm após o carregamento do DOM, 
@@ -1357,6 +1527,116 @@ if ($loadSavedSpecs) {
             });
             return false;
 		}
+
+        function loadTxtFile() {
+			
+			var loading = $(".loading");
+            $(document).ajaxStart(function() {
+                loading.show();
+            });
+            $(document).ajaxStop(function() {
+                loading.hide();
+            });
+
+            let formData = new FormData();
+            formData.append('txt_file', $('#txt_file')[0].files[0]);
+            formData.append('asset_amount', $('#asset_amount').val());
+
+            $.ajax({
+                url: './validate_txt_file.php',
+                method: 'POST',
+                data: formData,
+				dataType: 'json',
+				cache: false,
+				processData: false,
+				contentType: false,
+            }).done(function(response) {
+                if (!response.success) {
+                    $('#divResult').html(response.message);
+                   
+                } else {
+                    $('#asset_tags').text(response.fileContent);
+                    $('#divResult').html(response.message);
+                }
+                $('#txt_file').val('');
+                $('#txt_file').next('.custom-file-label').addClass("selected").html($('#load_txt_file_text').val());
+            });
+            return false;
+        }
+
+
+        function loadSerialsTxtFile() {
+			
+			var loading = $(".loading");
+            $(document).ajaxStart(function() {
+                loading.show();
+            });
+            $(document).ajaxStop(function() {
+                loading.hide();
+            });
+
+            let formData = new FormData();
+            formData.append('serials_txt_file', $('#serials_txt_file')[0].files[0]);
+            formData.append('asset_amount', $('#asset_amount').val());
+
+            $.ajax({
+                url: './validate_serials_txt_file.php',
+                method: 'POST',
+                data: formData,
+				dataType: 'json',
+				cache: false,
+				processData: false,
+				contentType: false,
+            }).done(function(response) {
+                if (!response.success) {
+                    $('#divResult').html(response.message);
+                   
+                } else {
+                    $('#divResult').html(response.message);
+                    $('#serial_numbers').text(response.fileContent);
+                }
+                $('#serials_txt_file').val('');
+                $('#serials_txt_file').next('.custom-file-label').addClass("selected").html($('#load_serials_txt_file_text').val());
+            });
+            return false;
+        }
+
+        function generateTags() {
+            var loading = $(".loading");
+            $(document).ajaxStart(function() {
+                loading.show();
+            });
+            $(document).ajaxStop(function() {
+                loading.hide();
+            });
+
+            let formData = new FormData();
+            formData.append('asset_unit', $('#asset_unit').val());
+            formData.append('asset_amount', $('#asset_amount').val());
+            formData.append('tags_prefix', $('#tags_prefix').val());
+
+            $.ajax({
+                url: './generate_asset_tags.php',
+                method: 'POST',
+                data: formData,
+				dataType: 'json',
+				cache: false,
+				processData: false,
+				contentType: false,
+            }).done(function(response) {
+                if (!response.success) {
+                    $('#divResultGenerateTags').html(response.message);
+                } else {
+                    $('#divResult').html(response.message);
+                    $('#asset_tags').text(response.tags);
+                    $('#modalGenerateTags').modal('hide');
+                }
+                
+            });
+            return false;
+
+
+        }
 
 
         function loadInModal(pageBase, params) {

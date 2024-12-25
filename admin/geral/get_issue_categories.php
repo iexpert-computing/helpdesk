@@ -13,7 +13,7 @@ $conn = ConnectPDO::getInstance();
 $post = $_POST;
 $data = array();
 
-$allowedCategories = [1,2,3];
+$allowedCategories = [1,2,3,4,5,6];
 
 if (!in_array($post['cat_type'], $allowedCategories)) {
     return;

@@ -19,24 +19,19 @@ function tickets_operadores_close_months(canvasId) {
         var operadores = []; //inner labels - Legends
         var chartTitle = [];
 
-        //console.log(data.length);
-
         for (var i in data.months) {
             months.push(data.months[i]);
         }
-        // console.log('Meses: ' + months);
 
         for (var j in data.operadores) {
             operadores.push(data.operadores[j]);
         }
-        // console.log('operadores: ' + operadores);
 
         for (var l in data.totais) {
             total.push(data.totais[l]);
         }
 
         chartTitle.push(data.chart_title);
-        // console.log('Total: ' + total);
         
         var dataSetValue = [];
         var count = operadores.length; /* Quantidade de operadores recebidas */

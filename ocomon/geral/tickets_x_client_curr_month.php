@@ -32,7 +32,7 @@ if (empty($filtered_areas)) {
     if ($isAdmin) {
         $qry_filter_areas = "";
     } else {
-        $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$_SESSION['s_uareas']}) OR " . $aliasAreasFilter . " = '-1')";
+        $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$_SESSION['s_uareas']})";
     }
 } else {
     $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$filtered_areas}))";
@@ -128,6 +128,15 @@ foreach ($clients as $row) {
         $i++;
     }
 }
+
+
+/* Trecho para remover os clientes que não tiveram registros no período */
+foreach ($data as $key => $clientValues) {
+    if (array_sum($clientValues) == 0) {
+        unset($data[$key]);
+    };
+}
+
 
 //TICKETS_BY_REQUESTER_AREA_CURRENT_MONTH
 $data[]['chart_title'] = ($_SESSION['requester_areas'] ? TRANS('TICKETS_BY_CLIENTS_CURRENT_MONTH_REQUESTER', '', 1) : TRANS('TICKETS_BY_CLIENTS_CURRENT_MONTH', '', 1));

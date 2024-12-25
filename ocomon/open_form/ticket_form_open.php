@@ -59,18 +59,20 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 		<title><?= TRANS('TICKET_OPENING'); ?></title>
 
 		<link rel="stylesheet" type="text/css" href="../../includes/css/estilos.css" />
-		<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 		<link rel="stylesheet" type="text/css" href="../../includes/components/jquery/datetimepicker/jquery.datetimepicker.css" />
 
 		<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
 		<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
-		<link rel="stylesheet" type="text/css" href="../../includes/components/summernote/summernote-bs4.css" />
+		<link rel="stylesheet" type="text/css" href="../../includes/components/suneditor/node_modules/suneditor/dist/css/suneditor.min.css" />
+		<link rel="stylesheet" type="text/css" href="../../includes/components/suneditor/node_modules/suneditor/src/assets/css/suneditor-contents.css" />
+
 		<link rel="stylesheet" type="text/css" href="../../includes/css/util.css" />
 		<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
 		<link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+		<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
 		<!-- <link rel="stylesheet" type="text/css" href="../../includes/css/index_css.css" /> -->
-		<link rel="shortcut icon" href="../../includes/icons/favicon.ico">
+		<link rel="shortcut icon" href="../../includes/icons/favicon.webp">
 
 
 		<style>
@@ -91,7 +93,8 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 
 		<div class="topo topo-color fixed-top p-2">
 			<div id="header_logo">
-				<span class="logo"><img src="../../MAIN_LOGO.svg" width="240"></span>
+				<!-- <span class="logo"><img src="../../MAIN_LOGO.svg" width="240"></span> -->
+				<span class="logo header-mainlogo"></span>
 			</div>
 			<div id="header_elements" class="fs-13">
 				<span class="font-weight-bold d-none d-sm-block"> <?= TRANS('USER_NOT_LOGGED') . "&nbsp;&nbsp;|&nbsp;&nbsp;"; ?>
@@ -236,7 +239,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 					/* Etiqueta do equipamento */
 					if ($screen['conf_scr_tag'] || empty($screen)) {
 					?>
-						<label for="idEtiqueta" class="col-md-2 col-form-label  text-md-right text-nowrap"><?= TRANS('ASSET_TAG'); ?></label>
+						<label for="idEtiqueta" class="col-md-2 col-form-label  text-md-right text-nowrap"><?= TRANS('ASSET_TAG_TAG'); ?></label>
 
 						<div class="form-group col-md-4">
 							<input type="text" class="form-control " id="idEtiqueta" name="equipamento" value="" placeholder="<?= TRANS('FIELD_TAG_EQUIP'); ?>" />
@@ -571,11 +574,14 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 			<div class=" fixed-bottom ">
 				<div class="  bg-light border-top text-center p-2 " style="z-index:4; ">
 					<div class="footer-text">
-						<a href="https://ocomonphp.sourceforge.io/" target="_blank">
-							OcoMon
-						</a>&nbsp;-&nbsp;
-						<?= TRANS('OCOMON_ABSTRACT'); ?><br />
-						<?= TRANS('COL_VERSION') . ": " . VERSAO . " - " . TRANS('MNS_MSG_LIC') . " GPL"; ?>
+						<span>
+							<a href="<?= APP_URL; ?>" target="_blank">
+								<strong><?= APP_NAME; ?></strong>
+							</a>
+							&nbsp;-&nbsp;
+							<?= TRANS('OCOMON_ABSTRACT'); ?><br />
+							<?= TRANS('COL_VERSION') . ": <strong>" . VERSAO . "</strong> - " . TRANS('MNS_MSG_LIC') . " GPL"; ?>
+						</span>
 					</div>
 				</div>
 			</div>
@@ -591,11 +597,12 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 	<script src="../../includes/components/jquery/jquery.initialize.min.js"></script>
 	<script src="../../includes/components/jquery/datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
 	<script src="../../includes/components/bootstrap/js/bootstrap.bundle.js"></script>
-	<script src="../../includes/components/summernote/summernote-bs4.js"></script>
-	<script src="../../includes/components/summernote/lang/summernote-pt-BR.min.js"></script>
 	<script src="../../includes/components/bootstrap-select/dist/js/bootstrap-select.min.js"></script>
 	<script src="../../includes/components/Inputmask-5.x/dist/jquery.inputmask.min.js"></script>
 	<script src="../../includes/components/Inputmask-5.x/dist/bindings/inputmask.binding.js"></script>
+	<script src="../../includes/components/suneditor/node_modules/suneditor/dist/suneditor.min.js"></script>
+    <script src="../../includes/components/suneditor/node_modules/suneditor/src/lang/pt_br.js"></script>
+	<script src="../../includes/javascript/format_bar.js"></script>
 
 	<script>
 		$(function() {
@@ -669,27 +676,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 
 			var bar = '<?php print $formatBar; ?>';
 			if ($('#idDescricao').length > 0 && bar == 1) {
-				$('#idDescricao').summernote({
-					// placeholder: 'Hello Bootstrap 4',
-					toolbar: [
-						['style', ['style']],
-						['font', ['bold', 'underline', 'clear']],
-						['fontname', ['fontname']],
-						['fontsize', ['fontsize']],
-						['color', ['color']],
-						['para', ['ul', 'ol', 'paragraph']],
-						['table', ['table']],
-						['insert', ['link']],
-						['view', ['fullscreen']],
-					],
-					lang: 'pt-BR', // default: 'en-US'
-					tabsize: 2,
-					// height: 100,
-					height: 80, // set editor height
-					minHeight: null, // set minimum height of editor
-					maxHeight: null, // set maximum height of editor
-					// focus: true // set focus to editable area after initializing summernote
-				});
+				var editor = render_format_bar('idDescricao', 80, 'basic');
 			}
 
 			$('input, select, textarea').on('change', function() {
@@ -709,7 +696,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 				var form = $('form').get(0);
 				// disabled the submit button
 				$("#idSubmit").prop("disabled", true);
-
+				editor.save();
 				$.ajax({
 					url: './ticket_form_open_process.php',
 					method: 'POST',

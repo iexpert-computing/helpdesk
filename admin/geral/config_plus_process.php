@@ -43,9 +43,14 @@ $data['numero'] = (isset($post['numero']) ? intval($post['numero']) : "");
 $data['action'] = $post['action'];
 $data['field_id'] = "";
 
+$authTypes = ['LDAP', 'OIDC', 'SYSTEM'];
+$defaultAuthType = 'SYSTEM';
+
 $ticket_by_mail_app = "ticket_by_email";
 $key_name_token = "API_TICKET_BY_MAIL_TOKEN";
 
+
+$data['auth_type'] = (isset($post['auth_type']) && in_array($post['auth_type'], $authTypes) ? noHtml($post['auth_type']) : $defaultAuthType);
 
 /* Seção de dados referentes ao LDAP */
 $data['auth_type_ldap'] = (isset($post['auth_type_ldap']) ? ($post['auth_type_ldap'] == "yes" ? 1 : 0) : 0);
@@ -62,8 +67,32 @@ $data['ldap_user'] = (isset($post['ldap_user']) ? noHtml($post['ldap_user']) : "
 $data['ldap_password'] = (isset($post['ldap_password']) ? noHtml($post['ldap_password']) : "");
 
 
+/* Seção de dados referentes ao OIDC */
+$data['auth_type_oidc'] = (isset($post['auth_type_oidc']) ? ($post['auth_type_oidc'] == "yes" ? 1 : 0) : 0);
+$data['oidc_issuer'] = (isset($post['oidc_issuer']) && !empty($post['oidc_issuer']) ? noHtml($post['oidc_issuer']) : "");
+$data['oidc_client_id'] = (isset($post['oidc_client_id']) && !empty($post['oidc_client_id']) ? noHtml($post['oidc_client_id']) : "");
+$data['oidc_client_secret'] = (isset($post['oidc_client_secret']) && !empty($post['oidc_client_secret']) ? noHtml($post['oidc_client_secret']) : "");
+$data['logout_url'] = (isset($post['logout_url']) && !empty($post['logout_url']) ? noHtml($post['logout_url']) : "");
+$data['oidc_field_username'] = (isset($post['oidc_field_username']) && !empty($post['oidc_field_username']) ? noHtml($post['oidc_field_username']) : "");
+$data['oidc_field_fullname'] = (isset($post['oidc_field_fullname']) && !empty($post['oidc_field_fullname']) ? noHtml($post['oidc_field_fullname']) : "");
+$data['oidc_field_email'] = (isset($post['oidc_field_email']) && !empty($post['oidc_field_email']) ? noHtml($post['oidc_field_email']) : "");
+$data['oidc_field_phone'] = (isset($post['oidc_field_phone']) && !empty($post['oidc_field_phone']) ? noHtml($post['oidc_field_phone']) : "");
+$data['oidc_client_to_assign'] = (isset($post['oidc_client_to_assign']) && !empty($post['oidc_client_to_assign']) ? noHtml($post['oidc_client_to_assign']) : "");
+$data['oidc_area'] = (isset($post['oidc_area']) && !empty($post['oidc_area']) ? noHtml($post['oidc_area']) : "");
+
+
+
+
+
 /* Seção referente a abertura de chamados por e-mail */
 $data['allow_open_by_email'] = (isset($post['allow_open_by_email']) ? ($post['allow_open_by_email'] == "yes" ? 1 : 0) : 0);
+$data['only_from_registered'] = (isset($post['only_from_registered']) ? ($post['only_from_registered'] == "yes" ? 1 : 0) : 0);
+
+
+$data['imap_provider'] = (isset($post['imap_provider_azure']) ? ($post['imap_provider_azure'] == "yes" ? 'AZURE' : 0) : 0);
+
+
+
 $data['mail_account'] = (isset($post['mail_account']) ? noHtml($post['mail_account']) : "");
 $data['imap_address'] = (isset($post['imap_address']) ? noHtml($post['imap_address']) : "");
 $data['account_password'] = (isset($post['account_password']) ? $post['account_password'] : "");
@@ -85,8 +114,7 @@ $data['input_tags'] = (isset($post['input_tags']) ? noHtml($post['input_tags']) 
 $idSystemUser = 1;
 $userInfo = "";
 
-
-if ($data['system_user']) {
+if (!empty($data['system_user'])) {
     $userInfo = getUserInfo($conn, 0, $data['system_user']);
     if (count($userInfo)) {
         $idSystemUser = $userInfo['user_id'];
@@ -129,7 +157,8 @@ if ($data['action'] == "edit") {
 
 
     /* Autenticação via LDAP habilitada */
-    if ($data['auth_type_ldap']) {
+    // if ($data['auth_type_ldap']) {
+    if ($data['auth_type'] == "LDAP") {
         if (empty($data['ldap_host'])) {
             $data['success'] = false;
             $data['field_id'] = "ldap_host";
@@ -153,7 +182,61 @@ if ($data['action'] == "edit") {
             $data['field_id'] = "ldap_area";
         } 
 
+        if (!empty($data['ldap_host'])) {
+            if (!filter_var($data['ldap_host'], FILTER_VALIDATE_DOMAIN)) {
+                /* FILTER_VALIDATE_DOMAIN */
+                $data['success'] = false; 
+                $data['field_id'] = "ldap_host";
+                $data['message'] = message('warning', '', TRANS('WRONG_FORMATTED_URL'), '');
+                echo json_encode($data);
+                return false;
+            }
+        }
+    }
         
+
+
+    /* Autenticação via OIDC habilitada */
+    // if ($data['auth_type_oidc']) {
+    if ($data['auth_type'] == "OIDC") {
+        if (empty($data['oidc_issuer'])) {
+            $data['success'] = false;
+            $data['field_id'] = "oidc_issuer";
+        } elseif (empty($data['oidc_client_id'])) {
+            $data['success'] = false;
+            $data['field_id'] = "oidc_client_id";
+        } elseif (empty($data['logout_url'])) {
+            $data['success'] = false;
+            $data['field_id'] = "logout_url";
+        } elseif (empty($data['oidc_field_username'])) {
+            $data['success'] = false;
+            $data['field_id'] = "oidc_field_username";
+        } elseif (empty($data['oidc_field_fullname'])) {
+            $data['success'] = false;
+            $data['field_id'] = "oidc_field_fullname";
+        } elseif (empty($data['oidc_field_email'])) {
+            $data['success'] = false;
+            $data['field_id'] = "oidc_field_email";
+        } elseif (empty($data['oidc_area'])) {
+            $data['success'] = false;
+            $data['field_id'] = "oidc_area";
+        } 
+
+        if (!empty($data['oidc_issuer']) && !filter_var($data['oidc_issuer'], FILTER_VALIDATE_URL)) {
+            $data['success'] = false; 
+            $data['field_id'] = "oidc_issuer";
+            $data['message'] = message('warning', '', TRANS('WRONG_FORMATTED_URL'), '');
+            echo json_encode($data);
+            return false;
+    }
+        if (!empty($data['logout_url']) && !filter_var($data['logout_url'], FILTER_VALIDATE_URL)) {
+            $data['success'] = false; 
+            $data['field_id'] = "logout_url";
+            $data['message'] = message('warning', '', TRANS('WRONG_FORMATTED_URL'), '');
+            echo json_encode($data);
+            return false;
+        }
+
     }
 
 
@@ -255,16 +338,7 @@ if ($data['action'] == "edit") {
     }
 
 
-    if (!empty($data['ldap_host'])) {
-        if (!filter_var($data['ldap_host'], FILTER_VALIDATE_DOMAIN)) {
-            /* FILTER_VALIDATE_DOMAIN */
-            $data['success'] = false; 
-            $data['field_id'] = "ldap_host";
-            $data['message'] = message('warning', '', TRANS('WRONG_FORMATTED_URL'), '');
-            echo json_encode($data);
-            return false;
-        }
-    }
+    
     
     if (!empty($data['mail_account'])) {
         if (!filter_var($data['mail_account'], FILTER_VALIDATE_EMAIL)) {
@@ -314,7 +388,12 @@ if ($data['action'] == "edit") {
 /* Todas as informações que estiverem nesse array serão atualizadas no banco */
 $dataUpd = [];
 
-$dataUpd['AUTH_TYPE'] = ($data['auth_type_ldap'] ? 'LDAP' : 'SYSTEM');
+// $dataUpd['AUTH_TYPE'] = ($data['auth_type_ldap'] ? 'LDAP' : 'SYSTEM');
+$dataUpd['AUTH_TYPE'] = $data['auth_type'];
+
+
+
+/* LDAP */
 $dataUpd['LDAP_HOST'] = $data['ldap_host'];
 $dataUpd['LDAP_PORT'] = $data['ldap_port'];
 $dataUpd['LDAP_DOMAIN'] = $data['ldap_domain'];
@@ -325,7 +404,27 @@ $dataUpd['LDAP_FIELD_PHONE'] = $data['ldap_field_phone'];
 $dataUpd['LDAP_AREA_TO_BIND_NEWUSERS'] = $data['ldap_area'];
 $dataUpd['LDAP_CLIENT_TO_BIND_NEWUSERS'] = $data['ldap_client'];
 
+
+/* OIDC */
+$dataUpd['OIDC_ISSUER'] = $data['oidc_issuer'];
+$dataUpd['OIDC_CLIENT_ID'] = $data['oidc_client_id'];
+if (!empty($data['oidc_client_secret']))
+    $dataUpd['OIDC_CLIENT_SECRET'] = $data['oidc_client_secret'];
+
+$dataUpd['OIDC_LOGOUT_URL'] = $data['logout_url'];
+$dataUpd['OIDC_FIELD_USERNAME'] = $data['oidc_field_username'];
+$dataUpd['OIDC_FIELD_FULLNAME'] = $data['oidc_field_fullname'];
+$dataUpd['OIDC_FIELD_EMAIL'] = $data['oidc_field_email'];
+$dataUpd['OIDC_FIELD_PHONE'] = $data['oidc_field_phone'];
+$dataUpd['OIDC_CLIENT_TO_BIND_NEWUSERS'] = $data['oidc_client_to_assign'];
+$dataUpd['OIDC_AREA_TO_BIND_NEWUSERS'] = $data['oidc_area'];
+
+
+
+
 $dataUpd['ALLOW_OPEN_TICKET_BY_EMAIL'] = $data['allow_open_by_email'];
+$dataUpd['EMAIL_TICKETS_ONLY_FROM_REGISTERED'] = $data['only_from_registered'];
+$dataUpd['IMAP_PROVIDER'] = $data['imap_provider'];
 $dataUpd['MAIL_GET_ADDRESS'] = $data['mail_account'];
 if (!empty($data['account_password']))
     $dataUpd['MAIL_GET_PASSWORD'] = $data['account_password'];
@@ -382,49 +481,28 @@ if ($data['action'] == "edit") {
         }
     }
 
+
+    /* Checar se o usuário da API de abertura de chamados foi alterado */
+    $changedApiUser = false;
+    if ($data['system_user'] != getConfigValue($conn, 'API_TICKET_BY_MAIL_USER')) {
+        $changedApiUser = true;
+    }
+
+    $updErrors = [];
     /* Atualização da configuração geral */
     foreach ($dataUpd as $key => $value) {
         
-        /* Checar se a chave existe */
-        $sqlFind = "SELECT id FROM config_keys WHERE key_name = '{$key}' ";
-        $resFind = $conn->query($sqlFind);
-        if ($resFind->rowCount()) {
-            /* A chave já existe - update */
+        if (!setConfigValue($conn, $key, $value)) {
+            $updErrors[] = $key;
+        }
+    }
 
-            $sql = "UPDATE config_keys SET 
-                    key_value = " . dbField($value, 'text') . " 
-                WHERE key_name = '{$key}';
-            ";
-            try {
-                $conn->exec($sql);
+    if (!count($updErrors)) {
                 $data['success'] = true;
                 $data['message'] = TRANS('MSG_SUCCESS_EDIT');
-            } catch (Exception $e) {
-                $data['success'] = false;
-                $data['message'] = TRANS('MSG_ERR_SAVE_RECORD') . "<hr>" . $sql . "<hr>" . $e->getMessage();
-                $_SESSION['flash'] = message('danger', '', $data['message'], '');
-                echo json_encode($data);
-                return false;
-            }
         } else {
-            /* Chave não existe - insert */
-            $sql = "INSERT INTO config_keys 
-                    (
-                        key_name, key_value
-                    )
-                    VALUES 
-                    (
-                        '{$key}', " . dbField($value, 'text') . "
-                    )
-            ";
-            try {
-                $conn->exec($sql);
-            }
-            catch (Exception $e) {
-                $exception .= "<hr>" . $e->getMessage();
-            }
-        }
-        
+        $data['success'] = false;
+        $data['message'] = TRANS('MSG_ERR_SAVE_RECORD') . "<hr>" . implode("<hr />", $updErrors);
     }
 
 
@@ -434,58 +512,67 @@ if ($data['action'] == "edit") {
         saveNewTags($conn, $arrayTags);
     }
 
-    /* Montar o Token */
-    $tokenData = array(
-        "exp" => time() + (60 * 60 * 24 * 365),
-        "app" => $ticket_by_mail_app
-    );
 
-    /* Gerar o token (jwt) para a autorização do usuário para abertura de chamados por email */
-    $jwt = (new AccessToken())->generate($idSystemUser, $tokenData);
+    /* Se o usuário da API de abertura de chamados foi alterado, atualizar o token */
+    if ($changedApiUser) {
+        /* Montar o Token */
+        $tokenData = array(
+            "exp" => time() + (60 * 60 * 24 * 365),
+            "app" => $ticket_by_mail_app
+        );
 
-    /* Remover os registros para o APP de abertura de chamados por e-mail pois a abertura por e-mails só é permitida para um user */
-    $sql = "DELETE FROM access_tokens WHERE app = :app ";
-    try {
-        $res = $conn->prepare($sql);
-        $res->bindParam(':app', $ticket_by_mail_app, PDO::PARAM_STR);
-        $res->execute();
-    }
-    catch (Exception $e) {
-        $exception .= "<hr>" . $e->getMessage();
-    }
+        /* Gerar o token (jwt) para a autorização do usuário para abertura de chamados por email */
+        $jwt = (new AccessToken())->generate($idSystemUser, $tokenData);
 
-    /* Inserção do novo token para abertura de chamados por e-mail */
-    $sql = "INSERT INTO access_tokens (
-        user_id, app, token
-    ) VALUES (
-        :user_id, :app, :jwt
-    )";
-    try {
-        $res = $conn->prepare($sql);
-        $res->bindParam(':user_id', $idSystemUser, PDO::PARAM_INT);
-        $res->bindParam(':app', $ticket_by_mail_app, PDO::PARAM_STR);
-        $res->bindParam(':jwt', $jwt, PDO::PARAM_STR);
-        $res->execute();
-
-        /* ATualiza o token na configuracao para abertura de chamados por e-mail */
-        $sql = "UPDATE config_keys SET key_value = :token WHERE key_name = :key_name ";
+            /* Remover os registros para o APP de abertura de chamados por e-mail pois a abertura por e-mails só é permitida para um user */
+        $sql = "DELETE FROM access_tokens WHERE app = :app ";
         try {
             $res = $conn->prepare($sql);
-            $res->bindParam(':token', $jwt, PDO::PARAM_STR);
-            $res->bindParam(':key_name', $key_name_token, PDO::PARAM_STR);
-
+            $res->bindParam(':app', $ticket_by_mail_app, PDO::PARAM_STR);
             $res->execute();
+        }
+        catch (Exception $e) {
+            $exception .= "<hr>" . $e->getMessage();
+        }
+
+        /* Inserção do novo token para abertura de chamados por e-mail */
+        $sql = "INSERT INTO access_tokens (
+            user_id, app, token
+        ) VALUES (
+            :user_id, :app, :jwt
+        )";
+        try {
+            $res = $conn->prepare($sql);
+            $res->bindParam(':user_id', $idSystemUser, PDO::PARAM_INT);
+            $res->bindParam(':app', $ticket_by_mail_app, PDO::PARAM_STR);
+            $res->bindParam(':jwt', $jwt, PDO::PARAM_STR);
+            $res->execute();
+
+            /* ATualiza o token na configuracao para abertura de chamados por e-mail */
+            $sql = "UPDATE config_keys SET key_value = :token WHERE key_name = :key_name ";
+            try {
+                $res = $conn->prepare($sql);
+                $res->bindParam(':token', $jwt, PDO::PARAM_STR);
+                $res->bindParam(':key_name', $key_name_token, PDO::PARAM_STR);
+
+                $res->execute();
+            } catch (Exception $e) {
+                $exception .= "<hr>" . $e->getMessage();
+            }
         } catch (Exception $e) {
             $exception .= "<hr>" . $e->getMessage();
         }
-    } catch (Exception $e) {
-        $exception .= "<hr>" . $e->getMessage();
+        /* Final do processo relacionado ao token para abertura de chamados por email */
     }
-    /* Final do processo relacionado ao token para abertura de chamados por email */
 }
 
 if (!empty($exception)) {
-    $data['message'] = $data['message'] . "<hr>" . $exception;
+
+    $message = $data['message'];
+    $success = $data['success'];
+    $data = [];
+    $data['success'] = $success;
+    $data['message'] = $message . "<hr>" . $exception;
 }
 
 $_SESSION['flash'] = message('success', '', $data['message'], '');

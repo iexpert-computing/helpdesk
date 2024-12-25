@@ -57,7 +57,7 @@ if (empty($asset_id)) {
 
 $query = $QRY["full_detail_ini"];
 $query .= " AND (c.comp_cod = '" . $asset_id . "')";
-$query .= $QRY["full_detail_fim"];
+// $query .= $QRY["full_detail_fim"];
 
 try {
     $res = $conn->query($query);
@@ -81,9 +81,19 @@ $hasCustomFields = hasCustomFields($conn, $asset_id, 'assets_x_cfields');
 $unit_info = (getUnits($conn, null, $asset_unit) ?? "");
 $client_id = (!empty($unit_info) && array_key_exists('id', $unit_info) ? $unit_info['id'] : "");
 $client_name = (!empty($unit_info) && array_key_exists('nickname', $unit_info) ? $unit_info['nickname'] : "");
+
+
+/* Informações sobre alocação do ativo para algum usuário */
+$userInfo = getUserFromAssetId ($conn, $asset_id);
+$isAlocated = (!empty($userInfo) ? true : false);
+
+
+
 $department_info = getDepartments($conn, null, $row['tipo_local']);
+
+
 $department_unit = (!empty($department_info['unidade']) ? "&nbsp;(" . $department_info['unidade'] . ")" : "");
-$inconsistent_department = ($asset_unit != $department_info['loc_unit'] && !empty($department_info['loc_unit']));
+$inconsistent_department = (!$isAlocated && $asset_unit != $department_info['loc_unit'] && !empty($department_info['loc_unit']));
 
 $alertText = "<hr />" .TRANS('ASSET_UNIT') . ":&nbsp;" . $row['instituicao'] . "<br />";
 $alertText .= TRANS('DEPARTMENT_UNIT') . ":&nbsp;" . $department_info['unidade'];
@@ -118,7 +128,9 @@ $hasFiles = $resultFiles->rowCount();
 
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
+
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -153,7 +165,7 @@ $hasFiles = $resultFiles->rowCount();
 		if ((!isset($_GET['action'])) && !isset($_POST['submit'])) {
 
 			?>
-			<h6><?= TRANS('BT_EDIT'); ?></h6>
+			<h6><?= TRANS('EDITION'); ?></h6>
             
             
 			<form name="form" method="post" action="<?= $_SERVER['PHP_SELF']; ?>" id="form" enctype="multipart/form-data">
@@ -209,9 +221,13 @@ $hasFiles = $resultFiles->rowCount();
                         </select>
 					</div>
 
+                    
+                    <?php
+                        $disabled = ($isChild || $isAlocated ? ' disabled' : '');
+                    ?>
                     <label for="asset_tag" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('ASSET_TAG'); ?></label>
 					<div class="form-group col-md-4">
-						<input type="text" class="form-control " id="asset_tag" name="asset_tag" value="<?= $row['etiqueta']; ?>" required />
+						<input type="text" class="form-control " id="asset_tag" name="asset_tag" value="<?= $row['etiqueta']; ?>" required <?= $disabled; ?>/>
                     </div>
 
 
@@ -220,7 +236,8 @@ $hasFiles = $resultFiles->rowCount();
                     <label for="client" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CLIENT'); ?></label>
                     <div class="form-group col-md-4">
                         <?php
-                            $disabled = ($isChild ? ' disabled' : '');
+                            // $disabled = ($isChild ? ' disabled' : '');
+                            $disabled = ($isChild || $isAlocated ? ' disabled' : '');
                         ?>
                         <select class="form-control bs-select" id="client" name="client" required <?= $disabled; ?>>
                             <?php
@@ -242,7 +259,8 @@ $hasFiles = $resultFiles->rowCount();
                     <label for="asset_unit" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('COL_UNIT'); ?></label>
                     <div class="form-group col-md-4">
                         <?php
-                            $disabled = ($isChild ? ' disabled' : '');
+                            // $disabled = ($isChild ? ' disabled' : '');
+                            $disabled = ($isChild || $isAlocated ? ' disabled' : '');
                         ?>
                         <select class="form-control bs-select" id="asset_unit" name="asset_unit" required <?= $disabled; ?>>
                             <option value=""><?= TRANS('SEL_UNIT'); ?></option>
@@ -261,22 +279,34 @@ $hasFiles = $resultFiles->rowCount();
 					</div>
 
                     <!-- Carregar apenas departamentos que estiverem vinculados à unidade ou ao cliente -->
-                    <label for="department" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('DEPARTMENT'); ?></label>
+                    <?php
+                        $disabled = ($isChild || $isAlocated ? ' disabled' : '');
+                        $popover = ($isChild || $isAlocated ? ' data-toggle="popover" data-placement="top" data-content="' . TRANS('HINT_ASSET_ALOCATED_CANNOT_CHANGE_LOCATION') . '" data-trigger="hover"' : '');
+                    ?>
+                    <label for="department" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right" <?= $popover; ?>><?= TRANS('DEPARTMENT'); ?></label>
                     <div class="form-group col-md-4">
-                        <?php
-                            $disabled = ($isChild ? ' disabled' : '');
-                        ?>
-                        <select class="form-control bs-select" id="department" name="department" required <?= $disabled; ?>>
+                        
+                        <select class="form-control bs-select" id="department" name="department" <?= $popover; ?> required <?= $disabled; ?>>
                             
                             <option value=""><?= TRANS('SEL_DEPARTMENT'); ?></option>
                             <?php
-                            
+                            $foundDepartment = false;
                             $departments = getDepartments($conn, null, null, $asset_unit);
                             foreach ($departments as $rowType) {
                                 ?>
-								<option value="<?= $rowType['loc_id']; ?>"
-                                <?= ($row['tipo_local'] == $rowType['loc_id'] ? ' selected' : ''); ?>
+								<option data-subtext="<?= $rowType['unidade']; ?>" value="<?= $rowType['loc_id']; ?>"
+                                <?php
+                                    if ($row['tipo_local'] == $rowType['loc_id']) {
+                                        $foundDepartment = true;
+                                        echo ' selected';
+                                    }
+                                ?>
                                 ><?= $rowType['local']; ?></option>
+                                <?php
+                            }
+                            if (!$foundDepartment) {
+                                ?>
+                                    <option data-subtext="<?= $department_info['unidade']; ?>" value="<?= $department_info['loc_id']; ?>" selected><?= $department_info['local']; ?></option>
                                 <?php
                             }
                             ?>
@@ -373,7 +403,7 @@ $hasFiles = $resultFiles->rowCount();
                                                     ?>
                                                         <option data-subtext="<?= $subtext; ?>" value="<?= $model['codigo']; ?>"
                                                             <?= ($model['codigo'] == $spec['marc_cod'] ? " selected" : ""); ?>
-                                                        ><?= $model['modelo']; ?></option>
+                                                        ><?= $model['fabricante'] . '&nbsp' . $model['modelo']; ?></option>
                                                     <?php
                                                     }
                                                     ?>
@@ -402,10 +432,6 @@ $hasFiles = $resultFiles->rowCount();
                                     </div>
                                 <?php
                                 }
-
-
-                                ?>
-                            <?php
                         }
                     ?>
 
@@ -443,7 +469,7 @@ $hasFiles = $resultFiles->rowCount();
                             if (!empty($field_value['field_id'])) {
                             ?>
                                 <?= ($cfield['field_type'] == 'textarea' ? '<div class="w-100"></div>'  : ''); ?>
-                                <label for="<?= $cfield['field_name']; ?>" class="col-sm-<?= $labelColSize; ?> col-md-<?= $labelColSize; ?> col-form-label col-form-label-sm text-md-right " title="<?= $cfield['field_title']; ?>" data-pop="popover" data-placement="top" data-trigger="hover" data-content="<?= $cfield['field_description']; ?>"><?= $cfield['field_label']; ?></label>
+                                <label for="<?= $cfield['field_name']; ?>" class="col-sm-<?= $labelColSize; ?> col-md-<?= $labelColSize; ?> col-form-label col-form-label-sm text-md-right " title="<?= $cfield['field_title']; ?>" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= $cfield['field_description']; ?>"><?= $cfield['field_label']; ?></label>
                                 <div class="form-group col-md-<?= ($cfield['field_type'] == 'textarea' ? $fieldRowSize  : $fieldColSize); ?>">
                                     <?php
                                     if ($cfield['field_type'] == 'select') {
@@ -471,7 +497,7 @@ $hasFiles = $resultFiles->rowCount();
 
                                             $options = [];
                                             $options = getCustomFieldOptionValues($conn, $cfield['id']);
-                                            $defaultSelections = explode(',', $field_value['field_value_idx']);
+                                            $defaultSelections = explode(',', (string)$field_value['field_value_idx']);
 
                                             ?>
                                             <option value=""><?= TRANS('SEL_SELECT'); ?></option>
@@ -1098,6 +1124,9 @@ $hasFiles = $resultFiles->rowCount();
 
 
 				</div>
+
+                <input type="hidden" name="db_asset_department" id="db_asset_department" value="<?= $department_info['loc_id']; ?>" />
+
 			</form>
 		<?php
 		}
@@ -1118,6 +1147,18 @@ $hasFiles = $resultFiles->rowCount();
 		$(function() {
 
             // $('.bs-select').addClass('new-select2');
+            $('[data-toggle="popover"]').popover({
+                html: true,
+                container: 'body',
+                placement: 'right',
+                trigger: 'hover'
+            });
+
+
+            $(".popover-dismiss").popover({
+                trigger: "focus",
+            });
+
 
             $('.bs-select').selectpicker({
 				/* placeholder */
@@ -1283,6 +1324,7 @@ $hasFiles = $resultFiles->rowCount();
 				});
 
                 var form = $('form').get(0);
+                $("#asset_tag").prop("disabled", false);
                 $("#client").prop("disabled", false);
                 $("#asset_unit").prop("disabled", false);
                 $("#department").prop("disabled", false);
@@ -1562,7 +1604,7 @@ $hasFiles = $resultFiles->rowCount();
                     
                     if (data.length > 0) {
                         for (i in data) {
-                            html += '<option data-subtext="' + data[i].spec + '" value="' + data[i].codigo + '">' + data[i].modelo + '</option>';
+                            html += '<option data-subtext="' + data[i].spec + '" value="' + data[i].codigo + '">' + data[i].fabricante + ' ' + data[i].modelo + '</option>';
                         }
                     }
 					/* Para conseguir mapear os ids que vêm após o carregamento do DOM, 

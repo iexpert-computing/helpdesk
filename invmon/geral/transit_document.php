@@ -62,7 +62,7 @@ $terms = getStatementsInfo($conn, 'termo-transito');
     </style>
 
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -113,7 +113,7 @@ $terms = getStatementsInfo($conn, 'termo-transito');
         }
 
         $sql = $QRY["full_detail_ini"] . " AND c.comp_cod IN ({$equipment_id}) ";
-        $sql .= $QRY["full_detail_fim"];
+        // $sql .= $QRY["full_detail_fim"];
         try {
             $res = $conn->query($sql);
         } catch (Exception $e) {
@@ -156,7 +156,7 @@ $terms = getStatementsInfo($conn, 'termo-transito');
 					<thead>
 						<tr class="h6 text-dark">
 							<th id="cell-type"   class="text-semibold"><?= TRANS('COL_UNIT'); ?></th>
-							<th id="cell-id"     class="text-semibold"><?= TRANS('ASSET_TAG'); ?></th>
+							<th id="cell-id"     class="text-semibold"><?= TRANS('ASSET_TAG_TAG'); ?></th>
 							<th id="cell-id"   class="text-semibold"><?= TRANS('COL_TYPE'); ?></th>
 							<th id="cell-author"  class=" text-semibold"><?= TRANS('COL_MANUFACTURER'); ?></th>
 							<th id="cell-desc"  class=" text-semibold"><?= TRANS('COL_MODEL'); ?></th>

@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /**
  * Class WorkTime
  * @description: Based on a given array of weekly workload and a given array of holidays,
- * this class implements a set of methods to calculate the valid worktime inside an interval of time.
+ * this class implements a set of methods to calculate the valid worktime/business time inside an interval of time.
  * @author Flávio Ribeiro
  * @package ocomonphp
  */
@@ -35,6 +35,10 @@ class WorkTime
     private $date1;
     
     private $date2;
+
+    private $firstDate;
+
+    private $lastDate;
 
     private $checkpoints;
 
@@ -76,10 +80,7 @@ class WorkTime
     public function __construct(array $workTimes, array $holidays)
     {
         $this->status = "stopped";
-        // if (!count($workTimes)) {
-        //     $this->error[] = "The info about worktimes are empty!";
-        //     return;
-        // }
+        
         $this->workTimes = $workTimes;
         $this->holidays = $holidays;
         $this->fullWorkTime = 0;
@@ -410,6 +411,72 @@ class WorkTime
         return false;
     }
 
+
+
+    
+    /**
+     * Returns the older of the two given dates.
+     *
+     * @param string $date1 The first date.
+     * @param string $date2 The second date.
+     * @return string The older of the two dates.
+     */
+    private function olderDate(string $date1, ?string $date2 = null) {
+        $timestamp1 = strtotime($date1);
+        
+        if (!is_null($date2) && !empty($date2)) {
+            $timestamp2 = strtotime($date2);
+        } else {
+            return $date1;
+        }
+    
+        if ($timestamp1 < $timestamp2) {
+            return $date1;
+        }
+        return $date2;
+    }
+
+
+
+    private function absoluteTime(string $startTime, string $endTime) :array
+    {
+        $time1 = strtotime($startTime);
+        $time2 = strtotime($endTime);
+        $inSeconds = $time2 - $time1;
+
+
+        $startTime = new \DateTime($startTime);
+        $endTime = new \DateTime($endTime);
+
+        $diff = $startTime->diff($endTime);
+
+        $years = ($diff->y ? $diff->y : '');
+        $months = ($diff->m ? $diff->m : '');
+        $days = ($diff->d ? $diff->d : '');
+        $hours = ($diff->h ? $diff->h : '');
+        $minutes = ($diff->i ? $diff->i : '');
+        $seconds = ($diff->s ? $diff->s : '');
+
+        $inTime = "";
+        
+        $inTime = (!empty($years) ? $years . "a " : '');
+        $inTime .= (!empty($months) ? $months . "m " : '');
+        $inTime .= (!empty($days) ? $days . "d " : '');
+        $inTime .= (!empty($hours) ? $hours . "h " : '');
+        $inTime .= (!empty($minutes) ? $minutes . "m " : '');
+        $inTime .= (!empty($seconds) ? $seconds . "s " : '');
+
+        $output = [];
+        $output['inTime'] = trim($inTime);
+        $output['inSeconds'] = $inSeconds;
+
+        return $output;
+    }
+
+
+
+
+
     /**
      * countWeekendDays - Counts each type of days inside a period of time
      *
@@ -509,7 +576,7 @@ class WorkTime
 
 
     /**
-     * calcWorkTime - Does the math
+     * calcWorkTime / businessHours - Does the math
      *
      * @return void
      */
@@ -670,11 +737,8 @@ class WorkTime
             return;
         }
 
-        // if (count($this->error)) {
-        //     print_r($this->getError());
-        //     return;
-        // }
-        
+        $this->firstDate = $this->olderDate($date, $this->firstDate);
+
         $this->status = "started";
         $this->date1 = $date;
         $this->checkpoints[$date] = $this->status; 
@@ -697,11 +761,6 @@ class WorkTime
             return;
         }
 
-        // if (count($this->error)) {
-        //     print_r($this->getError());
-        //     return;
-        // }
-
         $this->status = "stopped";
         $this->date2 = $date;
         $this->checkpoints[$date] = $this->status;
@@ -716,9 +775,9 @@ class WorkTime
      *
      * @return string
      */
-    public function getTime(): string
+    public function getTime(): ?string
     {
-        return $this->verbose;
+        return $this->verbose ?? null;
     }
 
     /**
@@ -726,9 +785,29 @@ class WorkTime
      *
      * @return string
      */
-    public function getSeconds(): string
+    public function getSeconds(): ?string
     {
-        return $this->seconds;
+        return $this->seconds ?? null;
+    }
+
+    public function getFirstDate(): ?string
+    {
+        return $this->firstDate ?? null;
+    }
+
+    public function getLastDate(): ?string
+    {
+        return $this->date2 ?? null;
+    }
+
+    public function getAbsoluteTime(): ?string
+    {
+        return $this->absoluteTime($this->firstDate, $this->date2)['inTime'] ?? null;
+    }
+
+    public function getAbsoluteSeconds(): ?string
+    {
+        return $this->absoluteTime($this->firstDate, $this->date2)['inSeconds'] ?? null;
     }
 
     /**

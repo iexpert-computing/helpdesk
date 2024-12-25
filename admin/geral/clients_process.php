@@ -45,6 +45,8 @@ $data['field_id'] = "";
 
 $data['client_name'] = (isset($post['client_name']) ? noHtml($post['client_name']) : "");
 $data['nickname'] = (isset($post['nickname']) ? noHtml($post['nickname']) : "");
+$data['base_unit'] = (isset($post['base_unit']) && !empty($post['base_unit']) ? (int)$post['base_unit'] : "");
+$data['domain'] = (isset($post['domain']) ? noHtml($post['domain']) : "");
 $data['doc_type'] = (isset($post['doc_type']) ? noHtml($post['doc_type']) : "");
 $data['document_number'] = (isset($post['document_number']) ? noHtml($post['document_number']) : "");
 $data['contact_name'] = (isset($post['contact_name']) ? noHtml($post['contact_name']) : "");
@@ -103,7 +105,7 @@ if ($data['action'] == "new" || $data['action'] == "edit") {
     }
     
 
-    if (!empty($data['doc_type'])) {
+    if (!empty($data['doc_type']) && !empty($data['document_number'])) {
         if (!preg_match('/' . $maskTypes[$data['doc_type']] . '/i', $data['document_number'])) {
             $data['success'] = false; 
             $data['field_id'] = 'document_number';
@@ -113,11 +115,15 @@ if ($data['action'] == "new" || $data['action'] == "edit") {
         }
     }
 
+    if (!empty($data['domain']) && !isValidDomain($data['domain'])) {
+        $data['success'] = false; 
+        $data['field_id'] = "domain";
+        $data['message'] = message('warning', '', TRANS('WRONG_FORMATTED_URL'), '');
+        echo json_encode($data);
+        return false;
+    }
+
     
-
-
-
-
     if (!filter_var($data['contact_email'], FILTER_VALIDATE_EMAIL)) {
         $data['success'] = false; 
         $data['field_id'] = "contact_email";
@@ -221,6 +227,18 @@ if ($data['action'] == 'new') {
         return false;
     }
 
+    if (!empty($data['domain'])) {
+        $sql = "SELECT id FROM clients WHERE domain = '" . $data['domain'] . "' ";
+        $res = $conn->query($sql);
+        if ($res->rowCount()) {
+            $data['success'] = false; 
+            $data['field_id'] = "domain";
+            $data['message'] = message('warning', '', TRANS('MSG_DOMAIN_CLIENT_EXISTS'), '');
+            echo json_encode($data);
+            return false;
+        }
+    }
+
 
     if (!csrf_verify($post)) {
         $data['success'] = false; 
@@ -236,6 +254,8 @@ if ($data['action'] == 'new') {
                     `type`,
                     fullname, 
                     nickname, 
+                    base_unit,
+                    domain,
                     document_type, 
                     document_value, 
                     contact_name, 
@@ -244,7 +264,6 @@ if ($data['action'] == 'new') {
                     contact_name_2,
                     contact_email_2,
                     contact_phone_2,
-                    `address`,
                     area,
                     `status`,
                     is_active
@@ -254,6 +273,8 @@ if ($data['action'] == 'new') {
                     " . dbField($data['client_type']) . ", 
                     '" . $data['client_name'] . "', 
                     '" . $data['nickname'] . "', 
+                    " . dbField($data['base_unit']) . ", 
+                    " . dbField($data['domain'], 'text') . ", 
                     '" . $data['doc_type'] . "', 
                     '" . $data['document_number'] . "', 
                     '" . $data['contact_name'] . "', 
@@ -262,7 +283,6 @@ if ($data['action'] == 'new') {
                     '" . $data['contact_name_2'] . "', 
                     '" . $data['contact_email_2'] . "', 
                     '" . $data['contact_phone_2'] . "', 
-                    '" . $data['client_address'] . "',
                     null,
                     " . dbField($data['client_status']) . ",
                     '" . $data['client_active'] . "'
@@ -272,6 +292,23 @@ if ($data['action'] == 'new') {
     try {
         $conn->exec($sql);
         $data['cod'] = $conn->lastInsertId();
+
+
+        /* Atualiza o cliente na unidade selecionada */
+        if (!empty($data['base_unit'])) {
+            $sql = "UPDATE 
+                        instituicao 
+                    SET 
+                        inst_client = {$data['cod']} 
+                    WHERE 
+                        inst_cod = {$data['base_unit']} AND
+                        inst_client IS NULL
+                    ";
+            $conn->exec($sql);
+        }
+
+
+
         $data['success'] = true; 
         $data['message'] = TRANS('MSG_SUCCESS_INSERT');
 
@@ -335,6 +372,19 @@ if ($data['action'] == 'new') {
         return false;
     }
 
+    if (!empty($data['domain'])) {
+        $sql = "SELECT id FROM clients WHERE domain = '" . $data['domain'] . "' AND id <> '" . $data['cod'] . "' ";
+        $res = $conn->query($sql);
+        if ($res->rowCount()) {
+            $data['success'] = false; 
+            $data['field_id'] = "domain";
+            $data['message'] = message('warning', '', TRANS('MSG_DOMAIN_CLIENT_EXISTS'), '');
+            echo json_encode($data);
+            return false;
+        }
+    }
+
+
 
     if (!csrf_verify($post)) {
         $data['success'] = false; 
@@ -349,6 +399,8 @@ if ($data['action'] == 'new') {
                 `type` = " . dbField($data['client_type']) . ", 
                 fullname = '" . $data['client_name'] . "', 
                 nickname = '" . $data['nickname'] . "', 
+                base_unit = " . dbField($data['base_unit']) . ",
+                domain = " . dbField($data['domain'], 'text') . ",
                 document_type = '" . $data['doc_type'] . "', 
                 document_value = '" . $data['document_number'] . "', 
                 contact_name = '" . $data['contact_name'] . "', 
@@ -357,7 +409,6 @@ if ($data['action'] == 'new') {
                 contact_name_2 = '" . $data['contact_name_2'] . "', 
                 contact_email_2 = '" . $data['contact_email_2'] . "', 
                 contact_phone_2 = '" . $data['contact_phone_2'] . "', 
-                `address` = '" . $data['client_address'] . "', 
                 `area` = null,
                 `status` = " . dbField($data['client_status']) . ",
                 is_active = '" . $data['client_active'] . "'
@@ -366,6 +417,20 @@ if ($data['action'] == 'new') {
 
     try {
         $conn->exec($sql);
+
+        /* Atualiza o cliente na unidade selecionada */
+        if (!empty($data['base_unit'])) {
+            $sql = "UPDATE 
+                        instituicao 
+                    SET 
+                        inst_client = {$data['cod']} 
+                    WHERE 
+                        inst_cod = {$data['base_unit']} AND
+                        inst_client IS NULL
+                    ";
+            $conn->exec($sql);
+        }
+
         $data['success'] = true; 
         $data['message'] = TRANS('MSG_SUCCESS_EDIT');
 

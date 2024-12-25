@@ -56,6 +56,9 @@ $data['sla'] = (isset($post['sla']) ? noHtml($post['sla']) : "");
 $data['tipo_1'] = (isset($post['tipo_1']) ? noHtml($post['tipo_1']) : "");
 $data['tipo_2'] = (isset($post['tipo_2']) ? noHtml($post['tipo_2']) : "");
 $data['tipo_3'] = (isset($post['tipo_3']) ? noHtml($post['tipo_3']) : "");
+$data['tipo_4'] = (isset($post['tipo_4']) ? noHtml($post['tipo_4']) : "");
+$data['tipo_5'] = (isset($post['tipo_5']) ? noHtml($post['tipo_5']) : "");
+$data['tipo_6'] = (isset($post['tipo_6']) ? noHtml($post['tipo_6']) : "");
 $data['profile_form'] = (isset($post['profile_form']) ? noHtml($post['profile_form']) : "");
 
 
@@ -63,6 +66,8 @@ $data['descricao'] = (isset($post['descricao']) ? $post['descricao'] : "");
 $data['descricao'] = ($data['format_bar'] ? $data['descricao'] : noHtml($data['descricao']));
 
 $data['prob_active'] = (isset($post['prob_active']) ? ($post['prob_active'] == "yes" ? 1 : 0) : 0);
+$data['need_authorization'] = (isset($post['need_authorization']) ? ($post['need_authorization'] == "yes" ? 1 : 0) : 0);
+$data['card_in_costdash'] = (isset($post['card_in_costdash']) ? ($post['card_in_costdash'] == "yes" ? 1 : 0) : 0);
 
 
 /* Validações */
@@ -111,7 +116,18 @@ if ($data['action'] == 'new') {
 
     $sql = "INSERT INTO problemas 
         (
-            problema, prob_area, prob_sla, prob_tipo_1, prob_tipo_2, prob_tipo_3, prob_profile_form, prob_descricao, prob_area_default
+            problema, 
+            prob_area, 
+            prob_sla, 
+            prob_tipo_1, 
+            prob_tipo_2, 
+            prob_tipo_3, 
+            prob_tipo_4, 
+            prob_tipo_5, 
+            prob_tipo_6, 
+            prob_profile_form, prob_descricao, prob_area_default,
+            need_authorization,
+            card_in_costdash
         ) 
         VALUES 
         (
@@ -121,9 +137,14 @@ if ($data['action'] == 'new') {
             " . dbField($data['tipo_1']) . ", 
             " . dbField($data['tipo_2']) . ", 
             " . dbField($data['tipo_3']) . ", 
+            " . dbField($data['tipo_4']) . ", 
+            " . dbField($data['tipo_5']) . ", 
+            " . dbField($data['tipo_6']) . ", 
             " . dbField($data['profile_form']) . ", 
             '" . $data['descricao'] . "', 
-            " . dbField($data['area_default']) . " 
+            " . dbField($data['area_default']) . ", 
+            " . $data['need_authorization'] . ", 
+            " . $data['card_in_costdash'] . " 
         )";
 
     try {
@@ -218,10 +239,15 @@ if ($data['action'] == 'new') {
                 prob_tipo_1 = " . dbField($data['tipo_1']) . ", 
                 prob_tipo_2 = " . dbField($data['tipo_2']) . ", 
                 prob_tipo_3 = " . dbField($data['tipo_3']) . ",  
+                prob_tipo_4 = " . dbField($data['tipo_4']) . ",  
+                prob_tipo_5 = " . dbField($data['tipo_5']) . ",  
+                prob_tipo_6 = " . dbField($data['tipo_6']) . ",  
                 prob_profile_form = " . dbField($data['profile_form']) . ",  
 				prob_descricao = '" . $data['descricao'] . "', 
 				prob_active = '" . $data['prob_active'] . "', 
-				prob_area_default = " . dbField($data['area_default']) . " 
+				prob_area_default = " . dbField($data['area_default']) . ",
+				need_authorization = '" . $data['need_authorization'] . "', 
+				card_in_costdash = '" . $data['card_in_costdash'] . "' 
             WHERE prob_id='" . $data['cod'] . "'";
 
     try {

@@ -53,7 +53,9 @@ $trashAction = ($isAdmin ? $trashAction : '');
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
+
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
     <style>
         .navbar-nav>.nav-link:hover {
             background-color: #3a4d56 !important;
@@ -80,6 +82,12 @@ $trashAction = ($isAdmin ? $trashAction : '');
         .oc-cursor {
             cursor: pointer;
         }
+
+        .load-iframe {
+            border: 3px solid #DDD;
+            padding: 16px;
+            background-color: white;
+        }
     </style>
 
 </head>
@@ -90,9 +98,6 @@ $trashAction = ($isAdmin ? $trashAction : '');
 
     // var_dump($_REQUEST);
 
-    
-
-    
     $query = $QRY["full_detail_ini"];
     $query .= " AND (c.comp_cod = '" . $asset_id . "')";
     
@@ -101,7 +106,7 @@ $trashAction = ($isAdmin ? $trashAction : '');
         $query .= " AND inst.inst_cod IN ({$_SESSION['s_allowed_units']}) ";
     }
     
-    $query .= $QRY["full_detail_fim"];
+    // $query .= $QRY["full_detail_fim"];
 
     $resultado = $conn->query($query);
     $row = $resultado->fetch();
@@ -113,10 +118,21 @@ $trashAction = ($isAdmin ? $trashAction : '');
 
     $asset_tag = $row['etiqueta'];
     $asset_unit = $row['cod_inst'];
-    $client_name = (getUnits($conn, null, $asset_unit)['nickname'] ?? "");
+    // $client_name = (getUnits($conn, null, $asset_unit)['nickname'] ?? "");
+    $client_info = getClientByUnitId($conn, $asset_unit);
+    $client_name = (!empty($client_info) ? $client_info['nickname'] : "");
+    $client_id = (!empty($client_info) ? $client_info['id'] : "");
+
+
+    /* Informações sobre alocação do ativo para algum usuário */
+    $user_name = "";
+    $userInfo = getUserFromAssetId ($conn, $row['comp_cod']);
+    $isAlocated = (!empty($userInfo) ? true : false);
+
+
     $department_info = getDepartments($conn, null, $row['tipo_local']);
     $department_unit = (!empty($department_info['unidade']) ? "&nbsp;(" . $department_info['unidade'] . ")" : "");
-    $inconsistent_department = ($asset_unit != $department_info['loc_unit'] && !empty($department_info['loc_unit']));
+    $inconsistent_department = (!$isAlocated && $asset_unit != $department_info['loc_unit'] && !empty($department_info['loc_unit']));
 
     
     $model_id = $row['modelo_cod'];
@@ -130,7 +146,9 @@ $trashAction = ($isAdmin ? $trashAction : '');
     $specs = getAssetSpecs($conn, $asset_id, null, false);
     $specsDigital = getAssetSpecs($conn, $asset_id, null, true);
 
-    $hasSpecsFields = (count($specs) > 0);
+    // var_dump($specs);
+
+    $hasSpecsFields = (count($specs) || count($specsDigital) ? true : false);
     $hasCustomFields = hasCustomFields($conn, $asset_id, 'assets_x_cfields');
     $parentInfo = getAssetParentId($conn, $asset_id);
     $hasParent = (!empty($parentInfo) ? true : false);
@@ -185,6 +203,9 @@ $trashAction = ($isAdmin ? $trashAction : '');
     $colsDefault = "small text-break border-bottom rounded p-2 bg-white"; /* border-secondary */
     $colContent = $colsDefault . " col-sm-3 col-md-3";
     $colContentLine = $colsDefault . " col-sm-9";
+    
+    $txt_is_product = ($row['is_product'] ? '<span class="badge badge-warning p-2">' . TRANS('ALLOCABLE_RESOURCE') . '</span>' . "&nbsp;&nbsp;" : "");
+    
     ?>
 
     <div class="container">
@@ -197,7 +218,7 @@ $trashAction = ($isAdmin ? $trashAction : '');
     <nav class="navbar navbar-expand-md navbar-light  p-0 rounded" style="background-color: #48606b;">
         <!-- bg-secondary -->
         <!-- style="background-color: #dbdbdb; -->
-        <div class="ml-2 font-weight-bold text-white"><?= $row['instituicao']; ?>:&nbsp;<i class="fas fa-tag"></i>&nbsp;<?= $row['etiqueta']; ?></div> <!-- navbar-brand --> 
+        <div class="ml-2 font-weight-bold text-white"><?= $txt_is_product . $row['instituicao']; ?>:&nbsp;<i class="fas fa-tag"></i>&nbsp;<?= $row['etiqueta']; ?></div> <!-- navbar-brand --> 
         <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#idMenuOcorrencia" aria-controls="idMenuOcorrencia" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -209,24 +230,27 @@ $trashAction = ($isAdmin ? $trashAction : '');
                         ?>
                         <a class="nav-link small text-white" href="../../invmon/geral/asset_edit.php?asset_id=<?= $asset_id ?>"><i class="fas fa-edit"></i><?= TRANS('BT_EDIT'); ?></a>
 
-                        <a class="nav-link small text-white" onclick="getTickets('<?= $asset_unit;?>','<?= $asset_tag;?>')"><i class="fas fa-bars"></i><?= TRANS('TICKETS'); ?></a>
-
-                        <a class="nav-link small text-white" onclick="popup_alerta('../../invmon/geral/equipment_softwares.php?popup=true&asset_tag=<?= $asset_tag;?>&asset_unit=<?= $asset_unit;?>')"><i class="fas fa-photo-video"></i><?= TRANS('MNL_SW'); ?></a>
-
-                        <a class="nav-link small text-white" onclick="popup_alerta('../../invmon/geral/asset_specs_changes.php?asset_id=<?= $asset_id;?>')"><i class="fas fa-exchange-alt"></i><?= TRANS('HARDWARE_CHANGES'); ?></a>
-
-
-                        <a class="nav-link small text-white" onclick="popup_alerta('../../invmon/geral/show_asset_location_history.php?popup=true&asset_id=<?= $asset_id;?>')"><i class="fas fa-door-closed"></i><?= TRANS('DEPARTMENTS'); ?></a>
-
-                        <a class="nav-link small text-white" onclick="popup_alerta('../../invmon/geral/get_equipment_warranty_info.php?popup=true&asset_tag=<?= $asset_tag;?>&asset_unit=<?= $asset_unit;?>')"><i class="fas fa-business-time"></i><?= TRANS('LINK_GUARANT'); ?></a>
-
-                        <a class="nav-link small text-white" onclick="popup_alerta('../../invmon/geral/documents.php?popup=true&model_id=<?= $row['modelo_cod'];?>')"><i class="fas fa-book"></i><?= TRANS('LINK_DOCUMENTS'); ?></a>
-
-                        <a class="nav-link small text-white" href="../../invmon/geral/commitment_document.php?equipment_id=<?= $row['comp_cod'];?>"><i class="fas fa-file-signature"></i><?= TRANS('COMMITMENT_DOCUMENT_ABREV'); ?></a>
-
-                        <a class="nav-link small text-white" href="../../invmon/geral/transit_document.php?equipment_id=<?= $row['comp_cod'];?>"><i class="fas fa-dolly-flatbed"></i><?= TRANS('TRANSIT_DOCUMENT_ABREV'); ?></a>
 
                         <?php
+                            if (!$row['is_product']) {
+                                ?>
+                                    <a class="nav-link small text-white" onclick="getTickets('<?= $asset_unit;?>','<?= $asset_tag;?>')"><i class="fas fa-bars"></i><?= TRANS('TICKETS'); ?></a>
+
+                                    <a class="nav-link small text-white" onclick="popup_alerta('../../invmon/geral/equipment_softwares.php?popup=true&asset_tag=<?= $asset_tag;?>&asset_unit=<?= $asset_unit;?>')"><i class="fas fa-photo-video"></i><?= TRANS('MNL_SW'); ?></a>
+
+                                    <a class="nav-link small text-white" onclick="popup_alerta('../../invmon/geral/asset_specs_changes.php?asset_id=<?= $asset_id;?>')"><i class="fas fa-exchange-alt"></i><?= TRANS('HARDWARE_CHANGES'); ?></a>
+
+
+                                    <a class="nav-link small text-white" onclick="popup_alerta('../../invmon/geral/show_asset_location_history.php?popup=true&asset_id=<?= $asset_id;?>')"><i class="fas fa-door-closed"></i><?= TRANS('DEPARTMENTS'); ?></a>
+
+                                    <a class="nav-link small text-white" onclick="popup_alerta('../../invmon/geral/get_equipment_warranty_info.php?popup=true&asset_tag=<?= $asset_tag;?>&asset_unit=<?= $asset_unit;?>')"><i class="fas fa-business-time"></i><?= TRANS('LINK_GUARANT'); ?></a>
+
+                                    <a class="nav-link small text-white" onclick="popup_alerta('../../invmon/geral/documents.php?popup=true&model_id=<?= $row['modelo_cod'];?>')"><i class="fas fa-book"></i><?= TRANS('LINK_DOCUMENTS'); ?></a>
+
+                                    <a class="nav-link small text-white" onclick="popup_wide('../../invmon/geral/traffic_terms.php?popup=true&asset_id=<?= $row['comp_cod'];?>')"><i class="fas fa-dolly-flatbed"></i><?= TRANS('TRANSIT_DOCUMENT_ABREV'); ?></a>
+                                <?php
+                            }
+                            
                             if ($isAdmin) {
                                 ?>
                                     <a class="nav-link small text-white" href="#"><?= $trashAction; ?></a>
@@ -242,6 +266,12 @@ $trashAction = ($isAdmin ? $trashAction : '');
         </div>
     </nav>
     <!-- FINAL DO MENU DE OPÇÕES-->
+    <?php
+        if ($row['is_product']) {
+            echo "<br />";
+            echo message('info', '', TRANS('HELPER_ALLOCABLE_RESOURCE'), '', '', 1);
+        }
+    ?>
 
 
     <div class="modal" tabindex="-1" style="z-index:9001!important" id="modalEquipment">
@@ -249,7 +279,7 @@ $trashAction = ($isAdmin ? $trashAction : '');
             <div class="modal-content">
                 <!-- <div id="divModalEquipment" class="p-3"></div> -->
                 <div id="divModalEquipment" style="position:relative">
-                    <iframe id="ticketsInfo"  frameborder="0" style="position:absolute;top:0px;width:95%;height:100vh;"></iframe>
+                    <iframe id="ticketsInfo" class="load-iframe"  frameborder="1" style="position:absolute;top:0px;width:100%;height:100vh;"></iframe>
                 </div>
             </div>
             
@@ -264,6 +294,82 @@ $trashAction = ($isAdmin ? $trashAction : '');
     </div>
 
 
+    <?php
+    /* Se o ativo não estiver vinculado a uma unidade que esteja vinculada a um cliente então não é possível
+    vincular a um usuário */
+    if (!empty($client_id)) {
+    ?>
+    <?= csrf_input('csrf_asset_to_user'); ?>
+    <input type="hidden" name="asset_id" id="asset_id" value="<?= $asset_id; ?>">
+    <input type="hidden" name="asset_tag" id="asset_tag" value="<?= $asset_tag; ?>">
+    <div class="modal fade" id="modalChooseUser" data-backdrop="static" data-keyboard="false" tabindex="-1" style="z-index:2001!important" role="dialog" aria-labelledby="myModalChoose" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div id="divResultChooseUser"></div>
+                <div class="modal-header text-center bg-light">
+
+                    <h4 class="modal-title w-100 font-weight-bold text-secondary"><i class="fas fa-link"></i>&nbsp;<?= TRANS('ASSETS_TO_USER_ASSOCIATION'); ?></h4>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            
+                <div class="row mx-2 mt-4">
+
+                    <div class="form-group col-sm-12 col-md-12">
+                        <select class="form-control bs-select" name="user_to_link" id="user_to_link">
+                            <?php
+
+                            $allowOnlyOpsGetAssetsBtwClients = false;
+                            $allowUserGetAssetsBtwClients = false;
+                            $allowUserGetAssetsBtwClients = getConfigValue($conn, 'ALLOW_USER_GET_ASSETS_BTW_CLIENTS') ?? 0;
+
+                            if ($allowUserGetAssetsBtwClients) {
+                                $allowOnlyOpsGetAssetsBtwClients = getConfigValue($conn, 'ALLOW_ONLY_OPS_GET_ASSETS_BTW_CLIENTS') ?? 0;
+                            }
+
+
+                            if ($allowOnlyOpsGetAssetsBtwClients) {
+                                $users_ops = getUsers($conn, null, [1,2], null, null, null, -1, -1);
+                                $users_clients = getUsers($conn, null, [3], null, null, null, -1, $client_id);
+
+                                $users = array_merge($users_ops, $users_clients);
+                            } else if ($allowUserGetAssetsBtwClients) {
+                                $users = getUsers($conn, null, [1,2,3], null, null, null, -1, -1);
+
+                            } else {
+                                $users = getUsers($conn, null, [1,2,3], null, null, null, -1, $client_id);
+                            }
+
+                            foreach ($users as $user) {
+
+                                $subtext = $user['login'];
+                                ?>
+                                <option data-subtext="<?= $subtext; ?>" value="<?= $user['user_id']; ?>"
+                                <?= ($_SESSION['s_uid'] == $user['user_id'] ? " selected" : ""); ?>
+                                ><?= $user['nome']; ?></option>
+                                <?php
+                            }
+                            ?>
+                        </select>
+                        <small class="form-text text-muted"><?= TRANS('HELPER_CHOOSE_USER'); ?></small>
+                    </div>
+
+                    <div class="form-group col-sm-12 col-md-12" id="user_info">
+                        <!-- <div class="row mx-2" id="user_info"></div> -->
+                    </div>
+                </div>
+
+                <div class="modal-footer d-flex justify-content-end bg-light mt-0">
+                    <button class="btn btn-primary nowrap" id="assign" name="assign"><?= TRANS('ALOCATE_TO_USER'); ?></button>
+                    <button id="cancelAssign" class="btn btn-secondary" data-dismiss="modal" aria-label="Close"><?= TRANS('BT_CANCEL'); ?></button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php
+        }
+    ?>
 
     <!-- Modal de exclusão de registro -->
     <div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
@@ -313,8 +419,8 @@ $trashAction = ($isAdmin ? $trashAction : '');
     </div>
 
 
-        <!-- Modal para a desvinculação de ativos filhos -->
-        <div class="modal fade" id="modalUnlinkAsset" tabindex="-1" style="z-index:2001!important" role="dialog" aria-labelledby="myModalUnlinkAsset" aria-hidden="true">
+    <!-- Modal para a desvinculação de ativos filhos -->
+    <div class="modal fade" id="modalUnlinkAsset" tabindex="-1" style="z-index:2001!important" role="dialog" aria-labelledby="myModalUnlinkAsset" aria-hidden="true">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div id="divResultUnlinkAsset"></div>
@@ -348,18 +454,18 @@ $trashAction = ($isAdmin ? $trashAction : '');
                 </div>
                 <div class="row mx-2 mt-5">
                 <label class="col-md-4 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('REMOVE_SPEC_ALSO'); ?>"><?= firstLetterUp(TRANS('REMOVE_SPEC_ALSO')); ?></label>
-					<div class="form-group col-md-8 ">
-						<div class="switch-field">
-							<?php
-							$yesChecked = "";
-							$noChecked = "checked";
-							?>
-							<input type="radio" id="remove_specification" name="remove_specification" value="yes" <?= $yesChecked; ?> />
-							<label for="remove_specification"><?= TRANS('YES'); ?></label>
-							<input type="radio" id="remove_specification_no" name="remove_specification" value="no" <?= $noChecked; ?> />
-							<label for="remove_specification_no"><?= TRANS('NOT'); ?></label>
-						</div>
-					</div>
+                    <div class="form-group col-md-8 ">
+                        <div class="switch-field">
+                            <?php
+                            $yesChecked = "";
+                            $noChecked = "checked";
+                            ?>
+                            <input type="radio" id="remove_specification" name="remove_specification" value="yes" <?= $yesChecked; ?> />
+                            <label for="remove_specification"><?= TRANS('YES'); ?></label>
+                            <input type="radio" id="remove_specification_no" name="remove_specification" value="no" <?= $noChecked; ?> />
+                            <label for="remove_specification_no"><?= TRANS('NOT'); ?></label>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="buttons_unlink" class="modal-footer d-flex justify-content-end bg-light">
@@ -369,6 +475,62 @@ $trashAction = ($isAdmin ? $trashAction : '');
             </div>
         </div>
     </div>
+
+
+    <?php
+        if ($isAlocated) {
+        ?>
+        <!-- Modal para a desvinculação de usuário - caso o ativo esteja alocado -->
+        <div class="modal fade" id="modalUnlinkUser" tabindex="-1" style="z-index:2001!important" role="dialog" aria-labelledby="myModalUnlinkUser" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div id="divResultUnlinkUser"></div>
+                    <div class="modal-header text-center bg-light">
+
+                        <h4 class="modal-title w-100 font-weight-bold text-secondary"><i class="fas fa-unlink"></i>&nbsp;<?= TRANS('UNLINK_USER_FROM_THIS_ASSET'); ?></h4>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    
+                    <div class="row mx-4 mt-0">
+                        <?= message('danger', '', TRANS('HELPER_UNLINK_USER_FROM_THIS_ASSET'), '', '', true); ?>
+                    </div>
+                    <div class="row mx-2 mt-2">
+
+                        <div class="form-group col-md-4 text-right"><?= TRANS('CURRENT_USER'); ?></div>
+                        <div id="info_user_to_unlink" class="form-group col-md-8"></div>
+                        <div class="form-group col-md-4 text-right"><?= TRANS('HELPER_UPDATE_ASSET_DEPARTMENT'); ?></div>
+                        <div class="form-group col-md-8">
+                            <?php
+                                // $departments = getDepartments($conn, null, null, $row['cod_inst']);
+                                $departments = getDepartments($conn, null, null);
+                            ?>
+                            <select class="form-control bs-select" id="asset_new_department" name="asset_new_department">
+                                <?php
+                                    foreach ($departments as $asset_department) {
+                                        ?>
+                                            <option data-subtext="<?= $asset_department['unidade']; ?>" value="<?= $asset_department['loc_id']; ?>"
+                                            <?= ($asset_department['loc_id'] == $row['tipo_local'] ? " selected" : ""); ?>
+                                            ><?= $asset_department['local']; ?></option>
+                                        <?php
+                                    }
+                                ?>
+                            </select>
+                            <small class="form-text text-muted"><?= TRANS('HELPER_UPDATE_ASSET_DEPARTMENT'); ?></small>
+                        </div>
+                    </div>
+                   
+                    <div id="buttons_unlink_user" class="modal-footer d-flex justify-content-end bg-light">
+                        <button id="confirm_unlink_user" class="btn btn-primary"><?= TRANS('BT_OK'); ?></button>
+                        <button id="cancel_unlink_user" class="btn btn-secondary" data-dismiss="modal" aria-label="Close"><?= TRANS('BT_CANCEL'); ?></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php
+        }        
+    ?>
 
 
     <div class="container-fluid bg-light">
@@ -381,8 +543,8 @@ $trashAction = ($isAdmin ? $trashAction : '');
             $_SESSION['flash'] = '';
         }
 
-        echo $inconsistent_alert;
         ?>
+        <div class="mt-4"><?= $inconsistent_alert; ?></div>
 
         <div class="accordion"  id="accordionBasicInfo">
 
@@ -397,9 +559,34 @@ $trashAction = ($isAdmin ? $trashAction : '');
                 
                 <div id="basicInfo" class="collapse show" aria-labelledby="cardBasicInfo" data-parent="#accordionBasicInfo">
                     <div class="card-body">
+                        <?php
+                            if ($isAlocated) {
+                                $userInfos = getUserInfo($conn, $userInfo['user_id']);
+                                $user_name = $userInfos['nome'];
+                                $badge_remove_user_link = '&nbsp;<span class="unlink-user text-danger" data-tag="'.$asset_id.'"  title="'.TRANS('REMOVE_LINK').'"><i class="fas fa-unlink"></i></span>';
+                            } else {
+                                
+                                $badge_remove_user_link = "";
+                                $btDisabled = (empty($client_id) ? " disabled" : "");
+                                $hint = (empty($client_id) ? 'data-toggle="popover" data-placement="top" data-trigger="hover" data-content="'.TRANS("MSG_ASSET_NEED_TO_IN_CLIENT").'"' : "");
+                                
+                                $btAlocateToUser = '<button id="btn_alocate_to_user" ' . $btDisabled . ' class="btn btn-sm btn-primary" ' . $hint . ' ><i class="fas fa-user-plus"></i>&nbsp;'.TRANS('ALOCATE_TO_USER').'</button>';
+                                $user_name = $btAlocateToUser;
+                            }
+                        ?>
+                    
                         <div class="row my-2">
                             <div class="<?= $colLabel; ?>"><?= TRANS('CLIENT'); ?></div>
                             <div class="<?= $colContent; ?>"><?= $client_name; ?></div>
+                            <?php
+                                if (!$row['is_product'] && !$hasParent) {
+                                    ?>
+                                        <div class="<?= $colLabel; ?>"><?= TRANS('ALLOCATED_TO'); ?></div>
+                                        <div class="<?= $colContent; ?>"><?= $user_name . $badge_remove_user_link ?></div>
+                                    <?php
+                                }
+                            ?>
+                            
                         </div>
                         <div class="w-100"></div>
                         <div class="row my-2">
@@ -421,7 +608,7 @@ $trashAction = ($isAdmin ? $trashAction : '');
 
                         <div class="row my-2">
                             <div class="<?= $colLabel; ?>"><?= TRANS('COL_MODEL'); ?></div>
-                            <div class="<?= $colContent; ?>"><?= $row['modelo'] . $subtext ?></div>
+                            <div class="<?= $colContent; ?>"><?= $row['modelo'] ?></div>
                             <div class="<?= $colLabel; ?>"><?= TRANS('SERIAL_NUMBER'); ?></div>
                             <div class="<?= $colContent; ?>"><?= $row['serial']; ?></div>
                         </div>
@@ -433,27 +620,42 @@ $trashAction = ($isAdmin ? $trashAction : '');
                             <div class="<?= $colContent; ?>"><?= $row['situac_nome']; ?></div>
                         </div>
 
+                        <div class="row my-2">
                         <?php
                             if ($row['nome'] != '') {
                                 ?>
-                                    <div class="row my-2">
-                                        <div class="<?= $colLabel; ?>"><?= TRANS('NET_NAME'); ?></div>
-                                        <div class="<?= $colContent; ?>"><?= $row['nome']; ?></div>
-                                    </div>
+                                <div class="<?= $colLabel; ?>"><?= TRANS('NET_NAME'); ?></div>
+                                <div class="<?= $colContent; ?>"><?= $row['nome']; ?></div>
                                 <?php
                             }
+
+                            /* Disponibilidade */
+                            $availability = TRANS('AVAILABILITY_ATTACHED');
+                            $availability = ($row['is_product'] ? TRANS('NOT_APPLICABLE') : $availability);
+                            if (!$hasParent && !$row['is_product']) {
+                                $availabilityArray = getUserFromAssetId($conn, $row['comp_cod']);
+                                $availability = (!empty($availabilityArray) ? TRANS('IN_USE') : TRANS('AVAILABLE'));
+                            }
+                            
+                            ?>
+                            <div class="<?= $colLabel; ?>"><?= TRANS('AVAILABILITY'); ?></div>
+                            <div class="<?= $colContent; ?>"><?= $availability; ?></div>
+
+
+                            <?php
                         
                             if ($hasParent) {
 
                                 $badge_tag = '<span class="badge badge-info p-2 asset-tag" data-tag="'.$parentInfo['asset_id'].'" title="'.TRANS('ASSET_TAG').'">'.$parentInfo['comp_inv'].'</span>&nbsp<span class="unlink-child-tag text-danger" data-tag="'.$asset_id.'" title="'.TRANS('REMOVE_LINK').'"><i class="fas fa-unlink"></i></span>';
                                 ?>
-                                    <div class="row my-2">
+                                    <!-- <div class="row my-2"> -->
                                         <div class="<?= $colLabel; ?>"><?= TRANS('LINKED_TO_PARENT_ASSET'); ?></div>
                                         <div class="<?= $colContent; ?>"><?= $badge_tag; ?></div>
-                                    </div>
+                                    <!-- </div> -->
                                 <?php
                             }
-                        ?>
+                            ?>
+                        </div>
 
                         <div class="row my-2">
                             <div class="<?= $colLabel; ?>"><?= TRANS('ENTRY_TYPE_ADDITIONAL_INFO'); ?></div>
@@ -491,7 +693,6 @@ $trashAction = ($isAdmin ? $trashAction : '');
                                             <?php
                                         }
 
-
                                         /* Exibirá a etiqueta caso o componente seja um ativo cadastrado */
                                         $tagged = ($spec['asset_spec_tagged_id'] ? '&nbsp;<span class="badge badge-info p-2 asset-tag" data-tag="'.$spec['asset_spec_tagged_id'].'" title="'.TRANS('ASSET_TAG').'"><i class="fas fa-tag"></i>&nbsp;'.$spec['comp_inv'].'</span>&nbsp;<span class="unlink-child-tag text-danger" data-tag="'.$spec['asset_spec_tagged_id'].'" title="'.TRANS('REMOVE_LINK').'"><i class="fas fa-unlink"></i></span>' : '');
 
@@ -512,7 +713,7 @@ $trashAction = ($isAdmin ? $trashAction : '');
                                         $subtext = (!empty($subtext) ? '&nbsp;(' . $subtext . ') ' : '');
                                         ?>
                                             <div class="<?= $colLabel; ?>"><?= $spec['tipo_nome'] ?></div>
-                                            <div class="<?= $colContent; ?>"><?= $spec['marc_nome'] . $subtext . $tagged . $spec_options; ?></div>
+                                            <div class="<?= $colContent; ?>"><?= $spec['fab_nome'] . '&nbsp;' . $spec['marc_nome'] . '&nbsp;' . $subtext . $tagged . $spec_options; ?></div>
                                         <?php
                                         if (isPar($i)) {
                                             ?>
@@ -597,7 +798,7 @@ $trashAction = ($isAdmin ? $trashAction : '');
                                         $subtext = (!empty($subtext) ? '&nbsp;(' . $subtext . ') ' : '');
                                         ?>
                                             <div class="<?= $colLabel; ?>"><?= $spec['tipo_nome'] ?></div>
-                                            <div class="<?= $colContent; ?>"><?= $spec['marc_nome'] . $subtext . $tagged . $spec_options; ?></div>
+                                            <div class="<?= $colContent; ?>"><?= $spec['fab_nome'] . '&nbsp;' . $spec['marc_nome'] . $subtext . $tagged . $spec_options; ?></div>
                                         <?php
                                         if (isPar($i)) {
                                             ?>
@@ -1176,6 +1377,7 @@ $trashAction = ($isAdmin ? $trashAction : '');
         <input type="hidden" name="child_type_id" id="child_type_id" value="">
         <input type="hidden" name="child_manufacturer_id" id="child_manufacturer_id" value="">
         <input type="hidden" name="child_id" id="child_id" value="">
+        <input type="hidden" name="user_id" id="user_id" value="">
     </div>
 
 
@@ -1224,6 +1426,40 @@ $trashAction = ($isAdmin ? $trashAction : '');
                 loadInPopup(url, params);
             });
 
+
+            $('#assign').on('click', function() {
+                var loading = $(".loading");
+                $(document).ajaxStart(function() {
+                    loading.show();
+                });
+                $(document).ajaxStop(function() {
+                    loading.hide();
+                });
+                $.ajax({
+                    url: '../../admin/geral/add_user_assets_process.php',
+                    method: 'POST',
+                    data: {
+                        csrf_session_key: $('#csrf_session_key').val(),
+                        csrf: $('#csrf').val(),
+                        asset_id: $('#asset_id').val(),
+                        asset_tag: $('#asset_tag').val(),
+                        user_id: $('#user_to_link').val(),
+                        action: 'assign_from_asset_details',
+                    },
+                    dataType: 'json',
+
+                }).done(function(response) {
+
+                    if (!response.success) {
+                        $('#divResultChooseUser').html(response.message);
+                    } else {
+                        $('#modalChooseUser').modal('hide');
+                        location.reload();
+                    }
+                })
+                return false;
+            });
+
             $('.unlink-child-tag').css('cursor', 'pointer').on('click', function() {
                 let asset_id = $(this).attr('data-tag');
                 /* Primeiro abrir modal de confirmação solicitando o departamento (se for outro) para qual o ativo filho deve ir  */
@@ -1233,7 +1469,19 @@ $trashAction = ($isAdmin ? $trashAction : '');
             $('#confirm_unlink').on('click', function(e) {
                 e.preventDefault();
                 unlink_asset_child();
-            })
+            });
+
+            $('.unlink-user').css('cursor', 'pointer').on('click', function() {
+                let asset_id = $(this).attr('data-tag');
+                /* Primeiro abrir modal de confirmação solicitando o departamento (se for outro)
+                 para qual o ativo deve estar cadastrado  */
+                getLocatorInfo(asset_id);
+            });
+
+            $('#confirm_unlink_user').on('click', function(e) {
+                e.preventDefault();
+                unlink_asset_user();
+            });
 
 
             $('.fill-tag').css('cursor', 'pointer').on('click', function() {
@@ -1248,6 +1496,18 @@ $trashAction = ($isAdmin ? $trashAction : '');
                 })
             }
             
+
+            if ($('#btn_alocate_to_user').length > 0) {
+                $('#btn_alocate_to_user').on('click', function(){
+                    $('#modalChooseUser').modal('show'); 
+                });
+            }
+
+
+            $('#user_to_link').on('change', function() {
+                loadUserInfo ($(this).val());
+            });
+
 
             /* Adicionei o mutation observer em função dos elementos que são adicionados após o carregamento do DOM */
             var afterDom1 = $.initialize("#bt_confirm", function() {
@@ -1488,6 +1748,46 @@ $trashAction = ($isAdmin ? $trashAction : '');
         }
 
 
+        function unlink_asset_user() {
+            
+            var loading = $(".loading");
+            $(document).ajaxStart(function() {
+                loading.show();
+            });
+            $(document).ajaxStop(function() {
+                loading.hide();
+            });
+            $.ajax({
+                url: '../../admin/geral/unlink_asset_user_process.php',
+                method: 'POST',
+                data: {
+                    'asset_id': $('#asset_id').val(),
+                    'asset_new_department': $('#asset_new_department').val(),
+                    'action': 'unlink_user'
+                },
+                dataType: 'json',
+
+            }).done(function(data) {
+
+                if (!data.success) {
+                    $('#divResultUnlinkUser').html(data.message);
+
+                    if (data.field_id != "") {
+                        $('#' + data.field_id).focus().addClass('is-invalid');
+                    }
+                } else {
+
+                    var url = '<?= $_SERVER['PHP_SELF'] ?>?<?= $_SERVER['QUERY_STRING'] ?>';
+                    $(location).prop('href', url);
+                    return false;
+                }
+
+            }).fail(function() {
+                $('#divError').html('<p class="text-danger text-center"><?= TRANS('FETCH_ERROR'); ?></p>');
+            });
+            return false;
+        }
+
 
         /* Chama o modal para informar o novo departamento do ativo filho */
         function define_new_department(assetId) {
@@ -1504,6 +1804,28 @@ $trashAction = ($isAdmin ? $trashAction : '');
                 $('#info_child_to_unlink').html(data.asset_type + '&nbsp;' + data.manufacturer + '&nbsp;' + data.model + '&nbsp;<span class="badge badge-info"><i class="fas fa-tag"></i>' + data.tag + '</span>');
                 $('#child_id').val(assetId);
                 $('#modalUnlinkAsset').modal();
+            }).fail(function() {
+                $('#divError').html('<p class="text-danger text-center"><?= TRANS('FETCH_ERROR'); ?></p>');
+            });
+            return false;
+        }
+
+
+        /* Chama o modal para informar o novo departamento do ativo filho */
+        function getLocatorInfo(assetId) {
+            $.ajax({
+                url: './get_locator_info.php',
+                method: 'POST',
+                data: {
+                    'asset_id': assetId,
+                },
+                dataType: 'json',
+
+            }).done(function(data) {
+
+                $('#info_user_to_unlink').html(data.user_name + '&nbsp;-&nbsp;' + data.user_client + '&nbsp;-&nbsp;' + data.user_department);
+                $('#user_id').val(data.user_id);
+                $('#modalUnlinkUser').modal();
             }).fail(function() {
                 $('#divError').html('<p class="text-danger text-center"><?= TRANS('FETCH_ERROR'); ?></p>');
             });
@@ -1572,6 +1894,7 @@ $trashAction = ($isAdmin ? $trashAction : '');
                         /* Volta para a tela anterior */
                         window.history.back();
                     }
+                    redirect('./assets_tree.php')
 
                     return;
                 }
@@ -1580,6 +1903,36 @@ $trashAction = ($isAdmin ? $trashAction : '');
 			});
 			return false;
 			// $('#deleteModal').modal('hide'); // now close modal
+		}
+
+
+        function loadUserInfo (userId = ''){
+			
+            if (userId == ''){
+                userId = $('#requester').val();
+            }
+            
+            var loading = $(".loading");
+			$(document).ajaxStart(function() {
+				loading.show();
+			});
+			$(document).ajaxStop(function() {
+				loading.hide();
+			});
+
+			$.ajax({
+				url: '../../ocomon/geral/get_userinfo.php',
+				method: 'POST',
+                dataType: 'json',
+				data: {
+					user: userId,
+				},
+			}).done(function(response) {
+
+                let html = response.html;
+				$('#user_info').empty().html(html);
+				return true;
+			});
 		}
 
 
@@ -1600,6 +1953,12 @@ $trashAction = ($isAdmin ? $trashAction : '');
 
         function popup_alerta(pagina) { //Exibe uma janela popUP
             x = window.open(pagina, '_blank', 'dependent=yes,width=700,height=470,scrollbars=yes,statusbar=no,resizable=yes');
+            x.moveTo(window.parent.screenX + 50, window.parent.screenY + 50);
+            return false
+        }
+
+        function popup_wide(pagina) { //Exibe uma janela popUP
+            x = window.open(pagina, '_blank', 'dependent=yes,width=1024,height=768,scrollbars=yes,statusbar=no,resizable=yes');
             x.moveTo(window.parent.screenX + 50, window.parent.screenY + 50);
             return false
         }

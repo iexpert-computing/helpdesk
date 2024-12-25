@@ -68,14 +68,6 @@ if (isAreasIsolated($conn) && $_SESSION['s_nivel'] != 1) {
 }
 
 
-$logo = '../../includes/logos/MAIN_LOGO.png';
-// Read image path, convert to base64 encoding
-$logoType = pathinfo($logo, PATHINFO_EXTENSION);
-$logoData = file_get_contents($logo);
-$imgData = base64_encode($logoData);
-// Format the image SRC:  data:{mime};base64,{data};
-$imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
-
 
 ?>
 <!DOCTYPE html>
@@ -93,8 +85,9 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
     <link rel="stylesheet" type="text/css" href="../../includes/css/switch_radio.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <style>
         .input-group>.input-group-prepend {
@@ -113,11 +106,16 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
             min-width: 60px;
         }
         
+
+        .list-resources {
+            line-height: 1.5em;
+        }
+
         .input-group>.double-append {
             max-width: 55px;
             min-width: 55px;
         }
-
+        
         pre {
             white-space: pre-wrap;
             word-wrap: break-word;
@@ -140,16 +138,18 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
 
     <div class="container-fluid">
 
-        <div class="modal" id="modal" tabindex="-1" style="z-index:9001!important" id="modalSubs">
+        <div class="modal" id="modal" tabindex="-1" style="z-index:9001!important">
             <div class="modal-dialog modal-xl">
                 <div class="modal-content">
-                    <div id="divDetails">
+                    <div id="divDetails" style="position:relative">
+                        <iframe id="iframeTicketInfo"  frameborder="1" style="position:absolute;top:0px;width:100%;height:100vh;"></iframe>
                     </div>
                 </div>
             </div>
         </div>
 
-
+        <input type="hidden" name="report-mainlogo" class="report-mainlogo" id="report-mainlogo"/>
+        <input type="hidden" name="logo-base64" id="logo-base64"/>
 
         <h5 class="my-4"><i class="fas fa-filter text-secondary"></i>&nbsp;<?= TRANS('TTL_SMART_SEARCH_TO_REPORT'); ?></h5>
         <form method="post" action="<?= $_SERVER['PHP_SELF']; ?>" id="form" onSubmit="return false;">
@@ -245,6 +245,12 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                             </div>
                         </div>
                         <input type="text" class="form-control " id="data_fechamento_to" name="data_fechamento_to" placeholder="<?= TRANS('OCO_SEL_ANY'); ?>" autocomplete="off" />
+                        <div class="input-group-append">
+                            <div class="input-group-text" title="<?= TRANS('ONLY_CLOSED_DUE_INACTIVITY'); ?>" data-placeholder="<?= TRANS('ONLY_CLOSED_DUE_INACTIVITY'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+                                <i class="fas fa-hourglass-end"></i>&nbsp;
+                                <input type="checkbox" class="last-check-text-due" name="auto_close_due_inacticity" id="auto_close_due_inacticity" value="1">
+                    </div>
+                </div>
                     </div>
                 </div>
 
@@ -313,7 +319,7 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
 
 
                 <!-- Aberto por -->
-                <label for="aberto_por" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('OPENED_BY'); ?></label>
+                <label for="aberto_por" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('REQUESTER'); ?></label>
 
                 <div class="form-group col-md-4">
                     <div class="input-group">
@@ -421,6 +427,33 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                         </select>
                     </div>
                 </div>
+
+
+            <!-- Área solicitante -->
+            <label for="requester_area" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('REQUESTER_AREA'); ?></label>
+                <div class="form-group col-md-4">
+                    <div class="input-group">
+                        <div class="input-group-prepend">
+                            <div class="input-group-text">
+                                <i class="fas fa-user-friends"></i>&nbsp;
+                                <i class="fas fa-headset"></i>&nbsp;
+                            </div>
+                        </div>
+                        <select class="form-control sel2 " id="requester_area" name="requester_area[]" multiple="multiple">
+                            <?php
+                            
+                            $areas = getAreas($conn, 0, 1, null);
+                            
+                            foreach ($areas as $area) {
+                                ?>
+                                    <option value="<?= $area['sis_id'] ?>"><?= $area['sistema']; ?></option>
+                                <?php
+                            }
+                            ?>
+                        </select>
+                    </div>
+                </div>
+
 
                 <!-- Área de atendimento -->
                 <label for="area" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('RESPONSIBLE_AREA'); ?></label>
@@ -530,8 +563,8 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                         </select>
                         <div class="input-group-append">
                             <div class="input-group-text" title="<?= TRANS('SMART_NOT_CLOSED_RUNNING_STATUS'); ?>" data-placeholder="<?= TRANS('SMART_NOT_CLOSED_RUNNING_STATUS'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
-                                <!-- <i class="fas fa-clock"></i>&nbsp; -->
-                                <i class="fas fa-hourglass-half"></i>&nbsp;
+                                <i class="fas fa-clock"></i>&nbsp;
+                                <!-- <i class="fas fa-hourglass-half"></i>&nbsp; -->
                                 <input type="checkbox" class="last-check" name="no_time_freeze_status" id="no_time_freeze_status" value="1">
                             </div>
                         </div>
@@ -539,8 +572,45 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                 </div>
 
 
-                <!-- Avaliação de chamados -->
-                <!-- Área de atendimento -->
+
+                <!-- Status de autorização -->
+                <?php
+                    $authorizationTypes = [
+                        1 => TRANS('STATUS_WAITING_AUTHORIZATION'),
+                        2 => TRANS('STATUS_AUTHORIZED'),
+                        3 => TRANS('STATUS_REFUSED')
+                    ];
+                ?>
+                <label for="authorization_status" class="col-md-2 col-form-label col-form-label-sm text-md-right text-nowrap"><?= TRANS('AUTHORIZATION_STATUS'); ?></label>
+                <div class="form-group col-md-4">
+                    <div class="input-group">
+                        <div class="input-group-prepend">
+                            <div class="input-group-text" title="<?= TRANS('SMART_NOT_EMPTY'); ?>" data-placeholder="<?= TRANS('SMART_NOT_EMPTY'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+                                <i class="fas fa-user-check"></i>&nbsp;
+                                <input type="checkbox" name="no_empty_authorization_status" id="no_empty_authorization_status" class="first-check" value="1">
+                            </div>
+                        </div>
+                        <select class="form-control sel2 " id="authorization_status" name="authorization_status[]" multiple="multiple">
+                            <?php
+                            foreach ($authorizationTypes as $key => $value) {
+                                ?>
+                                <option value="<?= $key; ?>"><?= $value; ?></option>
+                                <?php
+                            }
+                            ?>
+                        </select>
+
+                        <div class="input-group-append">
+                            <div class="input-group-text" title="<?= TRANS('SMART_EMPTY'); ?>" data-placeholder="<?= TRANS('SMART_EMPTY'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+                                <i class="fas fa-times"></i>&nbsp;
+                                <input type="checkbox" name="no_authorization_status" id="no_authorization_status" class="last-check" value="1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- Avaliação de atendimento -->
                 <label for="rate" class="col-sm-2 col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('SERVICE_RATE'); ?></label>
                 <div class="form-group col-md-4">
                     <div class="input-group">
@@ -569,7 +639,28 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                     </div>
                 </div>
 
+                <!-- Rejeição -->
+                <label for="rejection" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('TICKET_REJECTION'); ?></label>
+                <div class="form-group col-md-4">
+                    <div class="input-group">
+                        <div class="input-group-prepend">
+                            <div class="input-group-text" title="<?= TRANS('NEVER_REJECTED'); ?>" data-placeholder="<?= TRANS('NEVER_REJECTED'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+                                <i class="fas fa-user-check"></i>&nbsp;
+                                <input type="checkbox" class="first-check-text" name="never_rejected" id="never_rejected" value="1">
+                            </div>
+                        </div>
+                        <input type="text" class="form-control " id="rejection" name="rejection" placeholder="<?= TRANS('OCO_SEL_ANY'); ?>" autocomplete="off" readonly />
+                        <div class="input-group-append">
+                            <div class="input-group-text" title="<?= TRANS('HAS_BEEN_REJECTED'); ?>" data-placeholder="<?= TRANS('HAS_BEEN_REJECTED'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+                                <i class="fas fa-user-times"></i>&nbsp;
+                                <input type="checkbox" class="last-check-text" name="has_been_rejected" id="has_been_rejected" value="1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
+
+                <!-- Com chamados relacionados - subchamados ou chamado pai -->
                 <label for="relacionados" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('TICKETS_REFERENCED'); ?></label>
                 <div class="form-group col-md-4">
                     <div class="input-group">
@@ -593,21 +684,31 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
 
 
 
-                  <!-- Rejeição -->
-                  <label for="rejection" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('TICKET_REJECTION'); ?></label>
+                <!-- Recursos alocados -->
+                <label for="resources" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('ALLOCABLE_RESOURCES'); ?></label>
                 <div class="form-group col-md-4">
                     <div class="input-group">
                         <div class="input-group-prepend">
-                            <div class="input-group-text" title="<?= TRANS('NEVER_REJECTED'); ?>" data-placeholder="<?= TRANS('NEVER_REJECTED'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
-                                <i class="fas fa-user-check"></i>&nbsp;
-                                <input type="checkbox" class="first-check-text" name="never_rejected" id="never_rejected" value="1">
+                            <div class="input-group-text" title="<?= TRANS('SMART_NOT_EMPTY'); ?>" data-placeholder="<?= TRANS('SMART_NOT_EMPTY'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+                                <i class="fas fa-plus-square"></i>&nbsp;
+                                <input type="checkbox" class="first-check" name="no_empty_resources" id="no_empty_resources" value="1">
                             </div>
                         </div>
-                        <input type="text" class="form-control " id="rejection" name="rejection" placeholder="<?= TRANS('OCO_SEL_ANY'); ?>" autocomplete="off" readonly />
+                        <select class="form-control  sel2" id="resources" name="resources[]" multiple="multiple">
+                            <?php
+                            $resources = getAssetsModels($conn, null, null, null, 1, ['t.tipo_nome']);
+                            foreach ($resources as $resource) {
+                                $fullType = $resource['tipo'] . ' - ' . $resource['fabricante'] . ' - ' . $resource['modelo'];
+                                ?>
+                                <option data-subtext="<?= $resource['cat_name']; ?>" data-model="<?= $resource['codigo']; ?>" value="<?= $resource['codigo']; ?>"><?= $fullType; ?></option>
+                                <?php
+                            }
+                            ?>
+                        </select>
                         <div class="input-group-append">
-                            <div class="input-group-text" title="<?= TRANS('HAS_BEEN_REJECTED'); ?>" data-placeholder="<?= TRANS('HAS_BEEN_REJECTED'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
-                                <i class="fas fa-user-times"></i>&nbsp;
-                                <input type="checkbox" class="last-check-text" name="has_been_rejected" id="has_been_rejected" value="1">
+                            <div class="input-group-text" title="<?= TRANS('SMART_EMPTY'); ?>" data-placeholder="<?= TRANS('SMART_EMPTY'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+                                <i class="fas fa-times"></i>&nbsp;
+                                <input type="checkbox" class="last-check" name="no_resources" id="no_resources" value="1">
                             </div>
                         </div>
                     </div>
@@ -822,7 +923,7 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
     <script src="../../includes/components/jquery/jquery.js"></script>
     <script src="../../includes/components/jquery/jquery.initialize.min.js"></script>
 
-    <script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables.js"></script>
+    <script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables.min.js"></script>
     <script src="../../includes/components/jquery/datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
     <script src="../../includes/components/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../../includes/components/bootstrap-select/dist/js/bootstrap-select.min.js"></script>
@@ -873,6 +974,11 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
             $('.popover-dismiss').popover({
                 trigger: 'focus'
             });
+
+            $('#modal').on('hidden.bs.modal', function(){
+                $("#iframeTicketInfo").attr('src','');
+            });
+
 
             /* Idioma global para os calendários */
             $.datetimepicker.setLocale('pt-BR');
@@ -1302,6 +1408,8 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                     loading.hide();
                 });
 
+                setLogoSrc();
+
                 $.ajax({
                     url: 'get_full_tickets_table.php',
                     method: 'POST',
@@ -1398,6 +1506,16 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                 
                 
                 var criterios = $('#divCriterios').text();
+
+                function setTitles() {
+                    var buttons = $( 'a.buttons-columnVisibility' );
+
+                    buttons.each(function( index ) {
+                        // console.log( index + ": " + $( this ).text() );
+                        var tooltip =  $( this ).text() ;
+                        $( this ).attr( 'title', tooltip );
+                    });
+                }
 
                 var table = $('#table_tickets_queue').DataTable({
 
@@ -1515,42 +1633,13 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                                 doc.defaultStyle.fontSize = 8;
                                 doc.styles.tableHeader.fontSize = 9;
 
-                                /* O trecho abaixo insere uma primeira coluna com o número da linha */
-                                // doc.content[doc.content.length - 1].table.headerRows = 2;
-                                // doc.content[doc.content.length - 1].table.body[0].splice(0, 0, {
-                                //     text: "SNo.",
-                                //     style: "tableHeader"
-                                // });
-                                // var iPlus;
-                                // for (var i = 0; i < rcout; i++) {
-                                //     iPlus = (i + 1);
-                                //     var obj = doc.content[doc.content.length - 1].table.body[i + 1];
-                                //     doc.content[doc.content.length - 1].table.body[(i + 1)][0] = {
-                                //         text: obj[0].text,
-                                //         style: [obj[0].style],
-                                //         bold: true
-                                //     };
-                                //     doc.content[doc.content.length - 1].table.body[(i + 1)][3] = {
-                                //         text: obj[3].text,
-                                //         style: [obj[3].style],
-                                //         alignment: 'center',
-                                //         bold: obj[3].text > 60 ? true : false,
-                                //         fillColor: obj[3].text > 60 ? 'red' : null
-                                //     };
-
-                                //     doc.content[doc.content.length - 1].table.body[iPlus].splice(0, 0, {
-                                //         text: iPlus,
-                                //         style: obj[0].style
-                                //     });
-                                // }
-                                /* Final do trecho de inserção da coluna com o número da linha */
-
                                 doc['header'] = (function(page, pages) {
                                     return {
                                         columns: [
                                             {
                                                 margin: [20, 10, 0, 0],
-                                                image: '<?= $imgSrc; ?>'
+                                                image: getLogoSrc(),
+                                                width: getLogoWidth()
                                             } ,
                                             {
                                                 table: {
@@ -1662,9 +1751,13 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                 table.buttons().container()
                     .appendTo($('.display-buttons:eq(0)', table.table().container()));
 
-                /* $('.double-scroll').doubleScroll({
-                    resetOnWindowResize: true
-                }) */
+
+
+                table.on( 'buttons-action', function ( e, buttonApi, dataTable, node, config ) {
+                    setTitles();
+                    // console.log( 'Button '+buttonApi.text()+' was activated' );
+                });
+                
 
             }, {
                 target: document.getElementById('divResult')
@@ -1878,11 +1971,50 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
 
         function openTicketInfo(ticket) {
 
-            let location = 'ticket_show.php?numero=' + ticket;
-            // $("#divDetails").load(location);
-            // $('#modal').modal();
-            popup_alerta_wide(location);
+            // let location = 'ticket_show.php?numero=' + ticket;
+            // popup_alerta_wide(location);
 
+            $("#iframeTicketInfo").attr('src','');
+
+            let location = './ticket_show.php?numero=' + ticket;
+            $("#iframeTicketInfo").attr('src',location);
+            $('#modal').modal();
+
+        }
+
+        function getLogoSrc() {
+            return $('#logo-base64').val() ?? '';
+        }
+
+        function setLogoSrc() {
+
+            let logoName = $('#report-mainlogo').css('background-image');
+
+            if (logoName == 'none') {
+                return;
+            }
+            logoName = logoName.replace(/.*\s?url\([\'\"]?/, '').replace(/[\'\"]?\).*/, '')
+            logoName = logoName.split('/').pop();
+
+            $.ajax({
+                url: './get_reports_logo.php',
+                method: 'POST',
+                data: {
+                    'logo_name': logoName
+                },
+                dataType: 'json',
+            }).done(function(data) {
+
+                if (!data.success) {
+                    return;
+                }
+                $('#logo-base64').val(data.logo);
+            });
+        }
+
+        function getLogoWidth() {
+            let logoWidth = $('#report-mainlogo').width() ?? 150;
+            return logoWidth;
         }
     </script>
 </body>

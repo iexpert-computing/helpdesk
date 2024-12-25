@@ -1,3 +1,13 @@
+
+@import url(../../../../includes/css/ocomon_colors.css);
+
+/* :root {
+  --ocomon-1: #1A2F43;
+  --ocomon-2: #33526F;
+  --ocomon-1: #D17000;
+  --ocomon-4: #628C97;
+  --ocomon-5: #D7E1DC;
+} */
 .default-theme .sidebar-wrapper {
   background-color: #1d1d1d; }
   .default-theme .sidebar-wrapper .sidebar-item {
@@ -529,35 +539,81 @@
 
 
   .ocomon-theme .sidebar-wrapper {
-    background-color: #3a4d56; } /* FUNDO PRINCIPAL DA SIDEBAR */
-    .ocomon-theme .sidebar-wrapper .sidebar-item {
-      border-top: 1px solid #6c757d; } 
-      .ocomon-theme .sidebar-wrapper .sidebar-item:first-child {
-        border-top: none; }
-    .ocomon-theme .sidebar-wrapper a:not(.dropdown-item),
-    .ocomon-theme .sidebar-wrapper .sidebar-header,
-    .ocomon-theme .sidebar-wrapper .sidebar-search input,
-    .ocomon-theme .sidebar-wrapper .sidebar-search i {
-      color: white; }
-    .ocomon-theme .sidebar-wrapper a:not(.dropdown-item):hover,
-    .ocomon-theme .sidebar-wrapper .sidebar-menu li.active > a {
-      color: #7FDBFF; } /* HOVER DOS TEXTOS DOS MENUS */ /* #7FDBFF; */
-    .ocomon-theme .sidebar-wrapper .sidebar-search input.search-menu,
-    .ocomon-theme .sidebar-wrapper .sidebar-search .input-group-text {
-      /* background-color: #6c757d; */ /* FUNDO DO SUBMENU DA SIDEBAR */
-      background-color: #48606b; /* FUNDO DO SUBMENU DA SIDEBAR */
-      border: none;
-      -webkit-box-shadow: none;
-      box-shadow: none;
-      margin-left: 1px; }
-    .ocomon-theme .sidebar-wrapper .sidebar-menu a:hover i,
-    .ocomon-theme .sidebar-wrapper .sidebar-menu a:hover:before,
-    .ocomon-theme .sidebar-wrapper .sidebar-menu li.active a i {
-      color: #7FDBFF; } /* HOVER DOS BOTÕES DO MENU */
-    .ocomon-theme .sidebar-wrapper .sidebar-menu ul li a i {
-      background-color: #48606b; } /* FUNDO DOS BOTÕES DA SIDEBAR */
-    .ocomon-theme .sidebar-wrapper .sidebar-menu .sidebar-dropdown div {
-      background-color: #48606b; } /* FUNDO DO SUBMENU (ABERTO) DA SIDEBAR */
+    background-color: #3a4d56; 
+  } /* Sobrescrito em `includes/css/estilos_custom.css` - Fundo principal da sidebar */
+  .ocomon-theme .sidebar-wrapper .sidebar-item {
+    border-top: 1px solid #6c757d; 
+  } 
+  .ocomon-theme .sidebar-wrapper .sidebar-item:first-child {
+      border-top: none; 
+  }
+  .ocomon-theme .sidebar-wrapper a:not(.dropdown-item),
+  .ocomon-theme .sidebar-wrapper .sidebar-header,
+  .ocomon-theme .sidebar-wrapper .sidebar-search input,
+  .ocomon-theme .sidebar-wrapper .sidebar-search i {
+    color: white; 
+  }
+  .ocomon-theme .sidebar-wrapper a:not(.dropdown-item):hover,
+  .ocomon-theme .sidebar-wrapper .sidebar-menu li.active > a {
+    color: var(--ocomon-3-lighter); 
+  } /* Hover dos textos dos menus */
+  .ocomon-theme .sidebar-wrapper .sidebar-search input.search-menu,
+  .ocomon-theme .sidebar-wrapper .sidebar-search .input-group-text {
+    background-color: #48606b; /* Sobrescrito em `includes/css/estilos_custom.css` - Fundo do submenu */
+    border: none;
+    -webkit-box-shadow: none;
+    box-shadow: none;
+    margin-left: 1px; 
+  }
+  .ocomon-theme .sidebar-wrapper .sidebar-menu a:hover i /* hover dos menus "botões" */{
+    color: var(--ocomon-5-lightest);
+    /* background-color: var(--ocomon-3-dark); */
+    border: 1px solid var(--ocomon-5-lightest);
+  }
+  .ocomon-theme .sidebar-wrapper .sidebar-menu a:hover:before{
+    color: unset;
+  }
+  .ocomon-theme .sidebar-wrapper .sidebar-menu li.active a i {
+    /* background-color: var(--ocomon-3);  */
+    color: var(--ocomon-5-lightest); 
+    border: 1px solid var(--ocomon-5-lightest);
+  } /* Hover dos botões de submenus abertos */
+
+  .ocomon-theme .sidebar-wrapper .sidebar-menu li.folder-item-active a i {
+    background-color: var(--ocomon-3-dark); 
+    color: var(--ocomon-5-lightest); 
+    /* border: 1px solid var(--ocomon-5-lightest); */
+  } /* Pasta aberta em com algum item selecionado */
+
+  .ocomon-theme .sidebar-wrapper .sidebar-menu ul li a i {
+    background-color: var(--ocomon-1); 
+    border: 1px solid var(--ocomon-5-lightest);
+  } /* FUNDO E BORDA DOS BOTÕES DA SIDEBAR */
+  
+  .ocomon-theme .sidebar-wrapper .sidebar-menu .sidebar-dropdown div {
+    background-color: var(--ocomon-1); 
+  } /* FUNDO DO SUBMENU (ABERTO) DA SIDEBAR */
+  
+  .ocomon-theme .sidebar-wrapper .sidebar-menu .sidebar-dropdown div a:hover {
+    color: var(--ocomon-3-lighter); 
+  } /* Hover no texto do submenu aberto */    
+
+  .ocomon-theme .sidebar-wrapper .sidebar-menu ul li a.active-link i {
+    background-color: var(--ocomon-3-dark); 
+    border: 1px solid var(--ocomon-5-lightest);
+  }      
+  
+  a.active-link > span.menu-text, a.active-link {
+    color: var(--ocomon-5-lightest);
+  } /* Texto selecionado mas sem submenus */
+  .ocomon-theme .sidebar-wrapper .sidebar-menu .sidebar-dropdown div a.active-link {
+    background-color: var(--ocomon-3-dark); 
+    color: var(--ocomon-5-lightest); 
+  } /* Texto selecionado no submenu */ 
+
+
+
+    
     .ocomon-theme .sidebar-wrapper .sidebar-menu .header-menu span {
       color: white; }
     .ocomon-theme .sidebar-wrapper .sidebar-footer {

@@ -52,6 +52,10 @@ $data['categoria'] = (isset($post['categoria']) ? noHtml($post['categoria']) : "
 $data['painel'] = (isset($post['painel']) ? noHtml($post['painel']) : "");
 
 
+$data['bgcolor'] = (isset($post['bgcolor']) && !empty($post['bgcolor']) ? noHtml($post['bgcolor']) : "#FFFFFF");
+$data['textcolor'] = (isset($post['textcolor']) && !empty($post['textcolor']) ? noHtml($post['textcolor']) : "#212529");
+
+
 $data['time_freeze'] = (isset($post['time_freeze']) ? ($post['time_freeze'] == "yes" ? 1 : 0) : 0);
 $data['time_freeze'] = ($data['painel'] == '3' || $data['cod'] == '4' ? 1 : $data['time_freeze']);
 
@@ -121,7 +125,9 @@ if ($data['action'] == 'new') {
                     stat_cat, 
                     stat_painel, 
                     stat_time_freeze, 
-                    stat_ignored
+                    stat_ignored,
+                    bgcolor,
+                    textcolor
                 ) 
                 VALUES 
                 (
@@ -129,7 +135,9 @@ if ($data['action'] == 'new') {
                     '" . $data['categoria'] . "', 
                     '" . $data['painel'] . "', 
                     '" . $data['time_freeze'] . "', 
-                    '" . $data['ignored'] . "'
+                    '" . $data['ignored'] . "',
+                    '{$data['bgcolor']}',
+                    '{$data['textcolor']}'
                 )";
     try {
         $conn->exec($sql);
@@ -184,7 +192,9 @@ if ($data['action'] == 'new') {
     $sql = "UPDATE status SET 
                 status = '" . $data['status'] . "', 
                 {$terms}
-                stat_time_freeze = " . $data['time_freeze'] . " 
+                stat_time_freeze = " . $data['time_freeze'] . " ,
+                bgcolor = '{$data['bgcolor']}',
+                textcolor = '{$data['textcolor']}'
                 
             WHERE stat_id = '" . $data['cod'] . "'";
 

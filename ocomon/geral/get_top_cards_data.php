@@ -83,15 +83,15 @@ if (!empty($dataPosted['area'])) {
 
 $aliasAreasFilter = ($dataPosted['requester_areas'] ? "ua.AREA" : "o.sistema");
 
-
+$uareas = $_SESSION['s_uareas'] . ",-1";
 if (empty($filtered_areas)) {
     if ($isAdmin) {
         $qry_filter_areas = "";
     } else {
-        $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$_SESSION['s_uareas']}) OR " . $aliasAreasFilter . " = '-1')";
+        $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$uareas}))";
     }
 } else {
-    $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$filtered_areas}))";
+    $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$filtered_areas})";
 }
 
 
@@ -120,11 +120,14 @@ $totalEmAberto = 0;
 
 /* Total de chamados em aberto no sistema */
 $sqlTotalEmAberto = "SELECT count(*) AS total FROM 
-                        ocorrencias o, status, usuarios ua 
+                        ocorrencias o, `status`, usuarios ua 
                     WHERE 
-                        status.stat_ignored <> 1 AND 
-                        status.stat_painel not in (3) AND o.status = status.stat_id AND 
-                        o.oco_scheduled = 0 AND o.aberto_por = ua.user_id 
+                        -- status.stat_ignored <> 1 AND 
+                        -- status.stat_painel not in (3) AND
+                        status.not_done = 1 AND 
+                        o.status = status.stat_id AND 
+                        o.oco_scheduled = 0 AND
+                        o.aberto_por = ua.user_id 
                         {$qry_filter_clients}
                         {$qry_filter_areas} ";
 
@@ -151,7 +154,7 @@ $sqlOpenToday = "SELECT count(*) AS total FROM
                     o.status = s.stat_id AND 
                     s.stat_ignored <> 1 AND   
                     o.oco_real_open_date >= '". $hoje ."' 
-                     {$qry_filter_clients}
+                    {$qry_filter_clients}
                     {$qry_filter_areas} ";
 try {
     $resultOpenToday = $conn->query($sqlOpenToday);
@@ -169,7 +172,7 @@ $sqlOpenMonth = "SELECT count(*) AS total FROM
                     o.status = s.stat_id AND 
                     s.stat_ignored <> 1 AND 
                     o.oco_real_open_date >= '". $mes ."' 
-                     {$qry_filter_clients}
+                    {$qry_filter_clients}
                     {$qry_filter_areas}";
 try {
     $resultOpenMonth = $conn->query($sqlOpenMonth);
@@ -222,10 +225,13 @@ $sqlEmProgresso = "SELECT count(*) AS total
                     FROM 
                         ocorrencias o, status s, usuarios ua 
                     WHERE 
-                        o.status NOT IN (1, 4, 12) AND s.stat_painel in (1) AND 
-                        s.stat_ignored <> 1 AND 
-                        o.status = s.stat_id AND o.oco_scheduled = 0 
-                        AND o.aberto_por = ua.user_id 
+                        -- o.status NOT IN (1, 4, 12) AND
+                        -- s.stat_painel in (1) AND 
+                        -- s.stat_ignored <> 1 AND 
+                        s.in_progress = 1 AND
+                        o.status = s.stat_id AND
+                        o.oco_scheduled = 0 AND
+                        o.aberto_por = ua.user_id 
                         {$qry_filter_clients}
                         {$qry_filter_areas}";
 try {
@@ -248,7 +254,9 @@ $sqlSemResposta = "SELECT count(*) AS total
                     WHERE 
                         o.aberto_por = ua.user_id AND 
                         o.status = s.stat_id AND
-                        s.stat_ignored <> 1 AND
+                        -- s.stat_ignored <> 1 AND
+                        -- s.stat_painel <> 3 AND
+                        s.not_done = 1 AND
                         o.data_atendimento IS NULL 
                         {$qry_filter_clients}
                         {$qry_filter_areas}";

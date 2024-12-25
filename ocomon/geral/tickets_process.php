@@ -83,7 +83,7 @@ $qry_profile_screen = $QRY["useropencall_custom"];
 $qry_profile_screen .= " AND  c.conf_cod = '" . $data['profile_id'] . "'";
 $res_screen = $conn->query($qry_profile_screen);
 $screen = $res_screen->fetch(PDO::FETCH_ASSOC);
-
+// $screen = (empty($screen) && !is_array($screen) ? [] : $screen);
 
 $sqlProfileScreenGlobal = $QRY["useropencall"];
 $resScreenGlobal = $conn->query($sqlProfileScreenGlobal);
@@ -100,8 +100,37 @@ $data['success'] = true;
 $data['message'] = "";
 $data['cod'] = (isset($post['cod']) ? intval($post['cod']) : "");
 $data['numero'] = (isset($post['numero']) ? intval($post['numero']) : "");
-$data['action'] = $post['action'];
+$data['action'] = (isset($post['action']) ? noHtml($post['action']) : "");
+
+if (empty($data['action'])) {
+    /* Pode ser problema no arquivo de configuração do php, quanto ao post_max_size */
+    // var_dump($post);
+    // var_dump($_FILES);
+
+    $data['success'] = false;
+    $data['message'] = message('warning', '', TRANS('MSG_SOMETHING_GOT_WRONG'), '');
+    echo json_encode($data);
+    return false;
+    
+}
+
+// if ($data['action'] == "close") {
+//     var_dump($post); exit;
+// }
+
+
 $data['field_id'] = "";
+
+
+$status_cost_updated = $config['status_cost_updated'] ?? 1;
+$ticket_cost_before_action = 0;
+$ticket_cost_after_action = 0;
+$tickets_cost_field = (!empty($config['tickets_cost_field']) ? $config['tickets_cost_field'] : "");
+
+if ($data['numero'] && !empty($tickets_cost_field)) {
+    $cost_field_info = getTicketCustomFields($conn, $data['numero'], $tickets_cost_field);
+    $ticket_cost_before_action = priceDB($cost_field_info['field_value']);
+}
 
 
 $doneStatus = 4;
@@ -130,7 +159,7 @@ if ($_SESSION['s_nivel'] == 3) {
 
 
 $data['sistema'] = (isset($post['sistema']) && !empty($post['sistema']) ? noHtml($post['sistema']) : "-1");
-$data['area_destino'] = $screen['conf_opentoarea'];
+$data['area_destino'] = (isset($screen) && (is_array($screen)) && !empty($screen['conf_opentoarea']) ? $screen['conf_opentoarea'] : "-1");
 $data['problema'] = (isset($post['problema']) && !empty($post['problema']) ? noHtml($post['problema']) : "-1");
 $data['radio_prob'] = (isset($post['radio_prob']) ? noHtml($post['radio_prob']) : $data['problema']);
 
@@ -141,7 +170,36 @@ $data['unidade'] = (isset($post['instituicao']) && !empty($post['instituicao']) 
 $data['etiqueta'] = (isset($post['equipamento']) ? noHtml($post['equipamento']) : "");
 $data['department'] = (isset($post['local']) && !empty($post['local']) ? noHtml($post['local']) : "-1");
 
-$data['aberto_por'] = (isset($_SESSION['s_uid']) ? intval($_SESSION['s_uid']) : "");
+
+// $data['aberto_por'] = (isset($_SESSION['s_uid']) ? intval($_SESSION['s_uid']) : "");
+$data['aberto_por'] = (isset($post['requester']) && !empty($post['requester']) ? (int)$post['requester'] : (int)$_SESSION['s_uid']);
+// $data['aberto_por'] = (!empty($data['aberto_por']) ? $data['aberto_por'] : (int)$_SESSION['s_uid']);
+
+$data['registration_operator'] = (isset($_SESSION['s_uid']) ? (int)$_SESSION['s_uid'] : "");
+
+
+
+if ($_SESSION['s_nivel'] == 3 && $data['aberto_por'] != $_SESSION['s_uid']) {
+
+	$author_department = getUserDepartment($conn, $_SESSION['s_uid']);
+	$requester_department = getUserDepartment($conn, $data['aberto_por']);
+	
+	if (empty($author_department) || $author_department != $requester_department) {
+		$data['success'] = false; 
+        $data['field_id'] = "requester";
+        $data['message'] = message('warning', '', TRANS('MSG_INVALID_REQUESTER'), '');
+        echo json_encode($data);
+        return false;
+	}
+}
+
+
+
+
+
+
+
+
 
 $data['logado'] = (isset($_SESSION['s_uid']) ? intval($_SESSION['s_uid']) : "");
 
@@ -209,7 +267,9 @@ if (empty($data['channel'])) {
 
 
 /* Informações sobre a área destino */
-$rowAreaTo = ($data['sistema'] != '-1' ? getAreaInfo($conn, $data['sistema']) : getAreaInfo($conn, $screen['conf_opentoarea']));
+$areaToInfo = (isset($screen) && (is_array($screen)) && isset($screen['conf_opentoarea']) ? getAreaInfo($conn, $screen['conf_opentoarea']) : []);
+
+$rowAreaTo = ($data['sistema'] != '-1' ? getAreaInfo($conn, $data['sistema']) : $areaToInfo);
 
 
 
@@ -233,7 +293,7 @@ if ($data['action'] == "open") {
         $data['status'] =  $config['conf_schedule_status'];
     }
 
-    $data['aberto_por'] = (isset($_SESSION['s_uid']) ? intval($_SESSION['s_uid']) : "");
+    // $data['aberto_por'] = (isset($_SESSION['s_uid']) ? intval($_SESSION['s_uid']) : "");
 
 } elseif ($data['action'] == "edit") {
     
@@ -264,11 +324,25 @@ if ($data['action'] == "open") {
     $resGlobalUri = $conn->query($qryGlobalUri);
     $rowGlobalUri = $resGlobalUri->fetch();
     $data['global_uri'] = (!empty($rowGlobalUri['gt_id']) ? $rowGlobalUri['gt_id'] : "");
+
+
+    /* Dados de operadores extras e períodos de atendimento */
+    $data['treater_extra'] = (isset($post['treater_extra']) ? $post['treater_extra'] : []);
+    $data['treating_start_date'] = (isset($post['treating_start_date']) ? $post['treating_start_date'] : []);
+    $data['treating_stop_date'] = (isset($post['treating_stop_date']) ? $post['treating_stop_date'] : []);
+
+    /* remover elementos vazios dos arrays */
+    $data['treater_extra'] = array_filter($data['treater_extra']);
+    $data['treating_start_date'] = array_filter($data['treating_start_date']);
+    $data['treating_stop_date'] = array_filter($data['treating_stop_date']);
+
+
+
 }
 
 $tooShortTag = false;
 if (!empty($data['input_tags'])) {
-    $arrayTags = explode(',', $data['input_tags']);
+    $arrayTags = explode(',', (string)$data['input_tags']);
     
     foreach ($arrayTags as $tag) {
         if (strlen((string)$tag) < 4)
@@ -293,47 +367,47 @@ if ($data['action'] == "open") {
     /* Recebe os valores de obrigatorieda para cada campo onde se aplica */
 	$required_fields = getFormRequiredInfo($conn, $data['profile_id']);
 
-    if ($screen['conf_scr_client'] == '1' &&  empty($data['client']) && (!count($required_fields) || $required_fields['conf_scr_client'])) {
+    if (is_array($screen) && $screen['conf_scr_client'] == '1' &&  empty($data['client']) && (!count($required_fields) || $required_fields['conf_scr_client'])) {
         $data['success'] = false; 
         $data['field_id'] = "client";
-    } elseif ($screen['conf_scr_area'] == '1' && $data['sistema'] == "-1" && (!count($required_fields) || $required_fields['conf_scr_area'])) {
+    } elseif (is_array($screen) && $screen['conf_scr_area'] == '1' && $data['sistema'] == "-1" && (!count($required_fields) || $required_fields['conf_scr_area'])) {
         $data['success'] = false; 
         $data['field_id'] = "idArea";
-    } elseif ($screen['conf_scr_prob'] == '1' && $data['problema'] == "-1" && (!count($required_fields) || $required_fields['conf_scr_prob'])) {
+    } elseif (is_array($screen) && $screen['conf_scr_prob'] == '1' && $data['problema'] == "-1" && (!count($required_fields) || $required_fields['conf_scr_prob'])) {
         $data['success'] = false; 
         $data['field_id'] = "idProblema";
-    } elseif ($screen['conf_scr_desc'] == '1' && $data['descricao'] == "" && (!count($required_fields) || $required_fields['conf_scr_desc'])) {
+    } elseif (is_array($screen) && $screen['conf_scr_desc'] == '1' && $data['descricao'] == "" && (!count($required_fields) || $required_fields['conf_scr_desc'])) {
         $data['success'] = false; 
         $data['field_id'] = "idDescricao";
     // } elseif ($screen['conf_scr_unit'] && $data['unidade'] == "-1"  && $fieldsNew->isRequired("unit")) {
-    } elseif ($screen['conf_scr_unit'] && $data['unidade'] == "-1"  && (!count($required_fields) || $required_fields['conf_scr_unit'])) {
+    } elseif (is_array($screen) && $screen['conf_scr_unit'] && $data['unidade'] == "-1"  && (!count($required_fields) || $required_fields['conf_scr_unit'])) {
         $data['success'] = false; 
         $data['field_id'] = "idUnidade";
     // } elseif ($screen['conf_scr_tag'] && $data['etiqueta'] == ""  && $fieldsNew->isRequired("asset_tag")) {
-    } elseif ($screen['conf_scr_tag'] && $data['etiqueta'] == ""  && (!count($required_fields) || $required_fields['conf_scr_tag'])) {
+    } elseif (is_array($screen) && $screen['conf_scr_tag'] && $data['etiqueta'] == ""  && (!count($required_fields) || $required_fields['conf_scr_tag'])) {
         $data['success'] = false; 
         $data['field_id'] = "idEtiqueta";
     // } elseif ($screen['conf_scr_contact'] == '1' && $data['contato'] == ""  && $fieldsNew->isRequired("contact")) {
-    } elseif ($screen['conf_scr_contact'] == '1' && $data['contato'] == ""  && (!count($required_fields) || $required_fields['conf_scr_contact'])) {
+    } elseif (is_array($screen) && $screen['conf_scr_contact'] == '1' && $data['contato'] == ""  && (!count($required_fields) || $required_fields['conf_scr_contact'])) {
         $data['success'] = false; 
         $data['field_id'] = "contato";
     // } elseif ($screen['conf_scr_contact_email'] == '1' && $data['contato_email'] == ""  && $fieldsNew->isRequired("contact_email")) {
-    } elseif ($screen['conf_scr_contact_email'] == '1' && $data['contato_email'] == ""  && (!count($required_fields) || $required_fields['conf_scr_contact_email'])) {
+    } elseif (is_array($screen) && $screen['conf_scr_contact_email'] == '1' && $data['contato_email'] == ""  && (!count($required_fields) || $required_fields['conf_scr_contact_email'])) {
         $data['success'] = false; 
         $data['field_id'] = "contato_email";
     // } elseif ($screen['conf_scr_fone'] == '1' && $data['telefone'] == ""  && $fieldsNew->isRequired("phone")) {
-    } elseif ($screen['conf_scr_fone'] == '1' && $data['telefone'] == ""  && (!count($required_fields) || $required_fields['conf_scr_fone'])) {
+    } elseif (is_array($screen) && $screen['conf_scr_fone'] == '1' && $data['telefone'] == ""  && (!count($required_fields) || $required_fields['conf_scr_fone'])) {
         $data['success'] = false; 
         $data['field_id'] = "idTelefone";
     // } elseif ($screen['conf_scr_local'] == '1' && $data['department'] == "-1"  && $fieldsNew->isRequired("department")) {
-    } elseif ($screen['conf_scr_local'] == '1' && $data['department'] == "-1"  && (!count($required_fields) || $required_fields['conf_scr_local'])) {
+    } elseif (is_array($screen) && $screen['conf_scr_local'] == '1' && $data['department'] == "-1"  && (!count($required_fields) || $required_fields['conf_scr_local'])) {
         $data['success'] = false; 
         $data['field_id'] = "idLocal";
-    } elseif ($screen['conf_scr_upload'] == '1' && !$hasFile  && (!count($required_fields) || (isset($required_fields['conf_scr_upload']) && $required_fields['conf_scr_upload']))) {
+    } elseif (is_array($screen) && $screen['conf_scr_upload'] == '1' && !$hasFile  && (!count($required_fields) || (isset($required_fields['conf_scr_upload']) && $required_fields['conf_scr_upload']))) {
         $data['success'] = false; 
         $data['field_id'] = "idInputFile";
     } 
-    elseif ($screen['conf_scr_foward'] == '1' && $data['forward'] == $_SESSION['s_uid'] && (!count($required_fields) || $required_fields['conf_scr_foward'])) {
+    elseif (is_array($screen) && $screen['conf_scr_foward'] == '1' && $data['forward'] == $_SESSION['s_uid'] && (!count($required_fields) || $required_fields['conf_scr_foward'])) {
         $data['success'] = false; 
         $data['field_id'] = "idFoward";
     }
@@ -492,6 +566,129 @@ if ($data['action'] == "close") {
         echo json_encode($data);
         return false;
     }
+
+
+
+    /* Períodos de atendimento de operadores - entrada manual */
+    if (count($data['treater_extra']) != count($data['treating_start_date']) || count($data['treater_extra']) != count($data['treating_stop_date'])) {
+        $data['success'] = false; 
+        $data['message'] = message('warning', '', TRANS('MSG_MISSING_DATA_ADD_TREATERS'), '');
+        echo json_encode($data);
+        return false;
+    }
+
+    /* Conferindo a formatação das datas informadas */
+    $validDate = true;
+    foreach ($data['treating_start_date'] as $dateStart) {
+        if (!isValidDate($dateStart, 'd/m/Y H:i')) {
+            $validDate = false;
+            break;
+        }
+    }
+    /* Conferindo a formatação das datas informadas */
+    foreach ($data['treating_stop_date'] as $dateStop) {
+        if (!isValidDate($dateStop, 'd/m/Y H:i')) {
+            $validDate = false;
+            break;
+        }
+    }
+
+    if (!$validDate) {
+        $data['success'] = false; 
+        $data['message'] = message('warning', '', TRANS('MSG_WRONG_DATE_FORMAT'), '');
+        echo json_encode($data);
+        return false;
+    }
+
+    /* Formatando as datas recebidas nos array $data['treating_start_date'] e $data['treating_stop_date'] */
+    $data['treating_start_date'] = array_map('dateDB', $data['treating_start_date']);
+    $data['treating_stop_date'] = array_map('dateDB', $data['treating_stop_date']);
+
+
+
+    /* Conferindo se os períodos são válidos */
+    $validPeriod = true;
+    foreach ($data['treating_start_date'] as $key => $value) {
+
+        // if ($value >= $data['treating_stop_date'][$key]) {
+        if (strtotime($value) >= strtotime($data['treating_stop_date'][$key])) {
+            $validPeriod = false;
+            break;
+        }
+    }
+
+    if (!$validPeriod) {
+        $data['success'] = false; 
+        $data['message'] = message('warning', '', TRANS('MSG_COMPARE_DATE'), '');
+        echo json_encode($data);
+        return false;
+    }
+
+    /* A data final não pode ser superior à data atual */
+    $validStopDate = true;
+    foreach ($data['treating_stop_date'] as $key => $value) {
+        if ($value > date('Y-m-d H:i:s')) {
+            $validStopDate = false;
+            break;
+        }
+    }
+
+    if (!$validStopDate) {
+        $data['success'] = false; 
+        $data['message'] = message('warning', '', TRANS('DATE_SHOULD_BE_MAX_CURRENT'), '');
+        echo json_encode($data);
+        return false;
+    }
+
+    $hasDuplicateTreaters = (count($data['treater_extra']) != count(array_unique($data['treater_extra'])));
+    $hasIntersection = false;
+    if ($hasDuplicateTreaters) {
+        $data['duplicated'] = array();
+        /* Identifico e guardo os treaters (operadores) duplicados */
+        foreach(array_count_values($data['treater_extra']) as $val => $c) {
+            if($c > 1) $data['duplicated'][] = $val;
+        }
+
+        /* Identificando os índices relacionados ao mesmo treater (operador) */
+        foreach ($data['duplicated'] as $treaterID) {
+            $data[$treaterID] = array_keys($data['treater_extra'], $treaterID);
+        }
+
+        /* A partir da identificação de mais de um período para o mesmo operador, criar um array com todos os periodos de cada operador */
+        foreach ($data['duplicated'] as $treaterID) {
+            foreach ($data[$treaterID] as $idx) {
+                    /* Gravar um array com todos os períodos de cada operador */
+                    $data['duplicated_periods'][$treaterID][] = [$data['treating_start_date'][$idx], $data['treating_stop_date'][$idx]];
+            }
+        }
+        
+        /* Comparar todos os períodos de um mesmo operador para identificar se há alguma intersecção entre eles */
+        foreach ($data['duplicated_periods'] as $treaterID => $periods) {
+            // $periods é o array de períodos do operador
+            $hasIntersection = hasIntersectionTime($periods);
+
+            if ($hasIntersection) {
+                break;
+            }
+        }
+    }
+
+    
+    if ($hasIntersection) {
+        $data['success'] = false; 
+        $data['message'] = message('warning', '', TRANS('MSG_INTERSECTION_PERIOD'), '');
+        echo json_encode($data);
+        return false;
+    }
+
+    if ($arrayBeforePost['need_authorization'] && $arrayBeforePost['authorization_status'] != 2 && $arrayBeforePost['authorization_status'] != 3) {
+        $data['success'] = false; 
+        $data['message'] = message('warning', '', TRANS('MSG_CANT_BE_COMPLETED_AS_AUTHORIZATION_PENDING'), '');
+        echo json_encode($data);
+        return false;
+    }
+
+
 }
 
 
@@ -500,11 +697,11 @@ $dataCustom = [];
 $fields_ids = [];
 $fields_only_edition_ids = [];
 /* No caso de abertura, restringe aos campos extras existentes no perfil de tela */
-if ($screen['conf_scr_custom_ids'] || $data['action'] != 'open') { 
+if ((is_array($screen) && $screen['conf_scr_custom_ids']) || $data['action'] != 'open') { 
     
-    // $fields_ids = explode(',', $screen['conf_scr_custom_ids']);
-    $fields_ids = ($screen['conf_scr_custom_ids'] ? explode(',', $screen['conf_scr_custom_ids']) : []);
-    $fields_only_edition_ids = ($screen['cfields_only_edition'] ? explode(',', $screen['cfields_only_edition']) : []);
+    // $fields_ids = explode(',', (string)$screen['conf_scr_custom_ids']);
+    $fields_ids = (is_array($screen) && $screen['conf_scr_custom_ids'] ? explode(',', (string)$screen['conf_scr_custom_ids']) : []);
+    $fields_only_edition_ids = (is_array($screen) && $screen['cfields_only_edition'] ? explode(',', (string)$screen['cfields_only_edition']) : []);
     
     $sql = "SELECT * FROM custom_fields 
             WHERE 
@@ -547,7 +744,7 @@ if ($screen['conf_scr_custom_ids'] || $data['action'] != 'open') {
                         }
 
                         if ($cfield['field_type'] == 'number') {
-                            if ($post[$cfield['field_name']] != "" && !filter_var($post[$cfield['field_name']], FILTER_VALIDATE_INT)) {
+                            if (isset($post[$cfield['field_name']]) && $post[$cfield['field_name']] != "" && !filter_var($post[$cfield['field_name']], FILTER_VALIDATE_INT)) {
                                 $data['success'] = false; 
                                 $data['field_id'] = $cfield['field_name'];
                             }
@@ -685,7 +882,8 @@ if ($data['action'] == "open") {
             problema, descricao, instituicao, equipamento, 
             sistema, contato, contato_email, telefone, local, 
             operador, data_abertura, data_fechamento, status, data_atendimento, 
-            aberto_por, oco_scheduled, oco_scheduled_to, 
+            aberto_por, registration_operator,
+            oco_scheduled, oco_scheduled_to, 
             oco_real_open_date, date_first_queued, oco_prior, oco_channel, 
             profile_id
         )
@@ -695,7 +893,9 @@ if ($data['action'] == "open") {
             '" . $data['radio_prob'] . "', :descricao, " . dbField($data['unidade']) . ", '" . $data['etiqueta'] . "',
             '" . $data['sistema'] . "', '" . $data['contato'] . "', '" . $data['contato_email'] . "', '" . $data['telefone'] . "', '" . $data['department'] . "',
             '" . $data['operator'] . "', '{$now}', null, '" . $data['status'] . "', null,
-            '" . $data['aberto_por'] . "', '" . $data['is_scheduled'] . "', " . dbField($data['schedule_to'],'date') . ", 
+            '" . $data['aberto_por'] . "', 
+            " . dbField($data['registration_operator']) . ", 
+            '" . $data['is_scheduled'] . "', " . dbField($data['schedule_to'],'date') . ", 
             '{$now}', null, '" . $data['prioridade'] . "', '" . $data['channel'] . "',
             " . dbField($data['profile_id']) . "
         )";
@@ -709,7 +909,45 @@ if ($data['action'] == "open") {
         $data['global_uri'] = random64();
 
         /* Gravação da data na tabela tickets_stages */
-        $timeStage = insert_ticket_stage($conn, $data['numero'], 'start', $data['status']);
+        $timeStage = insert_ticket_stage($conn, $data['numero'], 'start', $data['status'], $data['operator']);
+
+
+
+        /* Assentamento - caso o chamado esteja sendo aberto em nome de outro usuário */
+        if ($data['registration_operator'] != $data['aberto_por']) {
+
+            /* Adiciona o assentamento */
+            $sqlEntry = "INSERT INTO assentamentos 
+            (
+                ocorrencia, assentamento, created_at, responsavel, asset_privated, tipo_assentamento
+            )
+            VALUES 
+            (
+                :numero,
+                :entry,
+                :created_at,
+                :logged,
+                0,
+                32
+            )";
+    
+            try {
+                $res = $conn->prepare($sqlEntry);
+                $res->bindParam(':numero', $data['numero'], PDO::PARAM_INT);
+                $res->bindParam(':entry', $data['descricao'], PDO::PARAM_STR);
+                $res->bindParam(':created_at', $now, PDO::PARAM_STR);
+                $res->bindParam(':logged', $data['logado'], PDO::PARAM_INT);
+                $res->execute();
+    
+                $notice_id = $conn->lastInsertId();
+                setUserTicketNotice($conn, 'assentamentos', $notice_id);
+    
+            } catch (Exception $e) {
+                $exception .= "<hr>" . $e->getMessage();
+            }
+        }
+
+
 
 
 
@@ -765,7 +1003,26 @@ if ($data['action'] == "open") {
 
         /* Se for um subchamado */
         if (!empty($data['father'])) {
-            $sqlDep = "INSERT INTO ocodeps (dep_pai, dep_filho) values (" . $data['father'] . ", " . $data['numero'] . ")";
+            
+            $projetID = getTicketProjectId($conn, $data['father']);
+            if (!$projetID) {
+                $projetID = 'NULL';
+            }
+            
+            $sqlDep = "INSERT INTO 
+                        ocodeps 
+                        (
+                            dep_pai, 
+                            dep_filho, 
+                            proj_id
+                        ) 
+                        values 
+                        (
+                            {$data['father']}, 
+                            {$data['numero']}, 
+                            " . $projetID. "
+                        )
+                        ";
             try {
                 $conn->exec($sqlDep);
 
@@ -774,7 +1031,7 @@ if ($data['action'] == "open") {
                 /* Gravar assentamento no chamado pai */
                 $sqlSubTicket = "INSERT INTO assentamentos 
                 (
-                    ocorrencia, assentamento, data, responsavel, asset_privated, tipo_assentamento
+                    ocorrencia, assentamento, created_at, responsavel, asset_privated, tipo_assentamento
                 )
                 VALUES 
                 (
@@ -788,12 +1045,16 @@ if ($data['action'] == "open") {
 
                 try {
                     $conn->exec($sqlSubTicket);
+                    $notice_id = $conn->lastInsertId();
+                    if ($_SESSION['s_uid'] != $data['aberto_por']) {
+                        setUserTicketNotice($conn, 'assentamentos', $notice_id);
+                    }
                 } catch (Exception $e) {
                     $exception .= "<hr>" . $e->getMessage();
                 }
             }
             catch (Exception $e) {
-                $exception .= "<hr>" . $e->getMessage();
+                $exception .= "<hr>" . $e->getMessage() . "<hr>" . $sqlDep;
             }
         }
 
@@ -862,11 +1123,11 @@ if ($data['action'] == "open") {
     try {
         $conn->exec($sql);
 
-        if ($newStatus) {
-            /* Gravação da data na tabela tickets_stages */
-            $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'stop', $data['status']);
-            $startTimeStage = insert_ticket_stage($conn, $data['numero'], 'start', $data['status']);
-        }
+        // if ($newStatus) {
+        //     /* Gravação da data na tabela tickets_stages */
+        //     $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'stop', $data['status']);
+        //     $startTimeStage = insert_ticket_stage($conn, $data['numero'], 'start', $data['status']);
+        // }
 
         $data['success'] = true; 
         $data['message'] = TRANS('MSG_SUCCESS_EDIT');
@@ -966,13 +1227,52 @@ if ($data['action'] == "open") {
         $afterPost['status'] = $data['status'];
         $afterPost['cliente'] = $data['client'];
         
+        $operationType = 1;
+        
+
+        /* Identificando o valor do custo do chamado após as gravações sobre a alteração das informações */
+        if (!empty($tickets_cost_field)) {
+            $cost_field_info = getTicketCustomFields($conn, $data['numero'], $tickets_cost_field);
+            $ticket_cost_after_action = priceDB($cost_field_info['field_value']);
+        }
+
+        $changeAuthorizationStatus = false;
+        if ($arrayBeforePost['authorization_status']) {
+            /* Caso o tipo de solicitação ou o custo do chamado tenha sido alterado, o status de autorização é resetado */
+            if ($ticket_cost_before_action != $ticket_cost_after_action || $arrayBeforePost['prob_cod'] != $afterPost['problema']) {
+                $changeAuthorizationStatus = true;
+
+                $afterPost['status'] = $status_cost_updated;
+                $afterPost['authorization_status'] = '0';
+                $operationType = 12;
+                $sql = "UPDATE
+                            ocorrencias
+                        SET
+                            status = {$status_cost_updated},
+                            authorization_status = null
+                        WHERE
+                            numero = {$data['numero']}
+                ";
+                $conn->exec($sql);
+            }
+        }
+        
+
+
+        if ($newStatus || $changeAuthorizationStatus) {
+            /* Gravação da data na tabela tickets_stages */
+            $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'stop', $afterPost['status'], $data['operator']);
+            $startTimeStage = insert_ticket_stage($conn, $data['numero'], 'start', $afterPost['status'], $data['operator']);
+        }
+
+
         /* Função que grava o registro de alterações do chamado */
-        $recordLog = recordLog($conn, $data['numero'], $arrayBeforePost, $afterPost, 1);
+        $recordLog = recordLog($conn, $data['numero'], $arrayBeforePost, $afterPost, $operationType);
 
 
         /* Se alguma tag for nova, gravar na tabela de referência: input_tags */
         if (!empty($data['input_tags'])) {
-            $arrayTags = explode(',', $data['input_tags']);
+            $arrayTags = explode(',', (string)$data['input_tags']);
             saveNewTags($conn, $arrayTags);
         }
 
@@ -1031,13 +1331,33 @@ if ($data['action'] == "open") {
 
         /* Gravação da data na tabela tickets_stages */
         /* A primeira entrada serve apenas para gravar a conclusão do status anterior ao encerramento */
-        $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'stop', $data['status']);
+        $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'stop', $data['status'], $data['operator']);
         /* As duas próximas entradas servem para lançar o status de encerramento - o tempo nao será contabilizado */
-        $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'start', $data['status']);
-        $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'stop', $data['status']);
+        $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'start', $data['status'], $data['operator']);
+        $stopTimeStage = insert_ticket_stage($conn, $data['numero'], 'stop', $data['status'], $data['operator']);
 
         $data['success'] = true; 
         $data['message'] = TRANS('MSG_OCCO_FINISH_SUCCESS');
+
+
+
+        $sql = "DELETE FROM tickets_treaters_stages WHERE ticket = {$data['numero']}";
+        $conn->exec($sql);
+        $insertManualStages = false;
+        if (count($data['treater_extra']) > 0 ) {
+            $insertManualStages = insertTreaterManualStageInTicket($conn, $data['numero'], $data['treater_extra'] , $data['treating_start_date'], $data['treating_stop_date'], $_SESSION['s_uid']);
+        
+            if (!$insertManualStages) {
+                $exception .= $insertManualStages . "<hr/>";
+            } else {
+                $ticketNumberSeparator = "%tkt%{$data['numero']}";
+                foreach (array_unique($data['treater_extra']) as $treater) {
+                    if ($treater != $_SESSION['s_uid']) {
+                        setUserNotification($conn, $treater, 1, TRANS('YOU_WERE_ADDED_AS_TREATER') . ': ' . $ticketNumberSeparator, $_SESSION['s_uid']);
+                    }
+                }
+            }
+        }
 
 
         /**
@@ -1166,7 +1486,7 @@ if ($data['action'] == "open") {
 
         /* Se alguma tag for nova, gravar na tabela de referência: input_tags */
         if (!empty($data['input_tags'])) {
-            $arrayTags = explode(',', $data['input_tags']);
+            $arrayTags = explode(',', (string)$data['input_tags']);
             saveNewTags($conn, $arrayTags);
         }
         
@@ -1225,7 +1545,7 @@ if (!empty($data['entry']) || !empty($data['technical_description'])) {
         
         $sqlTags = "INSERT INTO assentamentos 
         (
-            ocorrencia, assentamento, data, responsavel, asset_privated, tipo_assentamento
+            ocorrencia, assentamento, created_at, responsavel, asset_privated, tipo_assentamento
         )
         VALUES 
         (
@@ -1252,13 +1572,13 @@ if (!empty($data['entry']) || !empty($data['technical_description'])) {
         /* Adiciona o assentamento */
         $sqlEntry = "INSERT INTO assentamentos 
         (
-            ocorrencia, assentamento, data, responsavel, asset_privated, tipo_assentamento
+            ocorrencia, assentamento, created_at, responsavel, asset_privated, tipo_assentamento
         )
         VALUES 
         (
             :numero,
             :entry,
-            :date,
+            :created_at,
             :logged,
             :privated,
             1
@@ -1268,14 +1588,19 @@ if (!empty($data['entry']) || !empty($data['technical_description'])) {
             $res = $conn->prepare($sqlEntry);
             $res->bindParam(':numero', $data['numero'], PDO::PARAM_INT);
             $res->bindParam(':entry', $data['entry'], PDO::PARAM_STR);
-            $res->bindParam(':date', $now, PDO::PARAM_STR);
+            $res->bindParam(':created_at', $now, PDO::PARAM_STR);
             $res->bindParam(':logged', $data['logado'], PDO::PARAM_INT);
             $res->bindParam(':privated', $data['entry_privated'], PDO::PARAM_INT);
             $res->execute();
+
+            $notice_id = $conn->lastInsertId();
+            if (!$data['entry_privated'] && $_SESSION['s_uid'] != $data['aberto_por']) {
+                setUserTicketNotice($conn, 'assentamentos', $notice_id);
+            }
+
         } catch (Exception $e) {
             $exception .= "<hr>" . $e->getMessage();
         }
-
     }
 
     /* action close */
@@ -1283,15 +1608,15 @@ if (!empty($data['entry']) || !empty($data['technical_description'])) {
         /* Adiciona a descrição técnica como assentamento */
         $sqlEntry = "INSERT INTO assentamentos 
         (
-            ocorrencia, assentamento, data, responsavel, asset_privated, tipo_assentamento
+            ocorrencia, assentamento, created_at, responsavel, asset_privated, tipo_assentamento
         )
         VALUES 
         (
             :numero,
             :tech_description,
-            :date,
+            :created_at,
             :logged,
-            0,
+            0, 
             4
         )";
 
@@ -1299,24 +1624,30 @@ if (!empty($data['entry']) || !empty($data['technical_description'])) {
             $res = $conn->prepare($sqlEntry);
             $res->bindParam(':numero', $data['numero'], PDO::PARAM_INT);
             $res->bindParam(':tech_description', $data['technical_description'], PDO::PARAM_STR);
-            $res->bindParam(':date', $now, PDO::PARAM_STR);
+            $res->bindParam(':created_at', $now, PDO::PARAM_STR);
             $res->bindParam(':logged', $data['logado'], PDO::PARAM_INT);
             $res->execute();
+
+            $notice_id = $conn->lastInsertId();
+            if ($_SESSION['s_uid'] != $data['aberto_por']) {
+                setUserTicketNotice($conn, 'assentamentos', $notice_id);
+            }
+
         } catch (Exception $e) {
             $exception .= "<hr>" . $e->getMessage();
         }
 
         $sqlEntry = "INSERT INTO assentamentos 
         (
-            ocorrencia, assentamento, data, responsavel, asset_privated, tipo_assentamento
+            ocorrencia, assentamento, created_at, responsavel, asset_privated, tipo_assentamento
         )
         VALUES 
         (
             :numero,
             :tech_solution,
-            :date,
+            :created_at,
             :logged,
-            0,
+            0, 
             5
         )";
 
@@ -1325,9 +1656,16 @@ if (!empty($data['entry']) || !empty($data['technical_description'])) {
             $res = $conn->prepare($sqlEntry);
             $res->bindParam(':numero', $data['numero'], PDO::PARAM_INT);
             $res->bindParam(':tech_solution', $data['technical_solution'], PDO::PARAM_STR);
-            $res->bindParam(':date', $now, PDO::PARAM_STR);
+            $res->bindParam(':created_at', $now, PDO::PARAM_STR);
             $res->bindParam(':logged', $data['logado'], PDO::PARAM_INT);
             $res->execute();
+
+            $notice_id = $conn->lastInsertId();
+            if ($_SESSION['s_uid'] != $data['aberto_por']) {
+                setUserTicketNotice($conn, 'assentamentos', $notice_id);
+            }
+
+
         } catch (Exception $e) {
             $exception .= "<hr>" . $e->getMessage();
         }
@@ -1363,15 +1701,15 @@ if (!empty($data['entry']) || !empty($data['technical_description'])) {
         
         $sqlJustify = "INSERT INTO assentamentos 
         (
-            ocorrencia, assentamento, data, responsavel, asset_privated, tipo_assentamento
+            ocorrencia, assentamento, created_at, responsavel, asset_privated, tipo_assentamento
         )
         VALUES 
         (
             :numero,
             :justificativa,
-            :date,
+            :created_at,
             :logged,
-            0,
+            0, 
             3
         )";
 
@@ -1379,9 +1717,14 @@ if (!empty($data['entry']) || !empty($data['technical_description'])) {
             $res = $conn->prepare($sqlJustify);
             $res->bindParam(':numero', $data['numero'], PDO::PARAM_INT);
             $res->bindParam(':justificativa', $data['justificativa'], PDO::PARAM_STR);
-            $res->bindParam(':date', $now, PDO::PARAM_STR);
+            $res->bindParam(':created_at', $now, PDO::PARAM_STR);
             $res->bindParam(':logged', $data['logado'], PDO::PARAM_INT);
             $res->execute();
+
+            $notice_id = $conn->lastInsertId();
+            if ($_SESSION['s_uid'] != $data['aberto_por']) {
+                setUserTicketNotice($conn, 'assentamentos', $notice_id);
+            }
 
         } catch (Exception $e) {
             $exception .= "<hr>" . $e->getMessage();
@@ -1491,7 +1834,7 @@ if ( $data['total_relatives_to_deal'] > 0 ) {
                 /* Gravar assentamento no chamado pai */
                 $sqlSubTicket = "INSERT INTO assentamentos 
                 (
-                    ocorrencia, assentamento, data, responsavel, asset_privated, tipo_assentamento
+                    ocorrencia, assentamento, created_at, responsavel, asset_privated, tipo_assentamento
                 )
                 VALUES 
                 (
@@ -1505,6 +1848,11 @@ if ( $data['total_relatives_to_deal'] > 0 ) {
 
                 try {
                     $conn->exec($sqlSubTicket);
+
+                    $notice_id = $conn->lastInsertId();
+                    if ($_SESSION['s_uid'] != $data['aberto_por']) {
+                        setUserTicketNotice($conn, 'assentamentos', $notice_id, 11);
+                    }
                 } catch (Exception $e) {
                     $exception .= "<hr>" . $e->getMessage();
                 }
@@ -1515,7 +1863,7 @@ if ( $data['total_relatives_to_deal'] > 0 ) {
                 /* Gravar assentamento no chamado filho */
                 $sqlSubTicket = "INSERT INTO assentamentos 
                 (
-                    ocorrencia, assentamento, data, responsavel, asset_privated, tipo_assentamento
+                    ocorrencia, assentamento, created_at, responsavel, asset_privated, tipo_assentamento
                 )
                 VALUES 
                 (
@@ -1529,6 +1877,11 @@ if ( $data['total_relatives_to_deal'] > 0 ) {
 
                 try {
                     $conn->exec($sqlSubTicket);
+
+                    $notice_id = $conn->lastInsertId();
+                    if ($_SESSION['s_uid'] != $data['aberto_por']) {
+                        setUserTicketNotice($conn, 'assentamentos', $notice_id, 11);
+                    }
                 } catch (Exception $e) {
                     $exception .= "<hr>" . $e->getMessage();
                 }
@@ -1553,7 +1906,7 @@ if ($rowconfmail['mail_queue']) {
 /* envio de e-mails */
 if ($data['action'] == "open") {
 
-    if (!empty($data['mail_area']) || !$screen['conf_scr_mail']) {
+    if (!empty($data['mail_area']) || ((is_array($screen) && $screen['conf_scr_mail'] == 0 && !empty($rowAreaTo)))) {
         $event = "abertura-para-area";
         $eventTemplate = getEventMailConfig($conn, $event);
 
@@ -1621,7 +1974,7 @@ if ($data['action'] == "open") {
 /* envio de e-mails */
 if ($data['action'] == "edit") {
 
-    if (!empty($data['mail_area'])) {
+    if (!empty($data['mail_area']) && !empty($rowAreaTo)) {
         $event = "edita-para-area";
         $eventTemplate = getEventMailConfig($conn, $event);
 
@@ -1717,7 +2070,7 @@ if ($data['action'] == "close") {
     $rating_id = $rowGlobalUri['gt_rating_id'];
     $ratingUrl = $VARS['%linkglobal%'] . '&rating_id=' . $rating_id;
 
-    if (!empty($data['mail_area'])) {
+    if (!empty($data['mail_area']) && !empty($rowAreaTo)) {
         $event = "encerra-para-area";
         $eventTemplate = getEventMailConfig($conn, $event);
 

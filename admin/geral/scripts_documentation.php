@@ -55,10 +55,15 @@ $version4 = $config['conf_updated_issues'];
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
-	<link rel="stylesheet" type="text/css" href="../../includes/components/summernote/summernote-bs4.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/components/suneditor/node_modules/suneditor/dist/css/suneditor.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../includes/components/suneditor/node_modules/suneditor/src/assets/css/suneditor-contents.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
 	<style>
 		.list-issues {
@@ -69,13 +74,6 @@ $version4 = $config['conf_updated_issues'];
 
 <body>
 
-	<?php
-		// if (isset($_GET['action']) && $_GET['action']=='endview') {
-		// 	//
-		// } else {
-		// 	$auth->showHeader();
-		// }
-	?>
 	<div class="container">
 		<div id="idLoad" class="loading" style="display:none"></div>
 	</div>
@@ -85,6 +83,10 @@ $version4 = $config['conf_updated_issues'];
 
 	<div class="container-fluid">
 		<h4 class="my-4"><i class="fas fa-tasks text-secondary"></i>&nbsp;<?= TRANS('ADM_SCRIPTS'); ?></h4>
+
+		<input type="hidden" name="label_close" id="label_close" value="<?= TRANS('BT_CLOSE'); ?>">
+		<input type="hidden" name="label_return" id="label_return" value="<?= TRANS('TXT_RETURN'); ?>">
+		
 		<div class="modal" id="modal" tabindex="-1" style="z-index:9001!important">
 			<div class="modal-dialog modal-xl">
 				<div class="modal-content">
@@ -100,34 +102,11 @@ $version4 = $config['conf_updated_issues'];
 			$_SESSION['flash'] = '';
 		}
 
-		//sr.*, prsc.*, pr.*, a.* 
-		$query = "SELECT 
-					sr.*
-					FROM scripts AS sr 
-						LEFT JOIN prob_x_script as prsc on prsc.prscpt_scpt_id = sr.scpt_id 
-						LEFT JOIN problemas as pr on pr.prob_id = prsc.prscpt_prob_id 
-					WHERE 1 = 1
-		";
-		if (isset($_GET['prob'])) {
-			$query .= " AND pr.prob_id = '" . (int)$_GET['prob'] . "' ";
-		}
+		$scriptId = (isset($_GET['cod']) ? (int)$_GET['cod'] : null);
+		$probId = (isset($_GET['prob']) ? (int)$_GET['prob'] : null);
 
-		if (isset($_GET['cod'])) {
-			$query .= " AND sr.scpt_id = '" . (int)$_GET['cod'] . "' ";
-		}
-
-		if (isset($_GET['action']) && $_GET['action'] == 'details') {
-			$query .= " AND sr.scpt_id = '" . (int)$_GET['cod'] . "' ";
-		}
-
-		if ((!isset($_GET['action']) || $_GET['action']=='endview')) {
-			$query .= " GROUP BY sr.scpt_id, sr.scpt_nome, sr.scpt_desc, sr.scpt_script, sr.scpt_enduser ";
-		}
-
-		$query .= " ORDER BY sr.scpt_nome";
-		$resultado = $conn->query($query);
-		$registros = $resultado->rowCount();
-
+		$scripts = getScripts($conn, $scriptId, $probId);
+		$registros = count($scripts);
 
 		/* Classes para o grid */
 		$colLabel = "col-sm-2 text-md-right font-weight-bold p-2 mb-4";
@@ -184,21 +163,12 @@ $version4 = $config['conf_updated_issues'];
 					<tbody>
 						<?php
 
-						foreach ($resultado->fetchall() as $row) {
-							$qryProb = "SELECT problema FROM prob_x_script 
-									LEFT JOIN problemas on prob_id = prscpt_prob_id 
-									WHERE 
-										prscpt_scpt_id = ".$row['scpt_id']." 
-										AND prscpt_prob_id = prob_id 
-										GROUP BY problema 
-										ORDER BY problema 
-									";
-							$resProb = $conn->query($qryProb);
+						foreach ($scripts as $row) {
+							
+							$scriptIssues = getIssuesByScript($conn, $row['scpt_id']);
 							
 							$allProbs = "";
-							foreach ($resProb->fetchall() as $rowProb) {
-								// !empty($allProbs)?$allProbs.=",<br>":$allProbs.="";
-								// $allProbs.= $rowProb['problema'];
+							foreach ($scriptIssues as $rowProb) {
 								$allProbs .= '<li class="list-issues">' . $rowProb['problema'] . '</li>';
 							}
 							$enduser = ($row['scpt_enduser'] ? '<span class="text-success"><i class="fas fa-check"></i></span>' : '');
@@ -220,7 +190,8 @@ $version4 = $config['conf_updated_issues'];
 			<?php
 			}
 		} elseif ((isset($_GET['action'])  && ($_GET['action'] == "details")) && !isset($_POST['submit'])) {
-			$row = $resultado->fetch();
+			// $row = $resultado->fetch();
+			$row = $scripts;
 			?>
 			<div class="row my-2">
 				
@@ -267,7 +238,8 @@ $version4 = $config['conf_updated_issues'];
 					<button class="btn btn-primary bt-edit" data-id="<?= (int)$_GET['cod']; ?>" name="edit"><?= TRANS("BT_EDIT"); ?></button>
 				</div>
 				<div class="col-12 col-md-2 ">
-					<button class="btn btn-secondary " name="return" onClick="javascript:history.back()"><?= TRANS("TXT_RETURN"); ?></button>
+					<button class="btn btn-secondary " name="return" id="close_details" ><?= TRANS("TXT_RETURN"); ?></button>
+					<!-- onClick="javascript:history.back()" -->
 				</div>
 			</div>
 			<?php
@@ -275,8 +247,8 @@ $version4 = $config['conf_updated_issues'];
 		
 		} elseif ((isset($_GET['action'])  && ($_GET['action'] == "endview")) && !isset($_POST['submit'])) {
 
-			if ($registros == 1) {
-				$row = $resultado->fetch();
+			if ($registros == 1 || isset($_GET['cod'])) {
+				$row = (isset($_GET['cod']) ? $scripts : $scripts[0]);
 				?>
 				<div class="row my-2">
 					<div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('DESCRIPTION')); ?></div>
@@ -299,8 +271,8 @@ $version4 = $config['conf_updated_issues'];
 				</thead>
 				<tbody>
 					<?php
-						foreach ($resultado->fetchall() as $row) {
-							if ($_SESSION['s_nivel']!=3 || $row['scpt_enduser']==1) {
+							foreach ($scripts as $row) {
+							if ($_SESSION['s_nivel'] < 3 || $row['scpt_enduser'] == 1) {
 								?>
 								<tr>
 									<td class="line"><a onclick="redirect('<?= $_SERVER['PHP_SELF']; ?>?action=endview&cod=<?= $row['scpt_id']; ?>')"><?= $row['scpt_nome']; ?></a></td>
@@ -376,7 +348,7 @@ $version4 = $config['conf_updated_issues'];
 					<label for="idProblema" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('ISSUE_TYPE'); ?></label>
 					<div class="form-group col-md-10">
 						<div id="Problema">
-							<select class="form-control" id="idProblema" name="problema">
+							<select class="form-control bs-select" id="idProblema" name="problema">
 								<option value="-1"><?= TRANS('SEL_SELECT'); ?></option>
 								<?php
 								$issues = ($version4 ? getIssuesByArea4($conn, true) : getIssuesByArea($conn));
@@ -438,7 +410,8 @@ $version4 = $config['conf_updated_issues'];
 
 		if ((isset($_GET['action']) && $_GET['action'] == "edit") && empty($_POST['submit'])) {
 
-			$row = $resultado->fetch();
+			// $row = $resultado->fetch();
+			$row = $scripts;
 		?>
 			<h6><?= TRANS('BT_EDIT'); ?></h6>
 			<form method="post" action="<?= $_SERVER['PHP_SELF']; ?>" id="form">
@@ -506,7 +479,7 @@ $version4 = $config['conf_updated_issues'];
 					<label for="idProblema" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('ISSUE_TYPE'); ?></label>
 					<div class="form-group col-md-10">
 						<div id="Problema">
-							<select class="form-control" id="idProblema" name="problema">
+							<select class="form-control bs-select" id="idProblema" name="problema">
 								<option value="-1"><?= TRANS('SEL_SELECT'); ?></option>
 								<?php
 								$issues = ($version4 ? getIssuesByArea4($conn, true) : getIssuesByArea($conn));
@@ -571,12 +544,12 @@ $version4 = $config['conf_updated_issues'];
 	<script src="../../includes/javascript/funcoes-3.0.js"></script>
 	<script src="../../includes/components/jquery/jquery.js"></script>
 	<script src="../../includes/components/jquery/jquery.initialize.min.js"></script>
-	<!-- <script type="text/javascript" src="../../includes/components/jquery/jquery-ui-1.12.1/jquery-ui.js"></script> -->
 	<script src="../../includes/components/bootstrap/js/bootstrap.bundle.min.js"></script>
+	<script src="../../includes/components/bootstrap-select/dist/js/bootstrap-select.min.js"></script>
 	<script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables.js"></script>
-	<script src="../../includes/components/summernote/summernote-bs4.js"></script>
-	<script src="../../includes/components/summernote/lang/summernote-pt-BR.min.js"></script>
-	<!-- <script type="text/javascript" charset="utf8" src="../../includes/components/ckeditor/ckeditor.js"></script> -->
+	<script src="../../includes/components/suneditor/node_modules/suneditor/dist/suneditor.min.js"></script>
+    <script src="../../includes/components/suneditor/node_modules/suneditor/src/lang/pt_br.js"></script>
+	<script src="../../includes/javascript/format_bar.js"></script>
 	<script type="text/javascript">
 		$(function() {
 
@@ -593,32 +566,22 @@ $version4 = $config['conf_updated_issues'];
 				}
 			});
 
+			$.fn.selectpicker.Constructor.BootstrapVersion = '4';
+			$('.bs-select').selectpicker({
+				/* placeholder */
+				title: "<?= TRANS('SEL_SELECT', '', 1); ?>",
+				liveSearch: true,
+				actionsBox: true,
+				liveSearchNormalize: true,
+				liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
+				noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
+				style: "",
+				styleBase: "form-control ",
+			});
+
 
 			if ($('#script_content').length > 0) {
-				$('#script_content').summernote({
-
-					toolbar: [
-						['style', ['style']],
-						['font', ['bold', 'underline', 'clear']],
-						['fontname', ['fontname']],
-						['fontsize', ['fontsize']],
-						['color', ['color']],
-						['para', ['ul', 'ol', 'paragraph']],
-						['table', ['table']],
-						['insert', ['link', 'picture', 'video']],
-						['view', ['fullscreen', 'codeview', 'help']],
-					],
-					tabDisable: true,
-
-					// placeholder: 'Hello Bootstrap 4',
-					lang: 'pt-BR', // default: 'en-US'
-					tabsize: 2,
-					// height: 100,
-					height: 300, // set editor height
-					minHeight: null, // set minimum height of editor
-					maxHeight: null, // set maximum height of editor
-					focus: true // set focus to editable area after initializing summernote
-				});
+				var editor = render_format_bar('script_content', 300, 'advanced');
 			}
 			
 			if ($('#action').val() == 'edit' || $('#action').val() == 'details') {
@@ -644,6 +607,17 @@ $version4 = $config['conf_updated_issues'];
 				$(location).prop('href', url);
 			});
 
+			/* Identificar se a janela está sendo carregada em uma popup */
+			if (window.self !== window.top) {
+				$('#close_details').text($('#label_close').val()).on("click", function() {
+					window.parent.closeScriptDetails();
+				});
+			} else {
+				$('#close_details').text($('#label_return').val()).on("click", function() {
+					window.history.back();
+				});
+			}
+
 
 			/* Load types of issues */
 			if ($("#idArea").length > 0) {
@@ -661,6 +635,7 @@ $version4 = $config['conf_updated_issues'];
 			/* Show selected issue */
 			if ($("#idProblema").length > 0) {
 				$("#idProblema").off().on("change", function() {
+					$("#idProblema").selectpicker('refresh');
 					showSelectedIssue();
 					showIssueDescription($("#idProblema").val());
 				});
@@ -693,6 +668,7 @@ $version4 = $config['conf_updated_issues'];
 				});
 
 				$("#idSubmit").prop("disabled", true);
+				editor.save();
 				$.ajax({
 					url: './scripts_documentation_process.php',
 					method: 'POST',
@@ -763,13 +739,20 @@ $version4 = $config['conf_updated_issues'];
 
 						if (selected_id !== '') {
 							if ($("#idProblema").find('option[value="' + selected_id + '"]').length === 0) {
-								$('#idProblema').val("").change();
+								// $('#idProblema').val("").change();
+								$('#idProblema').selectpicker('val', '');
+								$('#idProblema').selectpicker('refresh');
+
 							} else {
-								$('#idProblema').val(selected_id).change();
+								// $('#idProblema').val(selected_id).change();
+								$('#idProblema').selectpicker('val', selected_id);
+								$('#idProblema').selectpicker('refresh');
 							}
 						} else
 						if ($('#issue_selected').val() != '') {
-							$('#idProblema').val($('#issue_selected').val()).change();
+							// $('#idProblema').val($('#issue_selected').val()).change();
+							$('#idProblema').selectpicker('val', $('#issue_selected').val());
+							$('#idProblema').selectpicker('refresh');
 						}
 					}
 				});
@@ -809,6 +792,9 @@ $version4 = $config['conf_updated_issues'];
 						html += '<td><?= $config['conf_prob_tipo_1']; ?></td>';
 						html += '<td><?= $config['conf_prob_tipo_2']; ?></td>';
 						html += '<td><?= $config['conf_prob_tipo_3']; ?></td>';
+						html += '<td><?= $config['conf_prob_tipo_4']; ?></td>';
+						html += '<td><?= $config['conf_prob_tipo_5']; ?></td>';
+						html += '<td><?= $config['conf_prob_tipo_6']; ?></td>';
 						html += '</tr>';
 						html += '</thead>';
 						for (var i in response) {
@@ -825,6 +811,9 @@ $version4 = $config['conf_updated_issues'];
 							html += '<td>' + (response[i].probt1_desc ?? '') + '</td>';
 							html += '<td>' + (response[i].probt2_desc  ?? '') + '</td>';
 							html += '<td>' + (response[i].probt3_desc  ?? '') + '</td>';
+							html += '<td>' + (response[i].probt4_desc  ?? '') + '</td>';
+							html += '<td>' + (response[i].probt5_desc  ?? '') + '</td>';
+							html += '<td>' + (response[i].probt6_desc  ?? '') + '</td>';
 							html += '</tr>';
 						}
 						html += '</table>';

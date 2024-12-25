@@ -28,10 +28,16 @@ $route->get("/{id}", "Tickets:read");
 // $route->put("/{id}", "Tickets:update");
 
 $route->post("/", "Tickets:create");
+$route->post("/entry", "Tickets:comment");
+// $route->get("/references/{message_id}", "Tickets:references");
+// $route->get("/references", "Tickets:references");
 // $route->post("/", function(){
 //     echo json_encode(['message' => 'Teste no arquivo de rotas']);
 // });
 
+
+// $route->group("/status");
+// $route->get("/", "ServerStatus:read");
 
 // $route->group("/files");
 // $route->post("/{ticket}", "Files:create");

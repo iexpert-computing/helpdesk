@@ -46,6 +46,13 @@ if (!$basicConfig['conf_updated_issues']) {
 }
 
 
+$authTypes = [
+    'SYSTEM' => TRANS('AUTH_LOCAL_BASE'),
+    'LDAP' => TRANS('AUTH_LDAP_BASE'),
+    'OIDC' => TRANS('AUTH_OIDC_BASE')
+];
+
+
 $statusList = getStatus($conn, 0, '1,2');
 $panels = [
 	'1' => TRANS('PANEL_UPPER'),
@@ -124,7 +131,13 @@ $ldapAreaToNewUsers = "";
 if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND_NEWUSERS'])
     $ldapAreaToNewUsers = getAreaInfo($conn, $configs['LDAP_AREA_TO_BIND_NEWUSERS'])['area_name'];
 
+$oidcClientToNewUsers = TRANS('FILL_EMPTY');
+if (isset($configs['OIDC_CLIENT_TO_BIND_NEWUSERS']) && $configs['OIDC_CLIENT_TO_BIND_NEWUSERS'])
+    $oidcClientToNewUsers = getClients($conn, $configs['OIDC_CLIENT_TO_BIND_NEWUSERS'])['nickname'];
     
+$oidcAreaToNewUsers = "";
+if (isset($configs['OIDC_AREA_TO_BIND_NEWUSERS']) && $configs['OIDC_AREA_TO_BIND_NEWUSERS'])
+    $oidcAreaToNewUsers = getAreaInfo($conn, $configs['OIDC_AREA_TO_BIND_NEWUSERS'])['area_name'];
 
 ?>
 <!DOCTYPE html>
@@ -141,6 +154,7 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
     <link rel="stylesheet" type="text/css" href="../../includes/components/jquery/jquery.amsify.suggestags-master/css/amsify.suggestags.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
     <style>
         hr.thick {
@@ -148,9 +162,20 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
             color: #CCCCCC !important;
             /* border-radius: 5px; */
         }
+
+        .container-switch {
+			position: relative;
+		}
+
+        .bt-oauth-key:before {
+            font-family: "Font Awesome\ 5 Free";
+            content: "\f084";
+            font-weight: 900;
+            font-size: 16px;
+        }
     </style>
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -169,6 +194,15 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
             <div class="modal-dialog modal-xl">
                 <div class="modal-content">
                     <div id="divDetails">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal" id="modalIframe" tabindex="-1" style="z-index:9001!important">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div id="divDetailsIframe" style="position:relative">
+                        <iframe id="iframe-content"  frameborder="1" style="position:absolute;top:0px;width:100%;height:100vh;"></iframe>
                     </div>
                 </div>
             </div>
@@ -214,7 +248,7 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
             <div class="modal-dialog" role="document">
                 <div class="modal-content">
                     <div id="divResultAlertLdap"></div>
-                    <div class="modal-header text-center bg-secondary">
+                    <div class="modal-header text-center bg-danger">
 
                         <h4 class="modal-title w-100 font-weight-bold text-white"><i class="fas fa-exclamation-circle"></i>&nbsp;<?= TRANS('TXT_IMPORTANT'); ?></h4>
                         <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
@@ -225,6 +259,31 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
                     <div class="row p-3 mt-3">
                         <div class="col">
                             <p><?= TRANS('ALERT_BF_SET_TO_LDAP'); ?></p>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer d-flex justify-content-end bg-light">
+                        <button id="closeMessage" class="btn btn-secondary" data-dismiss="modal" aria-label="Close"><?= TRANS('BT_CLOSE'); ?></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="modalAlertOIDC" tabindex="-1" style="z-index:2001!important" role="dialog" aria-labelledby="myModalAlertOIDC" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div id="divResultAlertOIDC"></div>
+                    <div class="modal-header text-center bg-danger">
+
+                        <h4 class="modal-title w-100 font-weight-bold text-white"><i class="fas fa-exclamation-circle"></i>&nbsp;<?= TRANS('TXT_IMPORTANT'); ?></h4>
+                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    
+                    <div class="row p-3 mt-3">
+                        <div class="col">
+                            <p><?= TRANS('ALERT_BF_SET_TO_OIDC'); ?></p>
                         </div>
                     </div>
 
@@ -267,21 +326,15 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
                 
                 <!-- local base or LDAP -->
                 <h5 class="w-100 mt-4 "><i class="fas fa-database text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('CONFIG_AUTHENTICATION_BASE')); ?></h5>
+
+                <div class="row my-2">
+                    <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('TYPE_OF_AUTHENTICATION')); ?></div>
+                    <div class="<?= $colContent; ?>"><?= $authTypes[isset($configs['AUTH_TYPE']) ? $configs['AUTH_TYPE'] : 'SYSTEM']; ?></div>
+                    </div>
+
                 <p class="border-bottom text-secondary font-weight-bold mt-5 ml-2"><?= TRANS('CONFIG_LDAP'); ?></p>
                 <div class="row my-2">
-                    <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('ENABLE_LDAP')); ?></div>
-                    <div class="<?= $colContent; ?>">
-                        <?php
-                        $yesChecked = (isset($configs['AUTH_TYPE']) && $configs['AUTH_TYPE'] == 'LDAP' ? "checked" : "");
-                        $noChecked =  (!isset($configs['AUTH_TYPE']) || $configs['AUTH_TYPE'] != 'LDAP' ? "checked" : "");
-                        ?>
-                        <div class="switch-field">
-                            <input type="radio" id="auth_type_ldap" name="auth_type_ldap" value="yes" <?= $yesChecked; ?> disabled />
-                            <label for="auth_type_ldap"><?= TRANS('YES'); ?></label>
-                            <input type="radio" id="auth_type_ldap_no" name="auth_type_ldap" value="no" <?= $noChecked; ?> disabled />
-                            <label for="auth_type_ldap_no"><?= TRANS('NOT'); ?></label>
-                        </div>
-                    </div>
+                   
                     <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('LDAP_HOST')); ?></div>
                     <div class="<?= $colContent; ?>"><?= $configs['LDAP_HOST'] ?? ''; ?></div>
                     <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('LDAP_PORT')); ?></div>
@@ -303,11 +356,36 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
                 
                 </div>
                 
+                <!-- OIDC -->
+                <p class="border-bottom text-secondary font-weight-bold mt-5 ml-2"><?= TRANS('OIDC_CONFIG'); ?></p>
+                <div class="row my-2">
+                   
+                    <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('OIDC_ISSUER')); ?></div>
+                    <div class="<?= $colContent; ?>"><?= $configs['OIDC_ISSUER'] ?? ''; ?></div>
+                    <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('OIDC_CLIENT_ID')); ?></div>
+                    <div class="<?= $colContent; ?>"><?= $configs['OIDC_CLIENT_ID'] ?? ''; ?></div>
+                    <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('OIDC_LOGOUT_URL')); ?></div>
+                    <div class="<?= $colContent; ?>"><?= $configs['OIDC_LOGOUT_URL'] ?? ''; ?></div>
+                    <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('OIDC_FIELD_USERNAME')); ?></div>
+                    <div class="<?= $colContent; ?>"><?= $configs['OIDC_FIELD_USERNAME'] ?? ''; ?></div>
+                    <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('OIDC_FIELD_FULLNAME')); ?></div>
+                    <div class="<?= $colContent; ?>"><?= $configs['OIDC_FIELD_FULLNAME'] ?? 'name'; ?></div>
+                    <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('OIDC_FIELD_EMAIL')); ?></div>
+                    <div class="<?= $colContent; ?>"><?= $configs['OIDC_FIELD_EMAIL'] ?? 'mail'; ?></div>
+                    <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('OIDC_FIELD_PHONE')); ?></div>
+                    <div class="<?= $colContent; ?>"><?= $configs['OIDC_FIELD_PHONE'] ?? 'telephonenumber'; ?></div>
+                    <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('OIDC_CLIENT_TO_BIND_NEWUSERS')); ?></div>
+                    <div class="<?= $colContent; ?>"><?= $oidcClientToNewUsers; ?></div>
+                    <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('OIDC_AREA_TO_BIND_NEWUSERS')); ?></div>
+                    <div class="<?= $colContent; ?>"><?= $oidcAreaToNewUsers; ?></div>
+                
+                </div>
+                
                 <h5 class="w-100 mt-4 "><i class="fas fa-magic text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('AUTO_OPEN_TICKET_BY_EMAIL')); ?></h5>
                 <p class="border-bottom text-secondary font-weight-bold mt-5 ml-2"><?= TRANS('CONNECTION'); ?></p>
                 <div class="row my-2">
                     <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('ALLOW_AUTO_OPEN_TICKET_BY_EMAIL')); ?></div>
-                    <div class="<?= $colContent; ?>">
+                    <div class="<?= $colContent2; ?>">
                         <?php
                         $yesChecked = ($configs['ALLOW_OPEN_TICKET_BY_EMAIL'] == 1 ? "checked" : "");
                         $noChecked = ($configs['ALLOW_OPEN_TICKET_BY_EMAIL'] == 0 ? "checked" : "");
@@ -319,6 +397,35 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
                             <label for="allow_open_by_email_no"><?= TRANS('NOT'); ?></label>
                         </div>
                     </div>
+
+                    <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('ONLY_FROM_REGISTERED_EMAILS')); ?></div>
+                    <div class="<?= $colContent2; ?>">
+                        <?php
+                        $yesChecked = (($configs['EMAIL_TICKETS_ONLY_FROM_REGISTERED'] ?? 0) == 1 ? "checked" : "");
+                        $noChecked = (($configs['EMAIL_TICKETS_ONLY_FROM_REGISTERED'] ?? 0) == 0 ? "checked" : "");
+                        ?>
+                        <div class="switch-field">
+                            <input type="radio" id="only_from_registered_read" name="only_from_registered_read" value="yes" <?= $yesChecked; ?> disabled />
+                            <label for="only_from_registered_read"><?= TRANS('YES'); ?></label>
+                            <input type="radio" id="only_from_registered_read_no" name="only_from_registered_read" value="no" <?= $noChecked; ?> disabled />
+                            <label for="only_from_registered_read_no"><?= TRANS('NOT'); ?></label>
+                        </div>
+                    </div>
+
+                    <div class="<?= $colLabel; ?>"><?= TRANS('OFFICE_365'); ?></div>
+                    <div class="<?= $colContent; ?>">
+                        <?php
+                        $yesChecked = (($configs['IMAP_PROVIDER'] ?? 0) == 'AZURE' ? "checked" : "");
+                        $noChecked = (($configs['IMAP_PROVIDER'] ?? 0) == 0 ? "checked" : "");
+                        ?>
+                        <div class="switch-field">
+                            <input type="radio" id="imap_provider_azure" name="imap_provider_azure" value="yes" <?= $yesChecked; ?> disabled />
+                            <label for="imap_provider_azure"><?= TRANS('YES'); ?></label>
+                            <input type="radio" id="imap_provider_azure_no" name="imap_provider_azure" value="no" <?= $noChecked; ?> disabled />
+                            <label for="imap_provider_azure_no"><?= TRANS('NOT'); ?></label>
+                        </div>
+                    </div>
+
                     <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('MAIL_ADDRESS_TO_FETCH')); ?></div>
                     <div class="<?= $colContent; ?>"><?= $configs['MAIL_GET_ADDRESS']; ?></div>
                     <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('IMAP_ADDRESS_TO_FETCH')); ?></div>
@@ -371,7 +478,7 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
                 <div class="row my-2">
                     <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('SYSTEM_USER_TO_OPEN_TICKETS')); ?></div>
                     <div class="<?= $colContent; ?>"><?= $userToOpenTickets; ?></div>
-                    <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('CLIENT')); ?></div>
+                    <div class="<?= $colLabel; ?>" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_AUTO_TICKETING_CLIENT'); ?>"><?= firstLetterUp(TRANS('CLIENT')); ?></div>
                     <div class="<?= $colContent; ?>"><?= $clientToOpenTickets; ?></div>
                     <div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('SERVICE_AREA')); ?></div>
                     <div class="<?= $colContent; ?>"><?= $areaToOpenTickets; ?></div>
@@ -451,30 +558,30 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
 
                 
                 
-                <!-- Seção para configuração do LDAP -->
+                <!-- Seção para configuração do serviço de autenticação -->
                 <div class="form-group row mt-2 mb-4">
 
                     <h6 class="w-100 mt-5 ml-4 mb-4"><i class="fas fa-database text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('CONFIG_AUTHENTICATION_BASE')); ?></h6>
 
-                    <div class="form-group col-md-12 mt-4">
-                        <p class="border-bottom text-secondary font-weight-bold ml-4"><?= TRANS('CONFIG_LDAP'); ?></p>
+
+                            <?php
+                        $defined_auth_type =  $authTypes[isset($configs['AUTH_TYPE']) ? $configs['AUTH_TYPE'] : 'SYSTEM'];
+                            ?>
+
+                    <label class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('TYPE_OF_AUTHENTICATION'); ?>"><?= firstLetterUp(TRANS('TYPE_OF_AUTHENTICATION')); ?></label>
+                    <div class="form-group col-md-9 switch-field container-switch">
+                        <div class="multi-switch">
+                            <input type="radio" id="auth_system" name="auth_type" value="SYSTEM" <?= (!isset($configs['AUTH_TYPE']) || $configs['AUTH_TYPE'] == "SYSTEM" ? " checked" : ""); ?>/>
+                            <label for="auth_system" class="color-primary"><?= TRANS('AUTH_LOCAL_BASE'); ?></label>
+                            <input type="radio" id="auth_ldap" name="auth_type" value="LDAP" <?= (isset($configs['AUTH_TYPE']) && $configs['AUTH_TYPE'] == "LDAP" ? " checked" : ""); ?>/>
+                            <label for="auth_ldap" class="color-primary"><?= TRANS('AUTH_LDAP_BASE'); ?></label>
+                            <input type="radio" id="auth_oidc" name="auth_type" value="OIDC" <?= (isset($configs['AUTH_TYPE']) && $configs['AUTH_TYPE'] == "OIDC" ? " checked" : ""); ?>/>
+                            <label for="auth_oidc" class="color-primary"><?= TRANS('AUTH_OIDC_BASE'); ?></label>
+                        </div>
                     </div>
                     <div class="w-100"></div>
 
-                    <label class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_ENABLE_LDAP'); ?>"><?= firstLetterUp(TRANS('ENABLE_LDAP')); ?></label>
-                    <div class="form-group col-md-9">
-
-                        <div class="switch-field">
-                            <?php
-                            $yesChecked = (isset($configs['AUTH_TYPE']) && $configs['AUTH_TYPE'] == 'LDAP' ? "checked" : "");
-                            $noChecked =  (!isset($configs['AUTH_TYPE']) || $configs['AUTH_TYPE'] != 'LDAP' ? "checked" : "");
-                            ?>
-                            <input type="radio" id="auth_type_ldap" name="auth_type_ldap" value="yes" <?= $yesChecked; ?> />
-                            <label for="auth_type_ldap"><?= TRANS('YES'); ?></label>
-                            <input type="radio" id="auth_type_ldap_no" name="auth_type_ldap" value="no" <?= $noChecked; ?> />
-                            <label for="auth_type_ldap_no"><?= TRANS('NOT'); ?></label>
-                        </div>
-                    </div>
+                    
                     <label for="ldap_host" class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_LDAP_HOST'); ?>"><?= firstLetterUp(TRANS('LDAP_HOST')); ?></label>
                     <div class="form-group col-md-9">
                         <input type="text" class="form-control" name="ldap_host" id="ldap_host" value="<?= $configs['LDAP_HOST'] ?? ''; ?>" placeholder="<?= TRANS('LDAP_HOST'); ?>" />
@@ -552,6 +659,102 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
                     <div class="w-100"></div>
 
 
+                    <div class="form-group col-md-12 mt-4">
+                        <p class="border-bottom text-secondary font-weight-bold ml-4"><?= TRANS('OIDC_CONFIG'); ?></p>
+                    </div>
+                    <div class="w-100"></div>
+                    
+                    <label for="oidc_issuer" class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_OIDC_ISSUER'); ?>"><?= TRANS('OIDC_ISSUER'); ?></label>
+
+					<div class="form-group col-md-9">
+						<input type="text" class="form-control" name="oidc_issuer" id="oidc_issuer" required value="<?= $configs['OIDC_ISSUER'] ?? ''; ?>" />
+					</div>
+
+                    <label for="oidc_client_id" class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('OIDC_CLIENT_ID'); ?>"><?= TRANS('OIDC_CLIENT_ID'); ?></label>
+
+					<div class="form-group col-md-9">
+						<input type="text" class="form-control" name="oidc_client_id" id="oidc_client_id" required value="<?= $configs['OIDC_CLIENT_ID'] ?? ''; ?>" />
+					</div>
+
+                    <label for="oidc_client_secret" class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('OIDC_CLIENT_SECRET'); ?>"><?= TRANS('OIDC_CLIENT_SECRET'); ?></label>
+
+					<div class="form-group col-md-9">
+						<input type="password" class="form-control" name="oidc_client_secret" id="oidc_client_secret" required value="" />
+					</div>
+
+                    <label for="logout_url" class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('OIDC_LOGOUT_URL'); ?>"><?= TRANS('OIDC_LOGOUT_URL'); ?></label>
+
+					<div class="form-group col-md-9">
+						<input type="text" class="form-control" name="logout_url" id="logout_url" required value="<?= $configs['OIDC_LOGOUT_URL'] ?? ''; ?>" />
+					</div>
+
+                    <label for="oidc_field_username" class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_OIDC_FIELD_USERNAME'); ?>"><?= firstLetterUp(TRANS('OIDC_FIELD_USERNAME')); ?></label>
+                    <div class="form-group col-md-9">
+                        <input type="text" class="form-control" name="oidc_field_username" id="oidc_field_username" value="<?= $configs['OIDC_FIELD_USERNAME'] ?? 'preferred_username'; ?>" placeholder="<?= TRANS('OIDC_FIELD_USERNAME'); ?>" />
+                    </div>
+
+
+                    <label for="oidc_field_fullname" class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_OIDC_FIELD_FULLNAME'); ?>"><?= firstLetterUp(TRANS('OIDC_FIELD_FULLNAME')); ?></label>
+                    <div class="form-group col-md-9">
+                        <input type="text" class="form-control" name="oidc_field_fullname" id="oidc_field_fullname" value="<?= $configs['OIDC_FIELD_FULLNAME'] ?? 'name'; ?>" placeholder="<?= TRANS('OIDC_FIELD_FULLNAME'); ?>" />
+                    </div>
+                    <label for="oidc_field_email" class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_OIDC_FIELD_EMAIL'); ?>"><?= firstLetterUp(TRANS('OIDC_FIELD_EMAIL')); ?></label>
+                    <div class="form-group col-md-9">
+                        <input type="text" class="form-control" name="oidc_field_email" id="oidc_field_email" value="<?= $configs['OIDC_FIELD_EMAIL'] ?? 'email'; ?>" placeholder="<?= TRANS('OIDC_FIELD_EMAIL'); ?>" />
+                    </div>
+                    <label for="oidc_field_phone" class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_OIDC_FIELD_PHONE'); ?>"><?= firstLetterUp(TRANS('OIDC_FIELD_PHONE')); ?></label>
+                    <div class="form-group col-md-9">
+                        <input type="text" class="form-control" name="oidc_field_phone" id="oidc_field_phone" value="<?= $configs['OIDC_FIELD_PHONE'] ?? ''; ?>" placeholder="<?= TRANS('OIDC_FIELD_PHONE'); ?>" />
+                    </div>
+
+                    <label for="oidc_client_to_assign" class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_OIDC_CLIENT_TO_BIND_NEWUSERS'); ?>"><?= firstLetterUp(TRANS('OIDC_CLIENT_TO_BIND_NEWUSERS')); ?></label>
+                    <div class="form-group col-md-9">
+
+                        <SELECT class="form-control bs-select" name="oidc_client_to_assign" id="oidc_client_to_assign" >
+                            <option value=""><?= TRANS('FILL_EMPTY'); ?></option>
+                        <?php
+                            $clients = getClients($conn, null, 2);
+                            foreach ($clients as $client) {
+                                ?>
+                                <option value="<?= $client['id']; ?>"
+                                    <?= (isset($configs['OIDC_CLIENT_TO_BIND_NEWUSERS']) && $client['id'] == $configs['OIDC_CLIENT_TO_BIND_NEWUSERS'] ? " selected" : ""); ?>>
+                                    <?= $client['nickname']; ?>
+                                </option>
+                                <?php
+                            }
+                        ?>
+                        </SELECT>
+                    </div>
+
+
+                    <label for="oidc_area" class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_OIDC_AREA_TO_BIND_NEWUSERS'); ?>"><?= firstLetterUp(TRANS('OIDC_AREA_TO_BIND_NEWUSERS')); ?></label>
+                    <div class="form-group col-md-9">
+
+                        <SELECT class="form-control bs-select" name="oidc_area" id="oidc_area" >
+                            <option value=""><?= TRANS('SEL_SELECT'); ?></option>
+                        <?php
+                            $areas = getAreas($conn, 0, 1, 0);
+                            foreach ($areas as $area) {
+                                ?>
+                                <option value="<?= $area['sis_id']; ?>"
+                                    <?= (isset($configs['OIDC_AREA_TO_BIND_NEWUSERS']) && $area['sis_id'] == $configs['OIDC_AREA_TO_BIND_NEWUSERS'] ? " selected" : ""); ?>>
+                                    <?= $area['sistema']; ?>
+                                </option>
+                                <?php
+                            }
+                        ?>
+                        </SELECT>
+                    </div>
+
+                    <!-- <label class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('BT_OIDC_TEST'); ?>"><?= firstLetterUp(TRANS('BT_OIDC_TEST')); ?></label>
+                    <div class="form-group col-md-9">
+                        <input type="button" class="btn btn-success" name="testOIDC" id="testOIDC" value="<?= TRANS('BT_OIDC_TEST'); ?>" disabled>
+                    </div> -->
+                    
+                    <div class="w-100"></div>
+
+
+
                 </div>
                 
                 <!-- Seção para abertura de chamados por e-mail -->
@@ -566,7 +769,7 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
                     <div class="w-100"></div>
 
                     <label class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('ALLOW_AUTO_OPEN_TICKET_BY_EMAIL'); ?>"><?= firstLetterUp(TRANS('ALLOW_AUTO_OPEN_TICKET_BY_EMAIL')); ?></label>
-                    <div class="form-group col-md-9">
+                    <div class="form-group col-md-3">
 
                         <div class="switch-field">
                             <?php
@@ -579,6 +782,42 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
                             <label for="allow_open_by_email_no"><?= TRANS('NOT'); ?></label>
                         </div>
                     </div>
+
+
+                    <label class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_ONLY_FROM_REGISTERED_EMAILS'); ?>"><?= firstLetterUp(TRANS('ONLY_FROM_REGISTERED_EMAILS')); ?></label>
+                    <div class="form-group col-md-3">
+
+                        <div class="switch-field">
+                            <?php
+                            $yesChecked = (($configs['EMAIL_TICKETS_ONLY_FROM_REGISTERED'] ?? 0) == 1 ? "checked" : "");
+                            $noChecked = (($configs['EMAIL_TICKETS_ONLY_FROM_REGISTERED'] ?? 0) == 0 ? "checked" : "");
+                            ?>
+                            <input type="radio" id="only_from_registered" name="only_from_registered" value="yes" <?= $yesChecked; ?> />
+                            <label for="only_from_registered"><?= TRANS('YES'); ?></label>
+                            <input type="radio" id="only_from_registered_no" name="only_from_registered" value="no" <?= $noChecked; ?> />
+                            <label for="only_from_registered_no"><?= TRANS('NOT'); ?></label>
+                        </div>
+                    </div>
+
+
+                    <label class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_OFFICE_365'); ?>"><?= firstLetterUp(TRANS('OFFICE_365')); ?></label>
+                    <div class="form-group col-md-3">
+
+                        <div class="switch-field">
+                            <?php
+                            $yesChecked = (($configs['IMAP_PROVIDER'] ?? 0) == 'AZURE' ? "checked" : "");
+                            $noChecked = (($configs['IMAP_PROVIDER'] ?? 0) != 'AZURE' ? "checked" : "");
+                            ?>
+                            <input type="radio" id="imap_provider_azure" name="imap_provider_azure" value="yes" <?= $yesChecked; ?> />
+                            <label for="imap_provider_azure"><?= TRANS('YES'); ?></label>
+                            <input type="radio" id="imap_provider_azure_no" name="imap_provider_azure" value="no" <?= $noChecked; ?> />
+                            <label for="imap_provider_azure_no"><?= TRANS('NOT'); ?></label>
+                        </div>
+                    </div>
+                    <label class="col-md-3 col-form-label col-form-label-sm text-md-right"><?= TRANS('GET_ACCESS_TOKEN'); ?></label>
+                    <div class="form-group col-md-3">
+                        <button class="btn btn-oc-orange text-white bt-oauth-key" name="get_token" id="get_token" disabled>&nbsp;<?= TRANS('BT_GET_TOKEN'); ?></button>
+                    </div>     
 
                     <label for="mail_account" class="col-md-3 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_MAIL_ADDRESS_TO_FETCH'); ?>"><?= firstLetterUp(TRANS('MAIL_ADDRESS_TO_FETCH')); ?></label>
                     <div class="form-group col-md-3">
@@ -979,11 +1218,23 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
     $(function() {
 
         $(function() {
-            $('[data-toggle="popover"]').popover()
+            $('[data-toggle="popover"]').popover({
+                html: true
+            });
         });
 
         $('.popover-dismiss').popover({
             trigger: 'focus'
+        });
+
+        $('#modalIframe').on('hidden.bs.modal', function (e) {
+            $("#iframe-content").attr('src','');
+        });
+
+        $('#get_token').on('click', function(e) {
+            e.preventDefault();
+            // loadInIframe('../oauth/get_oauth_token');
+            openWindowToGetToken();
         });
 
         $.fn.selectpicker.Constructor.BootstrapVersion = '4';
@@ -1002,14 +1253,35 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
 
 
         enableBtLdapTest();
+        enableBtOIDCTest();
         $('input').on('change', function(){
             enableBtLdapTest();
+            enableBtOIDCTest();
         });
+
+        enableBtRegisteredUsers();
+        $('[name="allow_open_by_email"]').on('change', function() {
+            enableBtRegisteredUsers();
+		});
+
+        enableButtonGetToken();
+        $('[name="imap_provider_azure"]').on('change', function() {
+            enableButtonGetToken();
+		});
+
 
         $('#testLdap').on('click', function(e){
             e.preventDefault();
             $('#modalLdap').modal();
             $('#confirmLdapTest').html('<a class="btn btn-primary" onclick="doLdapTest()"><?= TRANS('BT_LDAP_TEST'); ?></a>');
+        });
+
+        $('#testOIDC').on('click', function(e){
+            e.preventDefault();
+            // $('#modalOIDC').modal();
+            doOIDCTest();
+
+            // $('#confirmOIDCTest').html('<a class="btn btn-primary" onclick="doOIDCTest()"><?= TRANS('BT_OIDC_TEST'); ?></a>');
         });
 
         $('#modalLdap').on('hidden.bs.modal', function(){
@@ -1019,9 +1291,12 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
         });
 
 
-        $('#auth_type_ldap').on('change', function(){
-            if($(this).val() == 'yes'){
+        $('[name="auth_type"]').on('change', function(){
+            if($(this).val() == 'LDAP'){
                $('#modalAlertLdap').modal();
+            } else
+            if($(this).val() == 'OIDC'){
+               $('#modalAlertOIDC').modal();
             }
         });
 
@@ -1039,8 +1314,11 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
             $("#idSubmit").prop("disabled", true);
             $("#testConnection").val('<?= TRANS('WAIT'); ?>');
 
+            var testUrl = (!$('#imap_provider_azure').is(':checked')) ? 'test_imap_connection' : 'test_azure_oauth_connection';
+
+
             $.ajax({
-                url: './test_imap_connection.php',
+                url: './' + testUrl + '.php',
                 method: 'POST',
                 data: $('#form').serialize(),
                 dataType: 'json',
@@ -1154,7 +1432,7 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
     
     function enableBtLdapTest () {
         if ($('#ldap_host').val() != '' && 
-            $('#ldap_domain').val() != '' && 
+            //$('#ldap_domain').val() != '' && 
             $('#ldap_basedn').val() != '' && 
             $('#ldap_field_fullname').val() != '' && 
             $('#ldap_field_email').val() != '' && 
@@ -1205,6 +1483,98 @@ if (isset($configs['LDAP_AREA_TO_BIND_NEWUSERS']) && $configs['LDAP_AREA_TO_BIND
         });
         return false;
     };
+
+
+    function enableBtRegisteredUsers() {
+        if ($('#allow_open_by_email').is(':checked')) {
+            $('#only_from_registered').prop('disabled', false);
+            $('#only_from_registered_no').prop('disabled', false);
+        } else {
+            $('#only_from_registered').prop('disabled', true);
+            $('#only_from_registered_no').prop('disabled', true);
+        }
+    }
+
+    function enableButtonGetToken() {
+        if ($('#imap_provider_azure').is(':checked')) {
+            $('#get_token').prop('disabled', false);
+            $('#account_password').prop('disabled', true);
+            $('#account_password').attr('placeholder', '<?= TRANS('UNECESSARY_TO_OAUTH'); ?>');
+        } else {
+            $('#get_token').prop('disabled', true);
+            $('#account_password').prop('disabled', false);
+            $('#account_password').attr('placeholder', '<?= TRANS('PASSWORD_EDIT_PLACEHOLDER'); ?>');
+
+        }
+    }
+
+
+    function enableBtOIDCTest () {
+        if ($('#oidc_issuer').val() != '' && 
+            $('#oidc_client_id').val() != '' && 
+            $('#oidc_client_secret').val() != '' 
+        ) {
+            $('#testOIDC').prop('disabled', false);
+        } else {
+            $('#testOIDC').prop('disabled', true);
+        }
+    }
+
+    function doOIDCTest() {
+        var loading = $(".loading");
+        $(document).ajaxStart(function() {
+            loading.show();
+        });
+        $(document).ajaxStop(function() {
+            loading.hide();
+        });
+        $("#testOIDC").prop("disabled", true);
+        $("#testOIDC").val('<?= TRANS('WAIT'); ?>');
+        $("#idSubmit").prop("disabled", true);
+        
+        // $("#confirmOIDCTest").prop("disabled", true);
+        // $("#confirmOIDCTest").val('<?= TRANS('WAIT'); ?>');
+
+        $.ajax({
+            url: './test_oidc_settings.php',
+            method: 'POST',
+            data: $('#form').serialize()+'&oidc_user='+$('#oidc_user').val()+'&oidc_password='+$('#oidc_password').val(),
+            dataType: 'json',
+        }).done(function(response) {
+
+            if (!response.success) {
+                $('#divResultOIDC').html(response.message);
+                $('input, select, textarea').removeClass('is-invalid');
+                if (response.field_id != "") {
+                    $('#' + response.field_id).focus().addClass('is-invalid');
+                }
+                // $("#confirmOIDCTest").prop("disabled", false);
+                $("#testOIDC").prop("disabled", false);
+                $("#idSubmit").prop("disabled", false);
+                $("#testOIDC").val('<?= TRANS('BT_OIDC_TEST'); ?>');
+            } else {
+                $('#divResultOIDC').html(response.message);
+                $('input, select, textarea').removeClass('is-invalid');
+                $("#testOIDC").prop("disabled", false);
+                $("#idSubmit").prop("disabled", false);
+                $("#testOIDC").val('<?= TRANS('BT_OIDC_TEST'); ?>');
+                return false;
+            }
+        });
+        return false;
+    };
+
+    function openWindowToGetToken() {
+        let location = '../oauth/get_oauth_token.php'
+        popup_alerta_wide(location);
+    }
+
+
+    function loadInIframe(pageBase, params) {
+        let url = pageBase + '.php?' + params;
+        $("#iframe-content").attr('src',url)
+        $('#modalIframe').modal();
+    }
 </script>
 </body>
 
