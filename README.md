@@ -1,4 +1,4 @@
-# OcoMon - version 5.x
+# Helpdesk tem como base o OcoMon
 ## Date: 2023, June
 ## Author: Flávio Ribeiro (flaviorib@gmail.com)
 
