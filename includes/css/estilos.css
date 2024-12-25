@@ -45,6 +45,15 @@ fieldset {
   cursor: help;
 }
 
+.cursor-no-event {
+  cursor: default !important;
+}
+
+.cursor-edit {
+  cursor: url("../imgs/pencil-alt-solid.svg"), pointer!important;
+}
+
+
 body {
   font-family: FreeSans, sans-serif;
   color: black;
@@ -233,7 +242,7 @@ tr.lin_par {
   padding: 5px;
 }
 
-td.line {
+th.line, td.line {
   border-bottom: solid #f6f6f6;
   border-bottom-width: 2px;
   padding: 8px;

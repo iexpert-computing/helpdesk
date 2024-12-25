@@ -34,6 +34,8 @@ $conn = ConnectPDO::getInstance();
 
 $post = $_POST;
 
+// var_dump($post);    
+
 $terms = "";
 $criteria = array();
 $criterText = "";
@@ -147,6 +149,32 @@ if (isset($post['no_empty_' . $post_field_sufix]) && $post['no_empty_' . $post_f
 }
 
 
+
+/* Usuário do ativo */
+/* Exibição dos critérios relacionados aos usuários dos ativos */
+if (isset($post['no_empty_asset_user']) && !empty($post['no_empty_asset_user'])) {
+
+    $criterText = TRANS('SMART_ASSETS_HAVING_USERS') . "<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
+    $terms .= " ";
+} elseif (isset($post['no_asset_user']) && !empty($post['no_asset_user'])) {
+
+    $criterText = TRANS('SMART_ASSETS_NOT_HAVING_USERS') . "<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
+    $terms .= " ";
+} elseif (isset($post['asset_user']) && !empty($post['asset_user'])) {
+    $criterText = "";
+    
+    $usersNames = getArrayOfUsersNamesByIds($conn, $post['asset_user']);
+    $criterText = implode(", ", $usersNames);
+
+    $criterText = TRANS('FIELD_USER') . ": " . $criterText ."<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
+    $terms .= " ";
+} 
+
+
+
 /* Etiqueta */
 $field_label = TRANS('ASSET_TAG');
 $post_field_sufix = "etiqueta";
@@ -164,7 +192,7 @@ if (isset($post['no_empty_' . $post_field_sufix]) && $post['no_empty_' . $post_f
 
 } elseif (isset($post[$post_field_sufix]) && !empty($post[$post_field_sufix])) {
     
-    $tmp = explode(',', $post[$post_field_sufix]);
+    $tmp = explode(',', (string)$post[$post_field_sufix]);
     // $treatValues = array_map('intval', $tmp);
     $treatValues = array_map('noHtml', $tmp);
     $tagIN = "";
@@ -223,6 +251,35 @@ if (isset($post['no_empty_' . $post_field_sufix]) && $post['no_empty_' . $post_f
     $criterText = $field_label . ": " . $criterText ."<br />";
     $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
 }
+
+
+/* asset_or_resource : Filtra se é busca sobre todos os ativos ou apenas recursos */
+$field_label = TRANS('CONSIDERS');
+// $queryForTypes = [
+//     1 => "",
+//     2 => "AND cat.cat_is_product = 0",
+//     3 => "AND cat.cat_is_product = 1"
+// ];
+
+$queryForTypes = [
+    1 => "",
+    2 => "AND (c.is_product IS NULL OR c.is_product = 0) ",
+    3 => "AND c.is_product = 1"
+];
+
+$optionsForTypes = [
+    1 => TRANS('ALL_TYPES'),
+    2 => TRANS('ONLY_ASSETS'),
+    3 => TRANS('ONLY_RESOURCES')
+];
+if (isset($post['asset_or_resource']) && !empty($post['asset_or_resource'])) {
+    $terms .= $queryForTypes[$post['asset_or_resource']];
+
+    $criterText = $field_label . ": " . $optionsForTypes[$post['asset_or_resource']] ."<br />";
+    $criteria[] = "<span class='{$badgeClass}'>{$criterText}</span>";
+}
+
+
 
 
 
@@ -378,7 +435,7 @@ if (isset($post['no_empty_' . $post_field_sufix]) && $post['no_empty_' . $post_f
 
 } elseif (isset($post[$post_field_sufix]) && !empty($post[$post_field_sufix])) {
     
-    $tmp = explode(',', $post[$post_field_sufix]);
+    $tmp = explode(',', (string)$post[$post_field_sufix]);
     // $treatValues = array_map('intval', $tmp);
     $treatValues = array_map('noHtml', $tmp);
     $tagIN = "";
@@ -411,7 +468,7 @@ if (isset($post['no_empty_' . $post_field_sufix]) && $post['no_empty_' . $post_f
 
 } elseif (isset($post[$post_field_sufix]) && !empty($post[$post_field_sufix])) {
     
-    $tmp = explode(',', $post[$post_field_sufix]);
+    $tmp = explode(',', (string)$post[$post_field_sufix]);
     // $treatValues = array_map('intval', $tmp);
     $treatValues = array_map('noHtml', $tmp);
     $tagIN = "";
@@ -605,7 +662,7 @@ if (isset($post['no_empty_' . $post_field_sufix]) && $post['no_empty_' . $post_f
 
 } elseif (isset($post[$post_field_sufix]) && !empty($post[$post_field_sufix])) {
     
-    $tmp = explode(',', $post[$post_field_sufix]);
+    $tmp = explode(',', (string)$post[$post_field_sufix]);
     // $treatValues = array_map('intval', $tmp);
     $treatValues = array_map('noHtml', $tmp);
     $tagIN = "";
@@ -794,13 +851,20 @@ if (isset($post['no_empty_' . $post_field_sufix]) && $post['no_empty_' . $post_f
 
 // echo $terms;
 
-// $sql = $QRY["ocorrencias_full_ini"] . " WHERE 1 = 1 {$terms} ORDER BY numero";
 $sql = $QRY["full_detail_ini"];
 $sql .= $terms;
-$sql .= $QRY["full_detail_fim"];
 $sql .= " ORDER BY instituicao, etiqueta";
 
-// dump($sql);
+// /* Controle para evitar consultas sem critérios relevantes */
+// if (empty(trim($terms))) {
+//     $criterText = TRANS('SMART_WITHOUT_SEARCH_CRITERIA') . "<br />";
+//     $criteria[] = "<span class='{$badgeClassEmptySearch}'>{$criterText}</span>";
+
+//     /* Não permito a busca de ativos sem ao menos um critério dentro dos campos oficiais */
+//     echo message('warning', '', TRANS('CHOOSE_AT_LEAST_ONE_CRITERIA_ASSETS'), '', '' , 1);
+//     exit;
+
+// }
 
 $sqlResult = $conn->query($sql);
 $totalFiltered = $sqlResult->rowCount();
@@ -900,7 +964,7 @@ $dontRender = [];
 $customTerms = [];
 foreach ($custom_fields as $cfield) {
     $criterText = "";
-
+    
     /* Ver os campos que não devem ser renderizados */
     if (isset($post[$noRenderPrefix . $cfield['field_name']]) && $post[$noRenderPrefix . $cfield['field_name']] == 1) {
         $dontRender[] = $cfield['id'];
@@ -1053,29 +1117,38 @@ $criterios = "";
         <table id="table_tickets_queue" class="stripe hover order-column row-border" border="0" cellspacing="0" width="100%">
             <thead>
                 <tr class="header">
-                    <td class='line etiqueta'><?= TRANS('ASSET_TAG'); ?></td>
-                    <td class='line cliente'><?= TRANS('CLIENT'); ?></td>
-                    <td class='line unidade'><?= TRANS('COL_UNIT'); ?></td>
-                    <td class='line asset_category'><?= TRANS('ASSET_CATEGORY'); ?></td>
-                    <td class='line type_of'><?= TRANS('COL_TYPE'); ?></td>
-                    <td class='line manufacturer'><?= TRANS('COL_MANUFACTURER'); ?></td>
-                    <td class='line model'><?= TRANS('COL_MODEL'); ?></td>
-                    <td class='line serial_number'><?= TRANS('SERIAL_NUMBER'); ?></td>
-                    <td class='line part_number'><?= TRANS('COL_PARTNUMBER'); ?></td>
-                    <td class='line department'><?= TRANS('DEPARTMENT'); ?></td>
-                    <td class='line state'><?= TRANS('STATE'); ?></td>
-                    <td class='line supplier'><?= TRANS('COL_VENDOR'); ?></td>
-                    <td class='line cost_center'><?= TRANS('COST_CENTER'); ?></td>
-                    <td class='line value'><?= TRANS('FIELD_PRICE'); ?></td>
-                    <td class='line invoice_number'><?= TRANS('INVOICE_NUMBER'); ?></td>
-                    <td class='line assistance'><?= TRANS('ASSISTENCE'); ?></td>
-                    <td class='line waranty_type'><?= TRANS('FIELD_TYPE_WARRANTY'); ?></td>
-                    <td class='line waranty_expire'><?= TRANS('WARRANTY_EXPIRE'); ?></td>
-                    <td class='line purchase_date'><?= TRANS('PURCHASE_DATE'); ?></td>
+                    <?php
+                        if ($_SESSION['s_nivel'] == 1) {
+                            ?>
+                                <th class="line"></th><!-- Para o checkbox de selecao -->
+                            <?php
+                        }
+                    ?>
+                
+                    <th class='line etiqueta'><?= TRANS('ASSET_TAG'); ?></th>
+                    <th class='line cliente'><?= TRANS('CLIENT'); ?></th>
+                    <th class='line unidade'><?= TRANS('COL_UNIT'); ?></th>
+                    <th class='line asset_category'><?= TRANS('ASSET_CATEGORY'); ?></th>
+                    <th class='line type_of'><?= TRANS('COL_TYPE'); ?></th>
+                    <th class='line manufacturer'><?= TRANS('COL_MANUFACTURER'); ?></th>
+                    <th class='line model'><?= TRANS('COL_MODEL'); ?></th>
+                    <th class='line allocated_to'><?= TRANS('ALLOCATED_TO'); ?></th>
+                    <th class='line serial_number'><?= TRANS('SERIAL_NUMBER'); ?></th>
+                    <th class='line part_number'><?= TRANS('COL_PARTNUMBER'); ?></th>
+                    <th class='line department'><?= TRANS('DEPARTMENT'); ?></th>
+                    <th class='line state'><?= TRANS('STATE'); ?></th>
+                    <th class='line supplier'><?= TRANS('COL_VENDOR'); ?></th>
+                    <th class='line cost_center'><?= TRANS('COST_CENTER'); ?></th>
+                    <th class='line value'><?= TRANS('FIELD_PRICE'); ?></th>
+                    <th class='line invoice_number'><?= TRANS('INVOICE_NUMBER'); ?></th>
+                    <th class='line assistance'><?= TRANS('ASSISTENCE'); ?></th>
+                    <th class='line waranty_type'><?= TRANS('FIELD_TYPE_WARRANTY'); ?></th>
+                    <th class='line waranty_expire'><?= TRANS('WARRANTY_EXPIRE'); ?></th>
+                    <th class='line purchase_date'><?= TRANS('PURCHASE_DATE'); ?></th>
 
-                    <td class='line direct_attributes'><?= TRANS('DIRECT_ATTRIBUTES'); ?></td>
-                    <td class='line aggregated_attributes'><?= TRANS('AGGREGATED_ATTRIBUTES'); ?></td>
-                    <td class='line soft_aggregated_attributes'><?= TRANS('AGGREGATED_SOFTWARES'); ?></td>
+                    <th class='line direct_attributes'><?= TRANS('DIRECT_ATTRIBUTES'); ?></th>
+                    <th class='line aggregated_attributes'><?= TRANS('AGGREGATED_ATTRIBUTES'); ?></th>
+                    <th class='line soft_aggregated_attributes'><?= TRANS('AGGREGATED_SOFTWARES'); ?></th>
 
 
 
@@ -1084,25 +1157,60 @@ $criterios = "";
                         foreach ($custom_fields_full as $cfield) {
                             if (!in_array($cfield['id'], $dontRender)) {
                             ?>
-                                <td class="line custom_field <?= $cfield['field_name']; ?>"><?= $cfield['field_label']; ?></td>
+                                <th class="line custom_field <?= $cfield['field_name']; ?>"><?= $cfield['field_label']; ?></th>
                             <?php
                             }
                         }
                     ?>
 
-                    <td class='line deprecated_attributes'><?= TRANS('DEPRECATED_ATTRIBUTES'); ?></td>
+                    <th class='line deprecated_attributes'><?= TRANS('DEPRECATED_ATTRIBUTES'); ?></th>
 
                 </tr>
             </thead>
        
 <?php
 
-
+$result_ids = array();
 
 foreach ($sqlResult->fetchAll() as $row){
     $nestedData = array(); 
     $showRecord = true;
     
+
+
+
+    if ($showRecord) {
+        /* Usuários dos ativos */
+        if (isset($post['no_empty_asset_user']) && !empty($post['no_empty_asset_user'])) {
+            $showRecord = getUserFromAssetId($conn, $row['comp_cod']);
+        }
+
+        if (isset($post['no_asset_user']) && !empty($post['no_asset_user'])) {
+            $showRecord = !getUserFromAssetId($conn, $row['comp_cod']);
+        }
+
+        if (isset($post['asset_user']) && !empty($post['asset_user'])) {
+            $showRecord = false;
+
+            $possibleAssets = getAssetsFromArrayOfUsers($conn, $post['asset_user']);
+
+            if (in_array($row['comp_cod'], $possibleAssets)) {
+                $showRecord = true;
+            }
+        } 
+    }
+
+    $userInfo = [];
+    $allocated_to_user_id = getUserFromAssetId($conn, $row['comp_cod']);
+    if (!empty($allocated_to_user_id)) {
+        $userInfo = getUserById($conn, $allocated_to_user_id['user_id']);
+    }
+
+    
+    $allocated_to = (!empty($userInfo) ? $userInfo['nome'] : '-');
+
+
+
 
     /* Retona array com as especificações físicas agregadas ao ativo */
     $aggregated_specs = getAssetSpecs($conn, $row['comp_cod']);
@@ -1263,7 +1371,7 @@ foreach ($sqlResult->fetchAll() as $row){
                         } elseif ($operation == "IN") {
                             /* valor do post */
 
-                            $expMultiValues = (!empty($ticketFieldValue) ? explode(',', $ticketFieldValue) : []);
+                            $expMultiValues = (!empty($ticketFieldValue) ? explode(',', (string)$ticketFieldValue) : []);
                             foreach ($expMultiValues as $SepValue) {
                                 if ($SepValue == $value) {
                                     $foundOne = true;
@@ -1497,8 +1605,19 @@ foreach ($sqlResult->fetchAll() as $row){
             $classHighlight = '';
         }
 
+
+
+        $result_ids[] = $row['comp_cod'];
+
         ?>
         <tr>
+            <?php
+                if ($_SESSION['s_nivel'] == 1) {
+                    ?>
+                        <td class="line row-id"><?= $row['comp_cod']; ?></td><!-- Checkbox de selecao -->
+                    <?php
+                }
+            ?>
             <td class="line <?= $classHighlight; ?>" data-sort="<?= (int)$row['etiqueta']; ?>"><span class="pointer" onClick="openAssetInfo('<?= $row['comp_cod']; ?>')"><?= "<b>" . $row['etiqueta'] . "</b>"; ?></span></td>
             <td class="line <?= $classHighlight; ?>"><?= $row['nickname'] ; ?></td>
             <td class="line <?= $classHighlight; ?>"><?= $row['instituicao'] ; ?></td>
@@ -1506,6 +1625,7 @@ foreach ($sqlResult->fetchAll() as $row){
             <td class="line <?= $classHighlight; ?>"><?= $row['equipamento'] ; ?></td>
             <td class="line <?= $classHighlight; ?>"><?= $row['fab_nome'] ; ?></td>
             <td class="line <?= $classHighlight; ?>"><?= $row['modelo'] ; ?></td>
+            <td class="line <?= $classHighlight; ?>"><?= $allocated_to; ?></td>
             <td class="line <?= $classHighlight; ?>"><?= $row['serial'] ; ?></td>
             <td class="line <?= $classHighlight; ?>"><?= $row['part_number'] ; ?></td>
             <td class="line <?= $classHighlight; ?>"><?= $row['local'] ; ?></td>
@@ -1528,20 +1648,20 @@ foreach ($sqlResult->fetchAll() as $row){
                 foreach ($custom_fields_full as $cfield) {
                     
                     if (!in_array($cfield['id'], $dontRender)) {
-                        $cfield_values = getAssetCustomFields($conn, $row['comp_cod'], $cfield['id']);
+                    $cfield_values = getAssetCustomFields($conn, $row['comp_cod'], $cfield['id']);
 
-                        $showField = $cfield_values['field_value'];
+                    $showField = $cfield_values['field_value'];
 
-                        if ($cfield['field_type'] == 'date') {
-                            $showField = dateScreen($cfield_values['field_value'], 1);
-                        } elseif ($cfield['field_type'] == 'datetime') {
-                            $showField = dateScreen($cfield_values['field_value'], 0, "d/m/Y H:i");
-                        }
-                        ?>
-                            <td class="line custom_field">
-                                <?= $showField; ?>
-                            </td>
-                        <?php
+                    if ($cfield['field_type'] == 'date') {
+                        $showField = dateScreen($cfield_values['field_value'], 1);
+                    } elseif ($cfield['field_type'] == 'datetime') {
+                        $showField = dateScreen($cfield_values['field_value'], 0, "d/m/Y H:i");
+                    }
+                    ?>
+                        <td class="line custom_field">
+                            <?= $showField; ?>
+                        </td>
+                    <?php
                     }
                 }
             ?>
@@ -1568,6 +1688,8 @@ if ($hasLimitationByAllowedClients && $hasLimitationByAllowedUnits) {
                 echo $_SESSION['flash'];
                 $_SESSION['flash'] = '';
             }
+
+            $textResultIds = implode(',', $result_ids);
         ?>
         <div class="d-none" id="table_info_hidden">
             <div class="row"> <!-- d-none -->
@@ -1578,7 +1700,9 @@ if ($hasLimitationByAllowedClients && $hasLimitationByAllowedUnits) {
                     <?= $criterios; ?>
                 </div>
             </div>
-
+            <!-- Todos os ids resultantes - podem ser utilizados para novas ações sobre o resultado do filtro -->
+            <input type="hidden" name="result_ids" id="result_ids" value="<?= $textResultIds; ?>">
         </div>
+        
 
     </div>

@@ -81,12 +81,12 @@ if (!empty($dataPosted['area'])) {
 $aliasAreasFilter = ($dataPosted['requester_areas'] ? "ua.AREA" : "o.sistema");
 
 
-
+$uareas = $_SESSION['s_uareas'] . ",-1";
 if (empty($filtered_areas)) {
     if ($isAdmin) {
         $qry_filter_areas = "";
     } else {
-        $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$_SESSION['s_uareas']}) OR " . $aliasAreasFilter . " = '-1')";
+        $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$uareas})";
     }
 } else {
     $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$filtered_areas}))";
@@ -125,8 +125,9 @@ $sqlTotalEmAberto = "SELECT
                         ocorrencias o, status s, usuarios ua 
                     WHERE 
                         o.aberto_por = ua.user_id AND 
-                        s.stat_ignored <> 1 AND 
-                        s.stat_painel not in (3) AND 
+                        -- s.stat_ignored <> 1 AND 
+                        -- s.stat_painel not in (3) AND 
+                        s.not_done = 1 AND
                         o.status = s.stat_id AND 
                         o.oco_scheduled = 0 
                         {$qry_filter_clients} 
@@ -145,6 +146,7 @@ catch (Exception $e) {
 /* Fila zerada */
 $olderTicket = '';
 $olderAge = '';
+$olderDate = date('Y-m-d H:i:s');
 /* Chamado mais antigo em aberto */
 $sql = "SELECT 
             o.oco_real_open_date as data, o.numero 
@@ -152,17 +154,19 @@ $sql = "SELECT
             ocorrencias o, status s, usuarios ua 
         WHERE 
             o.aberto_por = ua.user_id AND 
-            s.stat_painel not in (3) AND 
+            -- s.stat_painel not in (3) AND 
+            -- s.stat_ignored <> 1 AND
+            s.not_done = 1 AND
             o.status = s.stat_id AND 
-            s.stat_ignored <> 1 AND
             o.oco_real_open_date = (
                 SELECT min(o.oco_real_open_date) 
                 FROM 
                     ocorrencias o, status s , usuarios ua 
                 WHERE 
                     o.aberto_por = ua.user_id AND
-                    s.stat_painel not in (3) AND 
-                    s.stat_ignored <> 1 AND 
+                    -- s.stat_painel not in (3) AND 
+                    -- s.stat_ignored <> 1 AND 
+                    s.not_done = 1 AND
                     o.status = s.stat_id 
                     {$qry_filter_clients} 
                     {$qry_filter_areas}
@@ -172,6 +176,7 @@ try {
     if ($res->rowCount()) {
         $rowOlder = $res->fetch();
         $olderTicket = $rowOlder['numero'];
+        $olderDate = $rowOlder['data'];
         $olderAge = absoluteTime($rowOlder['data'], date('Y-m-d H:i:s'))['inTime'];
     }
     /* Final do chamado mais antigo em aberto */
@@ -191,8 +196,9 @@ $sql = "SELECT
             ocorrencias o, status s, usuarios ua 
         WHERE 
             o.aberto_por = ua.user_id AND 
-            s.stat_painel not in (3) AND 
-            o.status = s.stat_id AND 
+            -- s.stat_painel not in (3) AND 
+            -- o.status = s.stat_id AND 
+            s.not_done = 1 AND
             s.stat_ignored <> 1 AND 
             o.oco_real_open_date = (
                     SELECT max(o.oco_real_open_date) 
@@ -200,8 +206,9 @@ $sql = "SELECT
                         ocorrencias o, status s, usuarios ua 
                     WHERE 
                         o.aberto_por = ua.user_id AND 
-                        s.stat_painel not in (3) AND 
-                        s.stat_ignored <> 1 AND 
+                        -- s.stat_painel not in (3) AND 
+                        -- s.stat_ignored <> 1 AND 
+                        s.not_done = 1 AND
                         o.status = s.stat_id 
                         {$qry_filter_clients} 
                         {$qry_filter_areas}
@@ -291,8 +298,9 @@ $sqlFilaGeral = "SELECT
                 WHERE 
                     o.aberto_por = ua.user_id AND 
                     o.status = s.stat_id AND 
-                    s.stat_ignored <> 1 AND 
-                    s.stat_painel in (2) AND 
+                    -- s.stat_ignored <> 1 AND 
+                    -- s.stat_painel in (2) AND 
+                    s.open_queue = 1 AND
                     o.oco_scheduled = 0 
                     {$qry_filter_clients} 
                     {$qry_filter_areas}
@@ -337,7 +345,12 @@ $avgAbsoluteSolutionTime = 0;
 $avgFilteredResponseTime = 0;
 $avgFilteredSolutionTime = 0;
 
-$sql = $QRY["ocorrencias_full_ini"] . " WHERE stat_ignored <> 1 AND s.stat_painel not in (3) {$qry_filter_clients}  {$qry_filter_areas}"; /* apenas abertos */
+// $sql = $QRY["ocorrencias_full_ini"] . " WHERE stat_ignored <> 1 AND s.stat_painel not in (3) {$qry_filter_clients}  {$qry_filter_areas}"; /* apenas abertos */
+$sql = $QRY["tickets_in_queues"] . " AND 
+            not_done = 1 AND 
+            oco_real_open_date >= '{$olderDate}' 
+            {$qry_filter_clients} 
+            {$qry_filter_areas}";
 $res = $conn->query($sql);
 $countRecords = $res->rowCount();
 foreach ($res->fetchAll() as $row) {

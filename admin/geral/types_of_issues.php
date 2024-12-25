@@ -47,8 +47,8 @@ if ($config['conf_updated_issues']) {
 
 echo message('danger', TRANS('TXT_IMPORTANT'), TRANS('UPDATE_RELATION_AREAS_ISSUES') . "<hr>" . TRANS('CLICK_HERE_TO_UPDATE'), 'updateIssues', '', true);
 
+// $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 
-$_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 
 ?>
 <!DOCTYPE html>
@@ -63,8 +63,9 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
 	<style>
 		li.except_areas {

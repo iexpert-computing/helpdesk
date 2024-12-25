@@ -43,7 +43,7 @@ $_SESSION['s_page_ocomon'] = $_SERVER['PHP_SELF'];
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.css" />
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <style>
         .dataTables_filter input,

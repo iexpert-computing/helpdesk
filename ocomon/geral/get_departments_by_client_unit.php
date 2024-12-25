@@ -33,11 +33,6 @@ $conn = ConnectPDO::getInstance();
 $post = $_POST;
 
 
-$areaAdmin = 0;
-if (isset($_SESSION['s_area_admin']) && $_SESSION['s_area_admin'] == '1' && $_SESSION['s_nivel'] != '1') {
-    $areaAdmin = 1;
-}
-
 $departments = [];
 
 

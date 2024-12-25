@@ -45,8 +45,29 @@ $conn = ConnectPDO::getInstance();
 // storing  request (ie, get/post) global array to a variable  
 // $requestData = $_REQUEST;
 $requestData = $_POST;
+$terms = "";
 
-// var_dump($requestData); exit();
+
+$searchStatusTermOptions = [
+    '1' => TRANS('NO_ASSETS_LINKED'),
+    '2' => TRANS('WITH_ASSETS_LINKED'),
+    '3' => TRANS('TERM_OUTDATED'),
+    '4' => TRANS('TERM_SIGNED'),
+    '5' => TRANS('SIGNING_PENDING'),
+];
+
+$termsIndexes = [
+    '' => "",
+    '1' => " AND (utp.user_id IS NULL OR utp.user_id = 0) ",
+    '2' => " AND utp.user_id IS NOT NULL ",
+    '3' => " AND is_term_updated = 0 AND utp.user_id IS NOT NULL ",
+    '4' => " AND is_term_signed = 1 ",
+    '5' => " AND is_term_signed = 0 AND is_term_updated = 1 AND utp.user_id IS NOT NULL "
+];
+
+$terms = $termsIndexes[$requestData['term_status']];
+
+
 $origin = "users.php";
 
 $columns = array(
@@ -63,8 +84,9 @@ $columns = array(
     9 => 'user_id'
 );
 
-$terms = "";
-if (isset($requestData['areaAdmin']) && $requestData['areaAdmin'] == "1") {
+
+// if (isset($requestData['areaAdmin']) && $requestData['areaAdmin'] == "1") {
+if ($areaAdmin && $_SESSION['s_nivel'] != 1) {
 
     $userManageableAreas = getManagedAreasByUser($conn, $_SESSION['s_uid']);
     $csvAreas = "";
@@ -77,14 +99,19 @@ if (isset($requestData['areaAdmin']) && $requestData['areaAdmin'] == "1") {
     $terms .= " AND s.sis_id IN ({$csvAreas}) ";
 }
 
-// getting total number records without any search
-$sql = "SELECT u.*, n.*,s.*, cl.*
-        \n FROM usuarios u 
-        \n LEFT JOIN sistemas as s on u.AREA = s.sis_id 
-        \n LEFT JOIN nivel as n on n.nivel_cod = u.nivel
-        \n LEFT JOIN clients as cl on cl.id = u.user_client
 
-        WHERE 1 = 1 {$terms};
+// getting total number records without any search
+$sql = "SELECT u.*, n.*,s.*, cl.*, 
+            utp.user_id as has_assets, utp.is_term_updated, utp.is_term_signed, utp.signed_at
+        FROM usuarios u 
+        LEFT JOIN sistemas as s on u.AREA = s.sis_id 
+        LEFT JOIN nivel as n on n.nivel_cod = u.nivel
+        LEFT JOIN clients as cl on cl.id = u.user_client
+        LEFT JOIN users_terms_pivot as utp on utp.user_id = u.user_id
+
+        WHERE 
+            u.user_id > 0 
+            {$terms};
 ";
 
 
@@ -95,14 +122,16 @@ $sqlResult = $conn->query($sql);
 $totalData = $sqlResult->rowCount();
 $totalFiltered = $totalData;  // when there is no search parameter then total number rows = total number filtered rows.
 
-$sql = "SELECT u.*, n.*,s.*, cl.*
-		\n FROM usuarios u 
-		\n LEFT JOIN sistemas as s on u.AREA = s.sis_id 
-		\n LEFT JOIN nivel as n on n.nivel_cod = u.nivel 
-        \n LEFT JOIN clients as cl on cl.id = u.user_client
+$sql = "SELECT u.*, n.*,s.*, cl.*, 
+            utp.user_id as has_assets, utp.is_term_updated, utp.is_term_signed, utp.signed_at
+		FROM usuarios u 
+		LEFT JOIN sistemas as s on u.AREA = s.sis_id 
+		LEFT JOIN nivel as n on n.nivel_cod = u.nivel 
+        LEFT JOIN clients as cl on cl.id = u.user_client
+        LEFT JOIN users_terms_pivot as utp on utp.user_id = u.user_id
 ";
 
-$sql.=" WHERE 1 = 1 {$terms} ";
+$sql.=" WHERE u.user_id > 0 {$terms} ";
 
 
 if( !empty($requestData['search']['value']) ) {   // if there is a search parameter, $requestData['search']['value'] contains search parameter
@@ -153,7 +182,9 @@ foreach ($sqlResult->fetchall() as $row) {
     $nestedData[] = $row['email'];
     $nestedData[] = $row['nivel_nome'];
     $nestedData[] = dateScreen($row['last_logon']);
-    $nestedData[] = "<button type='button' class='btn btn-secondary btn-sm' onclick=\"redirect('". $origin ."?action=edit&cod=". $row['user_id'] ."')\">" . TRANS('BT_EDIT') . "</button>";
+    
+    $nestedData[] = "<button type='button' class='btn btn-secondary btn-sm' onClick=\"loadInIframe('users','action=edit&cod=". $row['user_id'] ."')\">" . TRANS('BT_EDIT') . "</button>";
+    
     $nestedData[] = "<button type='button' class='btn btn-danger btn-sm' onclick=\"confirmDeleteModal('" . $row['user_id'] . "')\">" . TRANS('BT_REMOVE') . "</button>";
 	$data[] = $nestedData;
 }

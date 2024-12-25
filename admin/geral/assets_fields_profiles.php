@@ -74,8 +74,9 @@ $fields = [
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 	<style>
 		li.list_assets_types {
 			line-height: 1.5em;

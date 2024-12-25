@@ -48,8 +48,9 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -154,7 +155,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 								<td class="line"><?= $row['pr_desc']; ?></td>
 								<td class="line"><span class="badge" style="border: 1px solid gray; background: <?= $row['pr_color']; ?>">&nbsp;&nbsp;&nbsp;</span></td>
 								<td class="line"><span class="badge" style="border: 1px solid gray; background: <?= $row['pr_font_color']; ?>">&nbsp;&nbsp;&nbsp;</span></td>
-								<td class="line"><span class="badge p-2" style="background: <?= $row['pr_color']; ?>; color: <?= $row['pr_font_color']; ?>"><?= $row['pr_desc']; ?></span></td>
+								<td class="line"><span class="btn btn-sm cursor-no-event" style="background: <?= $row['pr_color']; ?>; color: <?= $row['pr_font_color']; ?>"><?= $row['pr_desc']; ?></span></td>
 								<td class="line"><button type="button" class="btn btn-secondary btn-sm" onclick="redirect('<?= $_SERVER['PHP_SELF']; ?>?action=edit&cod=<?= $row['pr_cod']; ?>')"><?= TRANS('BT_EDIT'); ?></button></td>
 								<td class="line"><button type="button" class="btn btn-danger btn-sm" onclick="confirmDeleteModal('<?= $row['pr_cod']; ?>')"><?= TRANS('REMOVE'); ?></button></td>
 							</tr>
@@ -205,7 +206,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 
 					<label for="sample" class="col-md-2 col-form-label text-md-right"><?= TRANS('APPEARANCE'); ?></label>
 					<div class="form-group col-md-10">
-						<span class="badge p-2" style="color: #000000; background-color: #CCCCCC" id="appearance"><?= TRANS('SAMPLE'); ?></span>
+						<span class="btn btn-sm cursor-no-event" style="color: #000000; background-color: #CCCCCC" id="appearance"><?= TRANS('SAMPLE'); ?></span>
                     </div>
                     
                     <label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('COL_DEFAULT'); ?>"><?= firstLetterUp(TRANS('COL_DEFAULT')); ?></label>
@@ -284,7 +285,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 
 					<label for="sample" class="col-md-2 col-form-label text-md-right"><?= TRANS('APPEARANCE'); ?></label>
 					<div class="form-group col-md-10">
-						<span class="badge p-2" style="color: <?= $row['pr_font_color']; ?>; background-color: <?= $row['pr_color']; ?>" id="appearance"><?= TRANS('SAMPLE'); ?></span>
+						<span class="btn btn-sm cursor-no-event" style="color: <?= $row['pr_font_color']; ?>; background-color: <?= $row['pr_color']; ?>" id="appearance"><?= TRANS('SAMPLE'); ?></span>
                     </div>
                     
                     <label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('COL_DEFAULT'); ?>"><?= firstLetterUp(TRANS('COL_DEFAULT')); ?></label>

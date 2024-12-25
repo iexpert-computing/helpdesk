@@ -50,6 +50,8 @@ $exception = "";
 $data = [];
 $raw_data = [];
 $clean_data = [];
+$fulltext_search = true;
+$array_not_having = [];
 
 if (empty($post['problema']) || strlen(trim($post['problema'])) < 5 ) {
 	echo message('warning','', TRANS('FILL_AT_LEAST_5_CHARS'), '');
@@ -58,6 +60,7 @@ if (empty($post['problema']) || strlen(trim($post['problema'])) < 5 ) {
 
 $chars = 'ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜüÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûýýþÿRr';
 $words = array_unique(str_word_count($post['problema'], 1, $chars));
+
 
 /* Descarta palavras com menos de 5 caracteres */
 $words = array_values(
@@ -68,6 +71,39 @@ $words = array_values(
         }
     )
 );
+
+
+$words_not_having = (isset($post['not_having']) && !empty($post['not_having'])? $post['not_having'] : '');
+if (!empty($words_not_having)) {
+	$array_not_having = array_unique(str_word_count($post['not_having'], 1, $chars));
+}
+
+/* Descarta palavras com menos de 5 caracteres */
+$array_not_having = array_values(
+    array_filter(
+        $array_not_having,
+        function ($value) {
+            return strlen((string)$value) >= 5;
+        }
+    )
+);
+
+/* Adiciona o prefixo para a pesquisa de exclusão: '-' */
+$array_not_having = array_map(function ($value) {
+	return '-' . $value;
+}, $array_not_having);
+
+
+$words_not_having = (!empty($array_not_having) ? implode(' ', $array_not_having) : '');
+
+
+
+// var_dump([
+// 	'words' => $words,
+// 	'array_not_having' => $array_not_having,
+// 	'words_not_having' => $words_not_having
+// ]); exit;
+
 
 /* Ver se utilizarei na montagem do sql */
 $html_words = array_map('htmlentities', $words);
@@ -82,6 +118,7 @@ $highlight_words = implode("|", $words);
 $data['start_date'] = (isset($post['data_inicial']) && !empty($post['data_inicial']) ? dateDB($post['data_inicial']) : '');
 $data['end_date'] = (isset($post['data_final']) && !empty($post['data_final']) ? dateDB($post['data_final']) : '');
 $data['search_in_comments'] = (isset($post['search_in_comments']) && $post['search_in_comments'] == 'on' ? 1 : 0);
+$data['search_in_progress_tickets'] = (isset($post['search_in_progress_tickets']) && $post['search_in_progress_tickets'] == 'on' ? 1 : 0);
 $data['any_word'] = (isset($post['anyword']) && $post['anyword'] == 'on' ? 1 : 0);
 $data['with_attachments'] = (isset($post['onlyImgs']) && $post['onlyImgs'] == 'on' ? 1 : 0);
 $data['operator'] = (isset($post['operador']) && $post['operador'] != '-1' ? $post['operador'] : '');
@@ -101,24 +138,52 @@ $words_entries_from = ', assentamentos a ';
 $words_entries_where = 's.numero = a.ocorrencia AND ';
 
 
+$statusTerm = " o.status IN ({$closured_status}) AND ";
+if ($data['search_in_progress_tickets']) {
+	$statusTerm = "";
+}
+
 /** Pesquina nas tabelas ocorrencias e solucoes */
 $words_search_sql = "";
 /** Pesquina na tabela de assentamentos */
 $words_entries_sql = "";
-foreach ($words as $word) {
-	if (strlen((string)$words_search_sql))
-		$words_search_sql .= $words_operation;
+
+
+
+if (!$fulltext_search) {
+	foreach ($words as $word) {
+		if (strlen((string)$words_search_sql))
+			$words_search_sql .= $words_operation;
+		
+		$words_search_sql .= " ((o.descricao) LIKE ('%{$word}%') OR";
+		$words_search_sql .= " (s.problema) LIKE ('%{$word}%') OR";
+		$words_search_sql .= " (s.solucao) LIKE ('%{$word}%'))";
 	
-	$words_search_sql .= " (lower (o.descricao) LIKE lower ('%{$word}%') OR";
-	$words_search_sql .= " lower (s.problema) LIKE lower ('%{$word}%') OR";
-	$words_search_sql .= " lower (s.solucao) LIKE lower ('%{$word}%'))";
+		if (strlen((string)$words_entries_sql))
+			$words_entries_sql .= $words_operation;
+	
+		$words_entries_sql .= " (a.assentamento) LIKE ('%{$word}%')";
+	}
+	$words_entries_sql = ' OR ' . $words_entries_sql;
+} else {
+	
 
-	if (strlen((string)$words_entries_sql))
-		$words_entries_sql .= $words_operation;
-
-	$words_entries_sql .= " lower (a.assentamento) LIKE lower ('%{$word}%')";
+	if (!$data['any_word']) {
+		$words = array_map(function ($value) {
+			return '+' . $value;
+		}, $words);
+	}
+	
+	$words_in_terms = implode(' ', $words) . ' ' . $words_not_having;
+	$words_search_sql = "MATCH (o.descricao) AGAINST ('{$words_in_terms}' IN BOOLEAN MODE) OR ";
+	$words_search_sql .= "MATCH (s.problema, s.solucao) AGAINST ('{$words_in_terms}' IN BOOLEAN MODE)";
+	
+	if ($data['search_in_comments']) {
+		$words_search_sql .= " OR MATCH (a.assentamento) AGAINST ('{$words_in_terms}' IN BOOLEAN MODE)";
+	}
+	
 }
-$words_entries_sql = ' OR ' . $words_entries_sql;
+
 
 if (!$data['search_in_comments']) {
 	$words_entries_select = '';
@@ -127,31 +192,34 @@ if (!$data['search_in_comments']) {
 	$words_entries_sql = '';
 }
 
-$sqlBase = "SELECT 
+
+if ($data['search_in_progress_tickets']) {
+	$sqlBase = "SELECT 
 			o.numero AS numero,
 			o.descricao AS descricao,
-			s.problema AS problema,
-			s.solucao AS solucao,
+			COALESCE(s.problema, '-') AS problema,
+			-- s.problema AS problema,
+			COALESCE(s.solucao, '-') AS solucao,
+			-- s.solucao AS solucao,
 			s.data AS data_fechamento,
 			u.nome AS responsavel,
 			{$words_entries_select}
 			ar.sistema AS area
 		FROM
-			ocorrencias o,
+			ocorrencias o 
+			LEFT JOIN solucoes s ON o.numero = s.numero,
 			sistemas ar, 
-			solucoes s,
 			usuarios u
 			{$with_attachments_from}
 			{$words_entries_from}
 		WHERE
 			{$date_from_sql} 
 			{$date_to_sql}
-			o.status IN ({$closured_status}) AND 
 			o.sistema = ar.sis_id AND 
 			{$filter_areas} 
-			o.numero = s.numero AND 
 			{$words_entries_where}
-			s.responsavel = u.user_id 
+			-- s.responsavel = u.user_id 
+			u.user_id = o.operador
 			{$with_operator_where}
 			{$with_attachments_where} AND
 			(
@@ -160,7 +228,45 @@ $sqlBase = "SELECT
 			)
 		ORDER BY
 			o.numero
-";
+		LIMIT 1000
+	";
+} else {
+
+	$sqlBase = "SELECT 
+		o.numero AS numero,
+		o.descricao AS descricao,
+		s.problema AS problema,
+		s.solucao AS solucao,
+		s.data AS data_fechamento,
+		u.nome AS responsavel,
+		{$words_entries_select}
+		ar.sistema AS area
+	FROM
+		ocorrencias o,
+		sistemas ar, 
+		solucoes s,
+		usuarios u
+		{$with_attachments_from}
+		{$words_entries_from}
+	WHERE
+		{$date_from_sql} 
+		{$date_to_sql}
+		o.status IN ({$closured_status}) AND
+		o.sistema = ar.sis_id AND 
+		{$filter_areas} 
+		o.numero = s.numero AND 
+		{$words_entries_where}
+		s.responsavel = u.user_id 
+		{$with_operator_where}
+		{$with_attachments_where} AND
+		(
+			{$words_search_sql}
+		)
+	ORDER BY
+		o.numero
+	LIMIT 1000
+	";
+}
 
 try {
 	$res = $conn->query($sqlBase);

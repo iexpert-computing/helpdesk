@@ -98,6 +98,47 @@ function getConfigValues (\PDO $conn): array
 
 
 /**
+ * Sets the value of a configuration key in the database.
+ *
+ * @param \PDO $conn The PDO connection object.
+ * @param string $key The name of the configuration key.
+ * @param string $value The value to set for the configuration key.
+ * @throws Exception If there is an error executing the database query.
+ * @return bool Returns true if the configuration value is successfully set, false otherwise.
+ */
+function setConfigValue (\PDO $conn, string $key, ?string $value = null): bool
+{
+
+    $value = ($value === null ? null : $value);
+    
+    $sql = "SELECT key_name, key_value FROM config_keys WHERE key_name = :key_name ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':key_name', $key);
+        $res->execute();
+        
+        if ($res->rowCount()) {
+
+            $sql = "UPDATE config_keys SET key_value = :key_value WHERE key_name = :key_name ";
+            $res = $conn->prepare($sql);
+            $res->bindParam(':key_name', $key, PDO::PARAM_STR);
+            $res->bindParam(':key_value', $value, PDO::PARAM_STR);
+            $res->execute();
+            return true;
+        }
+        $sql = "INSERT INTO config_keys (key_name, key_value) VALUES (:key_name, :key_value) ";
+        $res = $conn->prepare($sql);
+        $res->bindParam(':key_name', $key, PDO::PARAM_STR);
+        $res->bindParam(':key_value', $value, PDO::PARAM_STR);
+        $res->execute();
+        return true;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+
+/**
  * saveNewTags
  * Checa se há novas tags em um array informado - se existirem novas tags serão gravadas
  * @param \PDO $conn
@@ -430,7 +471,7 @@ function passLdap (string $username, string $pass, array $ldapConfig): bool
     }
 
     $username = filter_var($username, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-    $pass = filter_var($pass, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    // $pass = filter_var($pass, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
     $ldapConn = ldap_connect($ldapConfig['LDAP_HOST'], $ldapConfig['LDAP_PORT']);
     if (!$ldapConn) {
@@ -502,6 +543,7 @@ function getUserLdapData(string $username, string $pass, array $ldapConfig): arr
 }
 
 
+
 /**
  * isLocalUser
  * Retorna se existe um usuário com o nome de login informado
@@ -533,6 +575,25 @@ function isLocalUser (\PDO $conn, string $user): bool
 }
 
 
+function getUserById (\PDO $conn, int $id): array
+{
+    $sql = "SELECT * FROM usuarios WHERE user_id = :id ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':id', $id);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch();
+        }
+        return [];
+    } catch (Exception $e) {
+        echo $e->getMessage();
+        return [];
+    }
+}
+
+
+
 /**
  * getUsers
  * Retorna um array com a listagem dos usuários ou do usuário específico caso o id seja informado
@@ -541,9 +602,21 @@ function isLocalUser (\PDO $conn, string $user): bool
  * @param array|null $level
  * @param bool|null $can_route - filtra pelos usuários que podem encaminhar chamados
  * @param bool|null $can_get_routed - filtra pelos usuários que podem receber chamados encaminhados
+ * @param array|null $areas
+ * @param int|null $department (id do departamento - se for algum valor menor ou igual a 0, filtra por nao nulos)
+ * @param int|null $client (id do cliente - se for algum valor menor ou igual a 0, filtra por não nulos)
  * @return array
  */
-function getUsers (\PDO $conn, ?int $id = null, ?array $level = null, ?bool $can_route = null, ?bool $can_get_routed = null, ?array $areas = null): array
+function getUsers (
+    \PDO $conn, 
+    ?int $id = null, 
+    ?array $level = null, 
+    ?bool $can_route = null, 
+    ?bool $can_get_routed = null, 
+    ?array $areas = null,
+    ?int $department = null,
+    ?int $client = null
+): array
 {
     $in = "";
     if ($level) {
@@ -551,29 +624,45 @@ function getUsers (\PDO $conn, ?int $id = null, ?array $level = null, ?bool $can
         // VERSION 2. For strings: apply PDO::quote() function to all elements
         // $in = implode(',', array_map([$conn, 'quote'], $level));
     }
-    $terms = ($id ? " WHERE user_id = :id " : '');
+    // $terms = ($id ? " WHERE user_id = :id" : '');
+    $terms = ($id ? " AND user_id = :id" : '');
     
     if (!$id) {
         if ($level) {
-            $terms .= " WHERE nivel IN ($in) ";
+            // $terms .= " WHERE nivel IN ($in) ";
+            $terms .= " AND nivel IN ($in) ";
         }
 
         if ($can_route !== null) {
             $can_route = ($can_route ? 1 : 0);
-            $terms .= ($terms ? " AND " : " WHERE ") . "can_route = {$can_route} ";
+            // $terms .= ($terms ? " AND " : " WHERE ") . "can_route = {$can_route} ";
+            $terms .= " AND can_route = {$can_route} ";
         }
         if ($can_get_routed !== null) {
             $can_get_routed = ($can_get_routed ? 1 : 0);
-            $terms .= ($terms ? " AND " : " WHERE ") . "can_get_routed = {$can_get_routed} ";
+            // $terms .= ($terms ? " AND " : " WHERE ") . "can_get_routed = {$can_get_routed} ";
+            $terms .= " AND can_get_routed = {$can_get_routed} ";
         }
 
         if ($areas) {
             $in = implode(',', array_map('intval', $areas));
-            $terms .= ($terms ? " AND " : " WHERE ") . " AREA IN ({$in}) ";
+            // $terms .= ($terms ? " AND " : " WHERE ") . " AREA IN ({$in}) ";
+            $terms .= " AND AREA IN ({$in}) ";
+        }
+
+        if ($department) {
+            $terms .= ($department > 0 ? " AND user_department = '{$department}' " : " AND user_department IS NOT NULL ");
+            // $terms .= " AND user_department = '{$department}' ";
+        }
+    
+        if ($client) {
+            $terms .= ($client > 0 ? " AND user_client = '{$client}' " : " AND user_client IS NOT NULL ");
+            // $terms .= " AND user_client = '{$client}' ";
         }
     }
     
-    $sql = "SELECT * FROM usuarios {$terms} ORDER BY nome, login";
+    // $sql = "SELECT * FROM usuarios {$terms} ORDER BY nome, login";
+    $sql = "SELECT * FROM usuarios WHERE user_id > 0 {$terms} ORDER BY nome, login";
     try {
         $res = $conn->prepare($sql);
     
@@ -585,6 +674,10 @@ function getUsers (\PDO $conn, ?int $id = null, ?array $level = null, ?bool $can
         /* $res->debugDumpParams() */
         if ($res->rowCount()) {
             foreach ($res->fetchAll() as $row) {
+                
+                unset($row['password']);
+                unset($row['hash']);
+                
                 $data[] = $row;
             }
             if ($id)
@@ -598,6 +691,48 @@ function getUsers (\PDO $conn, ?int $id = null, ?array $level = null, ?bool $can
         // return [];
     }
 }
+
+
+
+function getUserDepartment(\PDO $conn, int $userId): ?int
+{
+    $sql = "SELECT user_department FROM usuarios WHERE user_id = :id ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':id', $userId, \PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            $row = $res->fetch();
+            return $row['user_department'];
+        }
+        return null;
+    }
+    catch (Exception $e) {
+        return null;
+    }
+}
+
+
+function getArrayOfUsersNamesByIds (\PDO $conn, array $ids): array
+{
+    $ids = array_map('intval', $ids);
+    $sql = "SELECT nome FROM usuarios WHERE user_id IN (".implode(',', $ids).")";
+    try {
+        $res = $conn->prepare($sql);
+        $res->execute();
+        if ($res->rowCount()) {
+            foreach ($res->fetchAll() as $row) {
+                $data[] = $row['nome'];
+            }
+            return $data;
+        }
+        return [];
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
+
 
 
 /**
@@ -642,6 +777,61 @@ function getUsersByPrimaryArea (\PDO $conn, ?int $area = null, ?array $level = n
     }
 }
 
+
+/**
+ * getUserByEmail
+ * Retorna as informações do usuário pelo email informado;
+ * Se maxId = false, só retornará informações caso não existam e-mails repetidos na base de usuários;
+ * Se maxId = true, vai retornar o user_id mais alto para o email informado (quando existirem mais de um);
+ *
+ * @param \PDO $conn
+ * @param string $email
+ * @param bool $maxId
+ * 
+ * @return array|null
+ */
+function getUserByEmail (\PDO $conn, string $email, bool $maxId = false): ?array
+{
+    /* Confere se o email está formatado */
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+
+    $terms = "";
+    if ($maxId) {
+        $terms = " AND user_id = (SELECT (MAX(user_id)) FROM usuarios WHERE email = :email) ";
+    }
+
+    $sql = "SELECT 
+                user_id, 
+                nome as name, 
+                user_client, 
+                user_department, 
+                fone as phone, 
+                nivel as level
+            FROM 
+                usuarios 
+            WHERE 
+                email = :email 
+                {$terms}
+                ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':email', $email);
+        $res->execute();
+        if ($res->rowCount() == 1) {
+            return $res->fetch();
+        }
+        return null;
+    }
+    catch (Exception $e) {
+        return null;
+    }
+}
+
+
+
+
 /**
  * getUserInfo
  * Retorna o array com as informações do usuário e da área de atendimento que ele está vinculado
@@ -653,18 +843,22 @@ function getUsersByPrimaryArea (\PDO $conn, ?int $area = null, ?array $level = n
  * @param string $userName: login do usuário - se for informado, o filtro será por ele
  * @return array
  */
-function getUserInfo (\PDO $conn, int $userId, string $userName = ''): array
+function getUserInfo (\PDO $conn, ?int $userId = null, string $userName = ''): array
 {
     $terms = (empty($userName) ? " user_id = :userId " : " login = :userName ");
     $sql = "SELECT 
                 u.user_id,
-                u.user_client,  
+                u.user_client, 
+                u.user_department, 
+                u.term_unit, 
+                u.term_unit_updated_at, 
                 u.login, u.nome, 
                 u.email, u.fone, 
                 u.password, u.hash, 
                 u.nivel, u.AREA as area_id, 
                 u.user_admin, u.last_logon, 
                 u.can_route, u.can_get_routed,
+                u.max_cost_authorizing, 
                 a.sistema as area_nome, 
                 a.sis_status as area_status, 
                 a.sis_email as area_email, 
@@ -672,12 +866,15 @@ function getUserInfo (\PDO $conn, int $userId, string $userName = ''): array
                 a.sis_wt_profile, 
                 a.sis_opening_mode as opening_mode,
                 p.upref_lang as language,
-                cl.id, cl.fullname, cl.nickname
+                cl.id, cl.fullname, cl.nickname,
+                l.local as department
             FROM 
                 sistemas a, usuarios u 
                 LEFT JOIN uprefs p ON u.user_id = p.upref_uid
                 LEFT JOIN clients cl ON u.user_client = cl.id
+                LEFT JOIN localizacao l ON u.user_department = l.loc_id
             WHERE 
+                u.user_id > 0 AND
                 u.AREA = a.sis_id 
                 AND 
                 {$terms} ";
@@ -699,6 +896,101 @@ function getUserInfo (\PDO $conn, int $userId, string $userName = ''): array
         return [];
     }
 }
+
+
+
+/**
+ * getUnitFromUserDepartmentOrUserClient
+ * Retorna o id da unidade relacionada ao usuário por meio do departamento vinculado 
+ * ao usuário ou então ao cliente vinculado ao usuário
+ *
+ * @param \PDO $conn
+ * @param int $userId
+ * 
+ * @return int|null
+ */
+function getUnitFromUserDepartmentOrUserClient(\PDO $conn, int $userId): ?int
+{
+    $userInfo = getUserInfo($conn, $userId);
+    if (empty($userInfo)) {
+        return null;
+    }
+    unset($userInfo['password']);
+    unset($userInfo['hash']);
+
+    $userClient = (!empty($userInfo) && !empty($userInfo['user_client']) ? $userInfo['user_client'] : "");
+    $userDepartment = (!empty($userInfo) && !empty($userInfo['user_department']) ? $userInfo['user_department'] : "");
+
+    $unitInfo = [];
+    $units = [];
+    if (!empty($userDepartment)) {
+        /* Buscando a unidade com base no departamento do usuário */
+        $departmentInfo = getDepartments($conn, null, $userDepartment);
+        if (!empty($departmentInfo) && !empty($departmentInfo['loc_unit'])) {
+            $unitInfo = getUnits($conn, null , $departmentInfo['loc_unit']);
+        }
+    }
+
+    $unit = (!empty($unitInfo) && !empty($unitInfo['inst_cod']) ? $unitInfo['inst_cod'] : "");
+
+    if (!empty($unit)) {
+        return $unit;
+    }
+
+    
+    /* Buscar pelo cliente do usuário então */
+    if (!empty($userClient)) {
+        $units = getUnits($conn, null , null, $userClient);
+    }
+
+    if (count($units) == 1) {
+        return $units[0]['inst_cod'];
+    }
+
+    return null;
+}
+
+/**
+ * getUserSignatureFileInfo
+ * Retorna as informações sobre o arquivo de assinatura mais recente do usuário informado
+ *
+ * @param \PDO $conn
+ * @param int $userId
+ * 
+ * @return array|null
+ */
+function getUserSignatureFileInfo (\PDO $conn, int $userId): ?array
+{
+    $sql = "SELECT 
+                * 
+            FROM 
+                users_x_signatures 
+            WHERE 
+                user_id = :user_id AND
+                id = (
+                    SELECT MAX(id) FROM users_x_signatures WHERE user_id = :user_id
+                )
+            ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':user_id', $userId);
+        $res->execute();
+        if ($res->rowCount()) {
+            $row = $res->fetch();
+            // $row['signature_file'] = base64_encode($row['signature_file']);
+            $row['signature_src'] = $row['file_type'] . ',' . base64_encode($row['signature_file']);
+            unset($row['signature_file']);
+            return $row;
+        }
+        return [];
+    }
+    catch (Exception $e) {
+        return [];
+    }
+}
+
+
+
 
 /**
  * getUserAreas
@@ -728,6 +1020,392 @@ function getUserAreas (\PDO $conn, int $userId): string
     catch (Exception $e) {
         return $areas;
     }
+}
+
+
+
+function getAssetsFromUser (\PDO $conn, int $userId): array
+{
+    // table: users_x_assets
+    $sql = "SELECT * 
+            FROM 
+                users_x_assets 
+            WHERE 
+                user_id = :user_id AND
+                is_current = 1
+    ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':user_id', $userId);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetchAll();
+        }
+        return [];
+    } catch (Exception $e) {
+        return ['error' => $e->getMessage()];
+    }
+}
+
+
+function getUserFromAssetId (\PDO $conn, int $assetId): array
+{
+    // table: users_x_assets
+    $sql = "SELECT user_id FROM users_x_assets WHERE asset_id = :asset_id AND is_current = 1";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':asset_id', $assetId);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch();
+        }
+        return [];
+    } catch (exception $e) {
+        return [];
+    }
+}
+
+
+function getAssetsFromArrayOfUsers (\PDO $conn, array $users): array
+{
+    // table: users_x_assets
+    $sql = "SELECT 
+                asset_id
+            FROM 
+                users_x_assets 
+            WHERE 
+                user_id IN (" . implode(',', $users) . ") AND
+                is_current = 1
+    ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->execute();
+        if ($res->rowCount()) {
+            foreach ($res->fetchAll() as $row) {
+                $data[] = $row['asset_id'];
+            }
+            return $data;
+        }
+        return [];
+    } catch (Exception $e) {
+        return ['error' => $e->getMessage()];
+    }
+}
+
+
+
+function getUserLastCommitmentTermId(\PDO $conn, int $userId): ?int
+{
+    $sql = "SELECT MAX(id) as id FROM users_x_files 
+    
+            WHERE
+                user_id = :userId AND
+                file_type = 1
+            ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':userId', $userId);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch()['id'];
+        }
+        return null;
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+
+function getUserLastCommitmentTermInfo(\PDO $conn, int $userId): array
+{
+
+    $sql = "SELECT 
+                id,
+                html_doc,
+                uploaded_at,
+                signed_at
+            FROM
+                users_x_files
+            WHERE
+                user_id = :user_id AND
+                file_type = 1 AND
+                id = (
+                    SELECT MAX(id) FROM users_x_files WHERE user_id = :user_id AND file_type = 1
+                )
+            ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':user_id', $userId);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch();
+        }
+        return [];
+    } catch (Exception $e) {
+        return [
+            'error' => $e->getMessage()
+        ];
+    }
+}
+
+
+function isLastUserTermSigned(\PDO $conn, int $userId): bool
+{
+    $sql = "SELECT 
+                signed_at
+            FROM
+                users_x_files
+            WHERE
+                user_id = :user_id AND
+                file_type = 1 AND
+                id = (
+                    SELECT MAX(id) FROM users_x_files WHERE user_id = :user_id AND file_type = 1
+                )
+            ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':user_id', $userId);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch()['signed_at'] != null;
+        }
+        return false;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+
+function lastUserTermSignedDate(\PDO $conn, int $userId): ?string
+{
+    $sql = "SELECT 
+                signed_at
+            FROM
+                users_x_files
+            WHERE
+                user_id = :user_id AND
+                file_type = 1 AND
+                id = (
+                    SELECT MAX(id) FROM users_x_files WHERE user_id = :user_id AND file_type = 1
+                )
+            ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':user_id', $userId);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch()['signed_at'];
+        }
+        return false;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+
+
+function isUserTermUpdated(\PDO $conn, int $userId): bool 
+{
+    $lastTermUpdate = "";
+    $lastAssetCreated = "";
+    $lastAssetUpdate = "";
+    $lastTermUnitUpdate = "";
+    
+    /* Busca a geração de termo mais recente */
+    $sql = "SELECT 
+                MAX(uploaded_at) as uploaded_at 
+            FROM 
+                users_x_files 
+            WHERE
+                user_id = :userId AND
+                file_type = 1
+            ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':userId', $userId);
+        $res->execute();
+        if ($res->rowCount()) {
+            $lastTermUpdate = $res->fetch()['uploaded_at'];
+        } else {
+            /* Se não possui nenhum registro, nunca foi gerado */
+            return false;
+        }
+        // return false;
+    } catch (Exception $e) {
+        return false;
+    }
+
+
+    /* Busca sobre a vinculação de ativos mais recente */
+    $sql = "SELECT
+                MAX(created_at) AS created_at
+            FROM 
+                users_x_assets
+            WHERE
+                user_id = :userId
+            ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':userId', $userId);
+        $res->execute();
+        if ($res->rowCount()) {
+            $lastAssetCreated = $res->fetch()['created_at'];
+        } else {
+            /* Se não possui nenhum registro de criação, não é necessário gerar termo */
+            return true;
+        }
+        // return false;
+    } catch (Exception $e) {
+        return false;
+    }
+
+    /* Busca sobre a atualização (remoção) de ativos mais recente */
+    $sql = "SELECT
+                MAX(updated_at) AS updated_at
+            FROM 
+                users_x_assets
+            WHERE
+                user_id = :userId AND
+                updated_at IS NOT NULL
+            ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':userId', $userId);
+        $res->execute();
+        if ($res->rowCount()) {
+            $lastAssetUpdate = $res->fetch()['updated_at'];
+        } /* else {
+            return true;
+        } */
+    } catch (Exception $e) {
+        return false;
+    }
+
+
+    /* Buscar o term_unit_updated_at na tabela de usuarios */
+    $sql = "SELECT 
+                term_unit_updated_at 
+            FROM 
+                usuarios 
+            WHERE 
+                user_id = :userId AND
+                term_unit_updated_at IS NOT NULL
+                ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':userId', $userId);
+        $res->execute();
+        if ($res->rowCount()) {
+            $lastTermUnitUpdate = $res->fetch()['term_unit_updated_at'];
+        }
+    } catch (Exception $e) {
+        return false;
+    }
+
+
+    $lastAssetUpdate = (!empty($lastAssetUpdate) ? $lastAssetUpdate : $lastAssetCreated);
+
+    $lastAssetUpdate = ($lastAssetUpdate > $lastTermUnitUpdate ? $lastAssetUpdate : $lastTermUnitUpdate);
+
+    $lastAssetUpdate = ($lastAssetUpdate > $lastAssetCreated ? $lastAssetUpdate : $lastAssetCreated);
+
+    if ($lastTermUpdate > $lastAssetUpdate)
+        return true;
+    return false;
+
+}
+
+
+
+function hasToSignTerm(\PDO $conn, int $userId): bool
+{
+    $commitmentTermId = getUserLastCommitmentTermId($conn, $userId);
+    
+    if (!$commitmentTermId) {
+        return false;
+    }
+    
+    $termUpdated = isUserTermUpdated($conn, $userId);
+
+    if (!$termUpdated) {
+        return false;
+    }
+
+    return (isLastUserTermSigned($conn, $userId) ? false : true);
+}
+
+
+
+
+
+
+
+function insertOrUpdateUsersTermsPivotTable(\PDO $conn, int $userId, bool $isTermUpdated, bool $isTermSigned, ?string $signedAt = null): bool
+{
+    $table = "users_terms_pivot";
+    // $hasTerm = ($hasTerm ? 1 : 0);
+    $hasTerm = 0;
+
+    $sql = "SELECT user_id FROM users_x_files WHERE user_id = :userId AND file_type = 1 LIMIT 1";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':userId', $userId);
+        $res->execute();
+        if ($res->rowCount() > 0) {
+            $hasTerm = 1;
+        }
+    } catch (\PDOException $e) {
+        // return false;
+        $hasTerm = 0;
+    }
+
+
+    $isTermUpdated = ($isTermUpdated ? 1 : 0);
+    $isTermSigned = ($isTermSigned ? 1 : 0);
+
+    $sql = "SELECT user_id FROM {$table} WHERE user_id = :userId";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':userId', $userId);
+        $res->execute();
+        if ($res->rowCount()) {
+            $sql = "UPDATE {$table} SET has_term = :has_term, is_term_updated = :is_term_updated, is_term_signed = :is_term_signed, signed_at = :signed_at WHERE user_id = :userId";
+            
+            try {
+                $res = $conn->prepare($sql);
+                $res->bindParam(':userId', $userId, \PDO::PARAM_INT);
+                $res->bindParam(':has_term', $hasTerm, \PDO::PARAM_INT);
+                $res->bindParam(':is_term_updated', $isTermUpdated, \PDO::PARAM_INT);
+                $res->bindParam(':is_term_signed', $isTermSigned, \PDO::PARAM_INT);
+                $res->bindParam(':signed_at', $signedAt, \PDO::PARAM_STR);
+                $res->execute();
+                return true;
+            } catch (exception $e) {
+                echo $e->getMessage();
+                return false;
+            }
+            
+        } else {
+            $sql = "INSERT INTO {$table} (user_id, has_term, is_term_updated, is_term_signed, signed_at) VALUES (:userId, :has_term, :is_term_updated, :is_term_signed, :signed_at)";
+
+            try {
+                $res = $conn->prepare($sql);
+                $res->bindParam(':userId', $userId);
+                $res->bindParam(':has_term', $hasTerm);
+                $res->bindParam(':is_term_updated', $isTermUpdated);
+                $res->bindParam(':is_term_signed', $isTermSigned);
+                $res->bindParam(':signed_at', $signedAt);
+                $res->execute();
+            } catch (exception $e) {
+                echo $e->getMessage();
+                return false;
+            }
+        }
+    } catch (exception $e) {
+        echo $e->getMessage();
+        return false;
+    }
+    return true;
 }
 
 
@@ -1175,6 +1853,34 @@ function getClients (\PDO $conn, ?int $id = null, ?int $operationType = null, ?s
     }
 }
 
+
+
+function getClientByUnitId(\PDO $conn, int $id): array
+{
+    $sql = "SELECT
+                cl.id,
+                cl.nickname
+            FROM
+                clients cl,
+                instituicao u
+            WHERE
+                cl.id = u.inst_client AND
+                u.inst_cod = :id
+    ";
+
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':id', $id); 
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch();
+        }
+        return [];
+    }
+    catch (Exception $e) {
+        return [];
+    }
+}
 
 
 /**
@@ -1731,69 +2437,92 @@ function getAssetsCategories(\PDO $conn, ?int $id = null): array
  * @return array
  */
 // function getAssetsTypes(\PDO $conn, ?int $id = null, ?int $type = null, ?int $category = null, ?int $inProfile = null, ?bool $andHasProfile = null): array
-function getAssetsTypes(\PDO $conn, ?int $id = null, ?int $type = null, ?array $category = null, ?int $inProfile = null, ?bool $andHasProfile = null): array
+function getAssetsTypes(
+    \PDO $conn, 
+    ?int $id = null, 
+    ?int $type = null, 
+    ?array $category = null, 
+    ?int $inProfile = null, 
+    ?bool $andHasProfile = null,
+    ?bool $isProduct = null,
+    ?bool $isDigital = null
+): array
 {
-    
-    /**
-     * $type 1: ativos que não podem ser agregados a outros
-     * $type 2: ativos que podem ser agregados a outros ativos (partes internas)
-     * $inProfile null: desconsidera o filtro
-     * $inProfile 0: ativos que não estão vinculados a nenhum perfil - não possuem um perfil - is null
-     * $inProfile id: ativos que estão vinculados a um perfil específico
-     */
 
-    $terms = ($id ? " WHERE t.tipo_cod = :id " : '');
+/**
+ * $type 1: ativos que não podem ser agregados a outros
+ * $type 2: ativos que podem ser agregados a outros ativos (partes internas)
+ * $inProfile null: desconsidera o filtro
+ * $inProfile 0: ativos que não estão vinculados a nenhum perfil - não possuem um perfil - is null
+ * $inProfile id: ativos que estão vinculados a um perfil específico
+ */
 
-    if (!$id) {
+$terms = ($id ? " WHERE t.tipo_cod = :id " : '');
 
-        if ($category !== null && !empty($category)) {
-            $terms .= ($terms ? " AND " : " WHERE ");
+if (!$id) {
 
-            $category = implode(",", $category);
-            
-            // $terms .= " c.id = " . $category;
-            $terms .= " c.id IN (" . $category . ")";
-        }
+    if ($category !== null && !empty($category)) {
+        $terms .= ($terms ? " AND " : " WHERE ");
 
-        if ($inProfile !== null) {
-            $terms .= ($terms ? " AND " : " WHERE ");
-            
-            if ($andHasProfile === true) {
-                $terms .= " (pt.profile_id = " . $inProfile . "  )";
-            } elseif ($andHasProfile === false) {
-                $terms .= " (pt.profile_id = " . $inProfile . " OR pt.profile_id IS NULL )";
-            } else {
-                $terms .= " pt.profile_id = " . $inProfile;
-            }
-
-
-            // if ($inProfile == 0) {
-            //     $terms .= " pt.profile_id IS NULL ";
-            // } else {
-            //     $terms .= " pt.profile_id = " . $inProfile;
-            // }
-        } elseif ($andHasProfile === true) {
-            $terms .= ($terms ? " AND " : " WHERE ");
-            $terms .= " pt.profile_id IS NOT NULL ";
-        } elseif ($andHasProfile === false) {
-            $terms .= ($terms ? " AND " : " WHERE ");
-            $terms .= " pt.profile_id IS NULL ";
-        }
+        $category = implode(",", $category);
+        
+        $terms .= " c.id IN (" . $category . ")";
     }
 
-    $sql = "SELECT 
-                t.tipo_cod, t.tipo_nome, t.tipo_categoria, 
-                c.cat_name, c.id, c.cat_description, 
-                p.profile_name, p.id as profile_id
-                FROM 
-                    tipo_equip t 
-                LEFT JOIN assets_categories c ON c.id = t.tipo_categoria
-                LEFT JOIN profiles_x_assets_types pt ON pt.asset_type_id = t.tipo_cod
-                LEFT JOIN assets_fields_profiles p ON p.id = pt.profile_id
-                {$terms}
-                ORDER BY 
-                    t.tipo_nome, c.cat_name
-                ";
+    if ($inProfile !== null) {
+        $terms .= ($terms ? " AND " : " WHERE ");
+        
+        if ($andHasProfile === true) {
+            $terms .= " (pt.profile_id = " . $inProfile . "  )";
+        } elseif ($andHasProfile === false) {
+            $terms .= " (pt.profile_id = " . $inProfile . " OR pt.profile_id IS NULL )";
+        } else {
+            $terms .= " pt.profile_id = " . $inProfile;
+        }
+
+        
+    } elseif ($andHasProfile === true) {
+        $terms .= ($terms ? " AND " : " WHERE ");
+        $terms .= " pt.profile_id IS NOT NULL ";
+    } elseif ($andHasProfile === false) {
+        $terms .= ($terms ? " AND " : " WHERE ");
+        $terms .= " pt.profile_id IS NULL ";
+    }
+
+
+    if ($isProduct !== null && $isProduct != 0) {
+
+        $isProduct = (int) $isProduct;
+        $terms .= ($terms ? " AND " : " WHERE ");
+        // $terms .= " c.cat_is_product = " . $isProduct;
+        $terms .= " t.can_be_product = " . $isProduct;
+    }
+
+    if ($isDigital !== null && $isDigital != 0) {
+
+        $isDigital = (int) $isDigital;
+        $terms .= ($terms ? " AND " : " WHERE ");
+        // $terms .= " c.cat_is_product = " . $isDigital;
+        $terms .= " t.is_digital = " . $isDigital;
+    }
+}
+
+$sql = "SELECT 
+            t.tipo_cod, t.tipo_nome, t.tipo_categoria, t.can_be_product, t.is_digital,
+            c.cat_name, c.id, c.cat_description, c.cat_is_product, c.cat_is_digital, 
+            p.profile_name, p.id as profile_id
+            FROM 
+                tipo_equip t 
+            LEFT JOIN assets_categories c ON c.id = t.tipo_categoria
+            LEFT JOIN profiles_x_assets_types pt ON pt.asset_type_id = t.tipo_cod
+            LEFT JOIN assets_fields_profiles p ON p.id = pt.profile_id
+
+            -- WHERE c.cat_is_product = 1 
+
+            {$terms}
+            ORDER BY 
+                t.tipo_nome, c.cat_name
+            ";
     try {
         $res = $conn->prepare($sql);
         if ($id) {
@@ -2086,15 +2815,58 @@ function getAssetsRequiredInfo (\PDO $conn, int $profileId): array
  * 
  * @return array
  */
-function getAssetsModels(\PDO $conn, ?int $modelId = null, ?int $assetTypeId = null, ?int $manufacturerId = null): array
+function getAssetsModels(
+    \PDO $conn, 
+    ?int $modelId = null, 
+    ?int $assetTypeId = null, 
+    ?int $manufacturerId = null,
+    ?bool $isProduct = null,
+    ?array $orderBy = null, 
+    ?bool $hasProductRegistered = null
+): array
 {
 
+    $defaultOrderBy = "m.marc_nome, t.tipo_nome";
+
+    if ($orderBy !== null) {
+        $defaultOrderBy = implode(",", $orderBy);
+    }
+    
+    $termsFrom = "";
+    $termsGroupBy = "";
     $terms = ($modelId ? " AND m.marc_cod = :modelId " : '');
 
     if (!$modelId) {
         $terms .= ($assetTypeId ? " AND t.tipo_cod = :assetTypeId " : '');
         $terms .= ($manufacturerId ? " AND m.marc_manufacturer = :manufacturerId " : '');
+
+
+        if ($isProduct !== null && $isProduct != 0) {
+            $isProduct = (int) $isProduct;
+            // $terms .= ($terms ? " AND " : " WHERE ");
+            // $terms .= " AND c.cat_is_product = " . $isProduct;
+            $terms .= " AND t.can_be_product = " . $isProduct;
+        }
+
+        
+        if ($hasProductRegistered !== null && $hasProductRegistered != 0) {
+            
+            $terms .= " AND e.comp_marca = m.marc_cod AND e.is_product = 1 ";
+            $termsFrom = ", equipamentos e ";
+            $termsGroupBy = "GROUP BY 
+                                m.marc_cod, 
+                                m.marc_manufacturer, 
+                                m.marc_nome, 
+                                t.tipo_nome, 
+                                t.tipo_cod, 
+                                t.can_be_product, 
+                                c.cat_name, 
+                                c.cat_is_product, 
+                                f.fab_nome";
+        }
     }
+
+
 
     
     $sql = "SELECT 
@@ -2103,13 +2875,21 @@ function getAssetsModels(\PDO $conn, ?int $modelId = null, ?int $assetTypeId = n
                 m.marc_nome as modelo, 
                 t.tipo_nome as tipo, 
                 t.tipo_cod as tipo_cod,
+                t.can_be_product,
+                c.cat_name, 
+                c.cat_is_product,
                 f.fab_nome as fabricante
             FROM 
-				tipo_equip as t , 
-                marcas_comp as m LEFT JOIN fabricantes f on f.fab_cod = m.marc_manufacturer
+				tipo_equip as t  
+                LEFT JOIN assets_categories c ON c.id = t.tipo_categoria, 
+                marcas_comp m LEFT JOIN fabricantes f on f.fab_cod = m.marc_manufacturer
+                {$termsFrom}
             WHERE 
                 m.marc_tipo = t.tipo_cod {$terms}
-            ORDER BY m.marc_nome, t.tipo_nome";
+            {$termsGroupBy}
+            ORDER BY $defaultOrderBy
+            
+            ";
 
     try {
         $res = $conn->prepare($sql);
@@ -2134,10 +2914,167 @@ function getAssetsModels(\PDO $conn, ?int $modelId = null, ?int $assetTypeId = n
         return [];
     }
     catch (Exception $e) {
+        return ['sql' => $sql, 'error' => $e->getMessage()];
+    }
+}
+
+
+
+
+function getPriceFromAssetModel (\PDO $conn, int $assetModelId): array
+{
+    $sql = "SELECT 
+                MAX(c.comp_cod) AS codigo,
+                c.comp_valor
+            FROM
+                equipamentos c
+            WHERE
+                c.comp_marca = :assetModelId
+            GROUP BY 
+                c.comp_cod, c.comp_valor
+            ";
+
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':assetModelId', $assetModelId);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch();
+        }
+        return [];
+    } catch (Exception $e) {
         return ['error' => $e->getMessage()];
     }
     
+}
+
+
+
+/**
+ * getResourcesFromTicket
+ * Retorna a listagem de recursos alocados para o ticket informado
+ *
+ * @param \PDO $conn
+ * @param int $ticket
+ * 
+ * @return array
+ */
+function getResourcesFromTicket (\PDO $conn, int $ticket): array
+{
+    // table: tickets_x_resources
+    $sql = "SELECT * 
+            FROM 
+                tickets_x_resources 
+            WHERE 
+                ticket = :ticket AND
+                is_current = 1
+    ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':ticket', $ticket);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetchAll();
+        }
+        return [];
+    } catch (Exception $e) {
+        return ['error' => $e->getMessage()];
+    }
+}
+
+
+/**
+ * hasResources
+ * Retorna se o chamado informado possui o(s) recurso(s) informado(s)
+ * @param \PDO $conn
+ * @param int $ticket
+ * @param array $resourceModelIds
+ * 
+ * @return bool
+ */
+function hasResources(\PDO $conn, int $ticket, array $resourceModelIds = []): bool
+{
+    /* Se forem informados recursos */
+    if (!empty($resourceModelIds)) {
+        $resourceModelIds = array_map('intval', $resourceModelIds);
+        $stringResourcesIds = implode(",", $resourceModelIds);
+
+        $sql = "SELECT 
+                    id
+                FROM 
+                    tickets_x_resources 
+                WHERE 
+                    ticket = :ticket AND
+                    model_id IN ({$stringResourcesIds}) AND
+                    is_current = 1
+                    ";
+        try {
+            $res = $conn->prepare($sql);
+            $res->bindParam(':ticket', $ticket, PDO::PARAM_INT);
+            $res->execute();
+            if ($res->rowCount()) {
+                return true;
+            }
+            return false;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
     
+    /* Caso nenhum recurso seja informado, entao apenas verifico se possui algum recurso para o chamado */
+    $sql = "SELECT
+                id
+            FROM
+                tickets_x_resources
+            WHERE
+                ticket = :ticket AND
+                is_current = 1
+            ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':ticket', $ticket, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            return true;
+        }
+        return false;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+
+/**
+ * getTotalPricesFromTicket
+ * Retorna o valor total de recursos alocados no chamado
+ * O valor retornado não é formatado
+ *
+ * @param \PDO $conn
+ * @param int $ticket
+ * 
+ * @return float
+ */
+function getTotalPricesFromTicket(\PDO $conn, int $ticket): float
+{
+    $sql = "SELECT COALESCE(SUM(unitary_price * amount), 0) AS total_price 
+            FROM 
+                tickets_x_resources 
+            WHERE 
+                ticket = :ticket AND
+                is_current = 1
+    ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':ticket', $ticket);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch()['total_price'];
+        }
+        return 0;
+    } catch (\PDOException $e) {
+        echo $e->getMessage();
+        return 0;
+    }
 }
 
 
@@ -2498,19 +3435,29 @@ function getAssetSpecs(
     if ($isDigital !== null) {
 
         $isDigital = ($isDigital == true || $isDigital == 1 ? 1 : 0);
-        $terms.= (strlen((string)$terms) ? " AND cat.cat_is_digital = {$isDigital} AND " : " cat.cat_is_digital = {$isDigital} AND ");
+        
+        if ($isDigital == 0) {
+            $terms.= (strlen((string)$terms) ? " AND (t.is_digital = 0 OR t.is_digital IS NULL) AND " : " (t.is_digital = 0 OR t.is_digital IS NULL) AND ");
+        } else {
+            $terms.= (strlen((string)$terms) ? " AND t.is_digital = 1 AND " : " t.is_digital = 1 AND ");
+        }
+        
     }
 
     if ($isProduct !== null) {
 
         $isProduct = ($isProduct == true || $isProduct == 1 ? 1 : 0);
-        $terms.= (strlen((string)$terms) ? " AND cat.cat_is_product = {$isProduct} AND " : " cat.cat_is_product = {$isProduct} AND ");
+        
+        // $terms.= (strlen((string)$terms) ? " AND cat.cat_is_product = {$isProduct} AND " : " cat.cat_is_product = {$isProduct} AND ");
+        $terms.= (strlen((string)$terms) ? " AND e.is_product = {$isProduct} AND " : " e.is_product = {$isProduct} AND ");
     }
     
     
-    $sql = "SELECT t.*, m.*, a.*, e.comp_inst, e.comp_inv, cat.* 
+    $sql = "SELECT t.*, m.*, a.*, e.comp_inst, e.comp_inv, cat.*, 
+                    fab.fab_nome
             FROM 
-                ((tipo_equip t, marcas_comp m, assets_x_specs a
+                ((tipo_equip t, marcas_comp m, fabricantes fab, 
+                assets_x_specs a
             LEFT JOIN 
                 equipamentos e on e.comp_cod = a.asset_spec_tagged_id) 
             LEFT JOIN 
@@ -2519,7 +3466,8 @@ function getAssetSpecs(
                 {$terms}
                 a.asset_id = :id AND
                 a.asset_spec_id = m.marc_cod AND
-                m.marc_tipo = t.tipo_cod
+                m.marc_tipo = t.tipo_cod AND
+                m.marc_manufacturer = fab.fab_cod
             ORDER BY
                 t.tipo_nome, m.marc_nome    
             ";
@@ -2533,6 +3481,7 @@ function getAssetSpecs(
             }
             return $data;
         }
+        // return [$sql => $sql];
         return [];
     }
     catch (Exception $e) {
@@ -2626,7 +3575,9 @@ function isAssetModelFreeToLink(\PDO $conn, int $modelId) :bool
             FROM 
                 equipamentos
             WHERE 
-                comp_marca = :id ";
+                comp_marca = :id AND
+                (is_product = 0 OR is_product IS NULL)
+            ";
     try {
         $res = $conn->prepare($sql);
         $res->bindParam(':id', $modelId);
@@ -2893,7 +3844,9 @@ function getSavedSpecs (\PDO $conn, int $modelId): array
 
 /**
  * updateAssetDepartment
- * Faz o update do departamento para o ativo informado
+ * Faz o update do departamento para o ativo informado - 
+ * Desconsidera a unidade do ativo e unidade do departamento visto que é possível que 
+ * um ativo possa estar registrado em uma unidade mas estar localizado em outra.
  *
  * @param \PDO $conn
  * @param int $assetId
@@ -2903,16 +3856,23 @@ function getSavedSpecs (\PDO $conn, int $modelId): array
  */
 function updateAssetDepartment(\PDO $conn, int $assetId, int $departmentId): bool
 {
-    $sql = "UPDATE equipamentos SET comp_local = :dep WHERE comp_cod = :id";
+    $sql = "UPDATE 
+                equipamentos 
+            SET 
+                comp_local = :dep 
+            WHERE 
+                comp_cod = :id";
     try {
         $res = $conn->prepare($sql);
+        
         $res->bindParam(':dep', $departmentId);
         $res->bindParam(':id', $assetId);
         $res->execute();
         return true;
     }
     catch (Exception $e) {
-        return ['error' => $e->getMessage()];
+        // return ['error' => $e->getMessage()];
+        return false;
     }
 }
 
@@ -2983,6 +3943,110 @@ function insertNewDepartmentInHistory(\PDO $conn, int $assetId, int $departmentI
         return ['error' => $e->getMessage()];
     }
     
+}
+
+
+/**
+ * updateAssetDepartamentAndHistory
+ * Atualiza o departamento e o histórico de localização de um ativo individual, bem como seus filhos
+ *
+ * @param \PDO $conn
+ * @param int $assetId
+ * @param int $author
+ * @param int|null $departmentId
+ * 
+ * @return bool
+ */
+function updateAssetDepartamentAndHistory (\PDO $conn, int $assetId, int $author, ?int $departmentId = null): bool
+{
+    $updateAssetDepartment = updateAssetDepartment($conn, $assetId, $departmentId);
+
+    $newDepartmentInHistory = insertNewDepartmentInHistory($conn, $assetId, $departmentId, $author);
+            
+    /* Fazer a atualização do departamento também para os ativos filhos e também gravar a modificação no histórico*/
+    $children = getAssetDescendants($conn, $assetId);
+    foreach ($children as $child) {
+        updateAssetDepartment($conn, $child['asset_spec_tagged_id'], $departmentId);
+        $newDepartmentInHistory = insertNewDepartmentInHistory($conn, $child['asset_spec_tagged_id'], $departmentId, $author);
+    }
+
+    return $updateAssetDepartment && $newDepartmentInHistory;
+}
+
+
+/**
+ * updateUserAssetsDepartment
+ * Atualiza o departamento de todos os ativos e ativos filhos alocados para um usuário
+ * Também atualiza o histórico tanto dos ativos quanto dos ativos filhos
+ *
+ * @param \PDO $conn
+ * @param int $userId
+ * @param int $departmentId
+ * @param int $author
+ * 
+ * @return bool
+ */
+function updateUserAssetsDepartment(\PDO $conn, int $userId, int $author, ?int $departmentId = null): bool
+{
+    $updateAssetDepartment = true;
+    $user_assets = getAssetsFromUser($conn, $userId);
+
+    if (!empty($user_assets) && !empty($departmentId)) {
+        foreach ($user_assets as $asset) {
+            $updateAssetDepartment = updateAssetDepartamentAndHistory($conn, $asset['asset_id'], $author, $departmentId);
+        }
+    }
+    return ($updateAssetDepartment);
+
+}
+
+
+
+/**
+ * updateAssetsTookOffUser
+ * Função a ser utilizada para atualizar ativos vinculados a usuários que forem desativados ou excluídos do sistema
+ * @param \PDO $conn
+ * @param int $user_id
+ * @param int $author
+ * @param int|null $newDepartment
+ * 
+ * @return bool
+ */
+function updateAssetsTookOffUser(\PDO $conn, int $user_id, int $author, ?int $newDepartment = null): bool
+{
+    $userAssetsInfo = getAssetsFromUser($conn, $user_id);
+    $count_userAssetsInfo = count($userAssetsInfo);
+    $assets_ids = [];   
+    $textAssetIds = "";
+
+    if ($count_userAssetsInfo > 0) {
+        foreach ($userAssetsInfo as $key => $value) {
+            $assets_ids[] = $value['asset_id'];
+        }
+        $textAssetIds = implode(',', $assets_ids);
+
+        if (empty($textAssetIds)) 
+            return false;
+
+        $sql = "UPDATE users_x_assets SET is_current = 0 WHERE user_id = :user_id AND asset_id IN ({$textAssetIds})";
+        try {
+            $res = $conn->prepare($sql);
+            $res->bindParam(':user_id', $user_id);
+            $res->execute();
+            
+        } catch (\PDOException $e) {
+            echo $e->getMessage();
+            return false;
+        }
+
+        if ($newDepartment) {
+            foreach ($assets_ids as $asset_id) {
+                $updateAssetsDepartment = updateAssetDepartamentAndHistory($conn, $asset_id, $author, $newDepartment);
+            }
+        }
+        return true;
+    }
+    return true;
 }
 
 
@@ -3107,10 +4171,13 @@ function getAssetDepartmentsChanges (\PDO $conn, int $asset_id): array
     /* A partir da versão 5 a consulta é apenas pelo asset_id */
     $sql = "SELECT 
                 l.local,
+                i.inst_nome,
+                COALESCE (i.inst_nome, 'N/A') AS unidade,
                 h.hist_data,
                 u.nome
             FROM 
                 historico h, usuarios u, localizacao l
+                LEFT JOIN instituicao i ON i.inst_cod = l.loc_unit
             WHERE 
                 h.asset_id = :asset_id AND
                 h.hist_user = u.user_id AND
@@ -3139,10 +4206,14 @@ function getAssetDepartmentsChanges (\PDO $conn, int $asset_id): array
     /* Até a versão 4 a consulta utiliza a etiqueta e a unidade do ativo */
     $sql = "SELECT 
                 l.local,
+                COALESCE (i.inst_nome, 'N/A') AS unidade,
                 h.hist_data,
                 u.nome
             FROM 
-            localizacao l, historico h LEFT JOIN usuarios u ON u.user_id = h.hist_user
+            localizacao l 
+                LEFT JOIN instituicao i ON i.inst_cod = l.loc_unit,
+            historico h 
+                LEFT JOIN usuarios u ON u.user_id = h.hist_user
             WHERE 
                 h.hist_inv = :asset_tag AND
                 h.hist_inst = :asset_unit AND
@@ -3170,6 +4241,466 @@ function getAssetDepartmentsChanges (\PDO $conn, int $asset_id): array
 
     return $data;
 }
+
+
+
+function getUsersFromAssetChanges(\PDO $conn, int $asset_id) :array
+{
+    $sql = "SELECT 
+                u.user_id, 
+                u.nome as usuario,
+                cl.nickname as cliente,
+                aut.nome as autor,
+                e.comp_inv,
+                e.comp_inst,
+                ua.created_at,
+                ua.updated_at,
+                ua.author_id,
+                ua.is_current
+            FROM
+                usuarios as aut,
+                equipamentos as e,
+                users_x_assets as ua,
+                usuarios as u
+                LEFT JOIN clients cl ON cl.id = u.user_client
+            WHERE
+                u.user_id = ua.user_id AND
+                aut.user_id = ua.author_id AND
+                ua.asset_id = e.comp_cod AND
+                e.comp_cod = :asset_id
+            ORDER BY
+                ua.created_at DESC";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':asset_id', $asset_id, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            foreach ($res->fetchAll() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return [];
+    }
+    catch (Exception $e) {
+        return ['error' => $e->getMessage()];
+    }
+    return [];
+}
+
+
+
+
+function getAssetsFromUserChanges(\PDO $conn, int $user_id) :array
+{
+    $sql = "SELECT 
+                u.user_id, 
+                u.nome as usuario,
+                aut.nome as autor,
+                e.comp_inv,
+                e.comp_inst,
+                t.tipo_nome,
+                f.fab_nome,
+                m.marc_nome,
+                cl.nickname as cliente,
+                i.inst_nome,
+                ua.created_at,
+                ua.updated_at,
+                ua.author_id,
+                ua.is_current
+            FROM
+                usuarios as u,
+                usuarios as aut,
+                equipamentos as e,
+                users_x_assets as ua,
+                tipo_equip as t,
+                fabricantes as f,
+                marcas_comp as m,
+                instituicao as i
+                LEFT JOIN clients as cl ON cl.id = i.inst_client
+            WHERE
+                u.user_id = ua.user_id AND
+                aut.user_id = ua.author_id AND
+                ua.asset_id = e.comp_cod AND
+                e.comp_tipo_equip = t.tipo_cod AND
+                e.comp_fab = f.fab_cod AND
+                e.comp_marca = m.marc_cod AND
+                i.inst_cod = e.comp_inst AND
+                u.user_id = :user_id
+
+            ORDER BY
+                ua.created_at DESC";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            foreach ($res->fetchAll() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return [];
+    }
+    catch (Exception $e) {
+        return ['error' => $e->getMessage()];
+    }
+    return [];
+}
+
+
+
+function setUserNotification(
+    \PDO $conn, 
+    int $user_id,
+    int $type,
+    string $text,
+    int $author_id) :bool
+{
+    $sql = "INSERT INTO users_notifications
+                (user_id, type, text, author)
+            VALUES
+                (:user_id, :type, :text, :author)
+    ";
+
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+        $res->bindParam(':type', $type, PDO::PARAM_INT);
+        $res->bindParam(':text', $text, PDO::PARAM_STR);
+        $res->bindParam(':author', $author_id, PDO::PARAM_INT);
+        
+        $res->execute();
+        return true;
+    }
+    catch (Exception $e) {
+        echo '<hr>' . $e->getMessage();
+        return false;
+    }
+}
+
+function getUnreadUserNotifications(\PDO $conn, int $user_id) :array
+{
+    $sql = "SELECT  
+                n.id,
+                n.user_id,
+                n.type,
+                n.text,
+                u.nome as author,
+                n.created_at
+            FROM 
+                users_notifications n, 
+                usuarios u 
+            WHERE 
+                n.author = u.user_id AND
+                n.user_id = :user_id AND 
+                seen_at IS NULL
+            ORDER BY
+                n.created_at DESC
+                ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            foreach ($res->fetchAll() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return [];
+    }
+    catch (Exception $e) {
+        return [];
+    }
+}
+
+function getSeenUserNotifications(\PDO $conn, int $user_id) :array
+{
+    $sql = "SELECT  
+                n.id,
+                n.user_id,
+                n.type,
+                n.text,
+                u.nome as author,
+                n.created_at
+            FROM 
+                users_notifications n, 
+                usuarios u 
+            WHERE 
+                n.author = u.user_id AND
+                n.user_id = :user_id AND 
+                seen_at IS NOT NULL
+            ORDER BY
+                n.created_at DESC
+                ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            foreach ($res->fetchAll() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return [];
+    }
+    catch (Exception $e) {
+        return [];
+    }
+}
+
+function setUserNotificationSeen(\PDO $conn, int $notification_id) :bool
+{
+    $now = date('Y-m-d H:i:s');
+    $sql = "UPDATE users_notifications
+            SET
+                seen_at = :now
+            WHERE
+                id = :notification_id";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':now', $now, PDO::PARAM_STR);
+        $res->bindParam(':notification_id', $notification_id, PDO::PARAM_INT);
+        
+        $res->execute();
+        return true;
+    }
+    catch (Exception $e) {
+        return false;
+    }
+}
+
+
+
+function setUserTicketNotice(\PDO $conn, string $sourceTable, int $notice_id, ?int $type = null) :bool
+{
+
+    $sourceTable = noHtml($sourceTable);
+
+    $sql = "INSERT INTO users_tickets_notices
+                (`type`,source_table, notice_id)
+            VALUES
+                (:type, :source_table, :notice_id)";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':source_table', $sourceTable, PDO::PARAM_STR);
+        $res->bindParam(':notice_id', $notice_id, PDO::PARAM_INT);
+        $res->bindParam(':type', $type, PDO::PARAM_INT);
+        
+        $res->execute();
+        return true;
+    }
+    catch (Exception $e) {
+        return false;
+    }
+}
+
+
+function getUnreadNoticesIDsFromTicket (\PDO $conn, int $ticket, ?bool $isTreater = false): ?array 
+{
+    $terms = ($isTreater ? " n.treater_seen_at IS NULL" : " n.requester_seen_at IS NULL");
+
+    $sql = "SELECT
+                n.notice_id
+            FROM
+                users_tickets_notices AS n,
+                ocorrencias AS o,
+                assentamentos AS a
+            WHERE
+                a.ocorrencia = o.numero AND
+                o.numero = :ticket AND
+                n.source_table = 'assentamentos' AND 
+                n.notice_id = a.numero AND 
+                {$terms}
+            ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':ticket', $ticket, \PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount() > 0) {
+            foreach ($res->fetchAll() as $row) {
+                $data[] = $row['notice_id'];
+            }
+            return $data;
+        }
+        return null;
+    } catch (\PDOException $e) {
+        echo $e->getMessage();
+        return null;
+    }
+}
+
+function setUserTicketNoticeSeen(\PDO $conn, string $sourceTable, array $notice_ids, ?bool $isTreater = false) :bool
+{
+    
+    if (empty($notice_ids)) {
+        return false;
+    }
+    
+    $notice_ids = array_map(function ($value) {
+        return (int)$value;
+    }, $notice_ids);
+
+    $text_ids = implode(', ', $notice_ids);
+    
+    $terms = " requester_seen_at = :now ";
+    $now = date('Y-m-d H:i:s');
+    if ($isTreater) {
+        $terms = " treater_seen_at = :now ";
+    }
+    
+    
+    $sql = "UPDATE users_tickets_notices
+            SET
+                {$terms}
+            WHERE
+                source_table = :source_table AND
+                notice_id IN ({$text_ids})";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':now', $now, PDO::PARAM_STR);
+        $res->bindParam(':source_table', $sourceTable, PDO::PARAM_STR);
+        // $res->bindParam(':notice_id', $notice_id, PDO::PARAM_INT);
+        $res->execute();
+        return true;
+    }
+    catch (Exception $e) {
+        return false;
+    }   
+}
+
+
+function getUserTicketsNotices(\PDO $conn, int $user_id, ?bool $onlyCount = false, ?bool $seen = false) :array
+{
+    $data = [];
+    $totalMyOpened = 0;
+    $totalMyTreated = 0;
+    $terms = "a.tipo_assentamento as type,
+                a.ocorrencia,
+                a.numero as notice_id,
+                a.assentamento,
+                a.created_at,
+                u.nome AS author";
+
+    $termsTicketsIopened = ",'TICKETS_YOU_OPENED' AS type_name ";
+    $termsTicketsITreat = ",'TICKETS_YOU_TREAT' AS type_name ";
+
+
+    $orderOrGroup = "ORDER BY a.created_at DESC";
+
+
+    if ($onlyCount) {
+        $terms = "COUNT(*) AS notices_count ";
+        $termsTicketsIopened = "";
+        $termsTicketsITreat = "";
+        $orderOrGroup = "";
+    }
+
+    // $whereTerms = "udn.seen_at IS NULL";
+    $whereRequesterTerms = "udn.requester_seen_at IS NULL";
+    $whereTreaterTerms = "udn.treater_seen_at IS NULL";
+    if ($seen == true) {
+        // $whereTerms = "udn.seen_at IS NOT NULL";
+        $whereRequesterTerms = "udn.requester_seen_at IS NOT NULL";
+        $whereTreaterTerms = "udn.treater_seen_at IS NOT NULL";
+    }
+    
+    /* Notificacoes para os solicitantes */
+    $sql = "SELECT
+            {$terms}
+            {$termsTicketsIopened}
+        FROM
+            users_tickets_notices as udn,
+            assentamentos as a,
+            ocorrencias as o,
+            usuarios as u
+        WHERE
+            udn.notice_id = a.numero AND
+            udn.source_table = 'assentamentos' AND
+            a.ocorrencia = o.numero AND
+            a.asset_privated = 0 AND
+            u.user_id = a.responsavel AND
+            o.aberto_por = :user_id AND
+            a.responsavel <> :user_id AND
+            {$whereRequesterTerms} 
+            {$orderOrGroup}
+        
+            ";
+
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+        $res->execute();
+        
+        if ($res->rowCount()) {
+            if ($onlyCount) {
+                $totalMyOpened = $res->fetch()['notices_count'];
+            }
+            foreach ($res->fetchAll() as $row) {
+                $data[] = $row;
+            }
+        }
+    }
+    catch (Exception $e) {
+        return ['error' => $e->getMessage()];
+    }
+
+    /* Notificacoes para os responsaveis */
+    $sql = "SELECT
+            {$terms}
+            {$termsTicketsITreat}
+            FROM
+                users_tickets_notices as udn,
+                assentamentos as a,
+                ocorrencias as o,
+                usuarios as u,
+                `status` st
+            WHERE
+                udn.notice_id = a.numero AND
+                udn.source_table = 'assentamentos' AND
+                a.ocorrencia = o.numero AND
+                u.user_id = a.responsavel AND
+                a.responsavel <> o.operador AND 
+                o.operador = :user_id AND
+                o.status = st.stat_id AND
+                st.stat_painel IN (1,3) AND
+                {$whereTreaterTerms} 
+                {$orderOrGroup}
+            
+                ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+        $res->execute();
+        
+        if ($res->rowCount()) {
+            
+            if ($onlyCount) {
+                $totalMyTreated = $res->fetch()['notices_count'];
+            }
+            
+            foreach ($res->fetchAll() as $row) {
+                $data[] = $row;
+            }
+        }
+    }
+    catch (Exception $e) {
+        return ['error' => $e->getMessage()];
+    }
+
+    if ($onlyCount) {
+        return ['notices_count' => $totalMyOpened + $totalMyTreated];
+    }
+
+    /* Remover duplicados */
+    $data = array_unique($data, SORT_REGULAR);
+
+    return $data;
+
+}
+
 
 
 
@@ -3344,6 +4875,144 @@ function getAreaAllowedClients (\PDO $conn, int $area_id): array
 }
 
 
+
+/**
+ * ticketHasExtendedInfo
+ * Retorna se existem informações extendidas para o ticket informado
+ *
+ * @param \PDO $conn
+ * @param int $ticket
+ * 
+ * @return bool
+ */
+function ticketHasExtendedInfo(\PDO $conn, int $ticket): bool 
+{
+    $sql = "SELECT ticket FROM tickets_extended WHERE ticket = :ticket";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':ticket', $ticket);
+        $res->execute();
+        if ($res->rowCount()) {
+            return true;
+        }
+        return false;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+/**
+ * getTicketExtendedInfo
+ * Retorna as informações extendidas para o ticket informado
+ *
+ * @param \PDO $conn
+ * @param int $ticket
+ * 
+ * @return array
+ */
+function getTicketExtendedInfo(\PDO $conn, int $ticket): array
+{
+    $sql = "SELECT * FROM tickets_extended WHERE ticket = :ticket";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':ticket', $ticket);
+        $res->execute();
+        if ($res->rowCount()) {
+            foreach ($res->fetchAll() as $row) {
+                $data[] = $row;
+            }
+            return $data;
+        }
+        return [];
+    }
+    catch (Exception $e) {
+        return ['error' => $e->getMessage()];
+    }
+}
+
+
+/**
+ * Sets or updates ticket extended info by specific columns.
+ * Tabela tickets_extended
+ *
+ * @param \PDO $conn The PDO connection object.
+ * @param int $ticket The ticket number.
+ * @param array $columns An array of column names.
+ * @param array $values An array of column values.
+ * @return bool Returns true if the operation is successful, false otherwise.
+ */
+function setOrUpdateTicketExtendedInfoByCols(\PDO $conn, int $ticket, array $columns, array $values): bool
+{
+    
+    if (count($columns) != count($values)) {
+        echo "Number of columns must be equal to number of values";
+        return false;
+    }
+
+    array_unshift( $columns, 'ticket' );
+    array_unshift( $values, $ticket );
+
+    $columns = array_map('noHtml', $columns);
+    $values = array_map('noHtml', $values);
+
+    $isUpdate = ticketHasExtendedInfo($conn, $ticket);
+
+    $sqlTerms = "";
+    $sqlColumns = "";
+    $sqlValues = "";
+    if ($isUpdate) {
+        /* Update */
+        foreach ($columns as $key => $column) {
+            if (strlen($sqlTerms)) 
+                $sqlTerms .= ", ";
+            $sqlTerms .= " {$column} = {$values[$key]} ";
+        }
+
+        $sql = "UPDATE tickets_extended SET {$sqlTerms} WHERE ticket = :ticket";
+
+    } else {
+        /* Insert */
+        foreach ($columns as $column) {
+            if (strlen($sqlColumns)) 
+                $sqlColumns .= ", ";
+            $sqlColumns .= " {$column} "; 
+        }
+
+        foreach ($values as $key => $value) {
+            if (strlen($sqlValues)) 
+                $sqlValues .= ", ";
+            $sqlValues .= $value;
+        }
+
+        $sql = "INSERT INTO tickets_extended ({$sqlColumns}) VALUES ({$sqlValues})";
+    }
+
+    try {
+        $res = $conn->prepare($sql);
+
+        if ($isUpdate) {
+            $res->bindParam(':ticket', $ticket, PDO::PARAM_INT);
+        }
+        
+        $res->execute();
+        if ($res->rowCount()) {
+            return true;
+        }
+        return false;
+    }
+    catch (Exception $e) {
+        // echo $e->getMessage();
+        // echo '<hr />' .$e->getTraceAsString();
+        // echo '<hr />' . $sql;
+        // var_dump([
+        //     'columns' => $columns,
+        //     'values' => $values,
+        //     '$sqlColumns' => $sqlColumns,
+        //     '$sqlValues' => $sqlValues
+        // ]);
+        return false;
+    }
+}
 
 
 
@@ -3564,6 +5233,23 @@ function getIssuesByArea(\PDO $conn, bool $all = false, ?int $areaId = null, ?in
 }
 
 
+function getIssuesCategoriesByType(\PDO $conn, int $type): array
+{
+    $type = (string)$type;
+    $table = "prob_tipo_" . $type;
+    $sql = "SELECT * FROM {$table} ";
+    $res = $conn->prepare($sql);
+    $res->execute();
+    if ($res->rowCount()) {
+        foreach ($res->fetchAll() as $row) {
+            $data[] = $row;
+        }
+        return $data;
+    }
+    return [];
+}
+
+
 
 /**
  * getIssuesByArea4
@@ -3581,17 +5267,34 @@ function getIssuesByArea(\PDO $conn, bool $all = false, ?int $areaId = null, ?in
  * @return array
  */
 function getIssuesByArea4(
-        \PDO $conn, 
-        bool $all = false, 
-        ?int $areaId = null, 
-        ?int $showHidden = 1, 
-        ?string $areasFromUser = null,
-        ?int $hasProfileForm = null
+    \PDO $conn, 
+    bool $all = false, 
+    ?int $areaId = null, 
+    ?int $showHidden = 1, 
+    ?string $areasFromUser = null,
+    ?int $hasProfileForm = null,
+    ?array $categories = null,
+    ?array $catsNotNull = null
 ): array
 {
     $areaId = (isset($areaId) && $areaId != '-1' && filter_var($areaId, FILTER_VALIDATE_INT) ? $areaId : "");
     $areasToOpen = [];
-    
+
+    /* Categorias de tipos de solicitação chave => valor, onde: 
+    chave é o número sufixo do campo de categoria e o valor é o código da categoria na tabela correspondente */
+    $termsCategories = "";
+    if ($categories !== null && !empty($categories)) {
+        foreach ($categories as $cat => $value) {
+            $termsCategories .= " AND prob_tipo_" . $cat . " = '{$value}' ";
+        }
+    }
+
+    if ($catsNotNull !== null && !empty($catsNotNull)) {
+        foreach ($catsNotNull as $cat) {
+            $termsCategories .= " AND prob_tipo_" . $cat . " IS NOT NULL ";
+        }
+    }
+
     $terms = "";
     if (!empty($areaId)) {
         $terms = " (a.area_id = :areaId OR a.area_id IS NULL) AND p.prob_active = 1 ";
@@ -3627,20 +5330,51 @@ function getIssuesByArea4(
         $terms .= " p.prob_profile_form IS NOT NULL ";
     }
 
-    /* -- a.prob_id, a.area_id as prob_area, p.prob_descricao, p.problema */
-    /* -- a.prob_id, a.area_id, p.prob_descricao, p.problema */
+    // -- p.prob_tipo_1, p.prob_tipo_2, p.prob_tipo_3
     $sql = "SELECT 
                 
-                a.prob_id, p.prob_descricao, p.problema, p.prob_profile_form
+                a.prob_id, p.prob_descricao, p.problema, p.prob_profile_form, 
+                cat1.probt1_cod, cat2.probt2_cod, cat3.probt3_cod, 
+                cat4.probt4_cod, 
+                cat5.probt5_cod, 
+                cat6.probt6_cod, 
+                cat1.probt1_desc, cat2.probt2_desc, cat3.probt3_desc, 
+                cat4.probt4_desc,
+                cat5.probt5_desc,
+                cat6.probt6_desc
             FROM 
-                problemas p, areas_x_issues a
+                -- problemas p, areas_x_issues a,
+                -- prob_tipo_1 cat1, prob_tipo_2 cat2, prob_tipo_3 cat3, prob_tipo_4 cat4
+
+                areas_x_issues a, 
+                problemas p
+                
+                LEFT JOIN prob_tipo_1 AS cat1 ON cat1.probt1_cod = p.prob_tipo_1
+                LEFT JOIN prob_tipo_2 AS cat2 ON cat2.probt2_cod = p.prob_tipo_2
+                LEFT JOIN prob_tipo_3 AS cat3 ON cat3.probt3_cod = p.prob_tipo_3
+                LEFT JOIN prob_tipo_4 AS cat4 ON cat4.probt4_cod = p.prob_tipo_4
+                LEFT JOIN prob_tipo_5 AS cat5 ON cat5.probt5_cod = p.prob_tipo_5
+                LEFT JOIN prob_tipo_6 AS cat6 ON cat6.probt6_cod = p.prob_tipo_6
             WHERE 
                 p.prob_id = a.prob_id AND 
+                -- p.prob_tipo_1 = cat1.probt1_cod AND
+                -- p.prob_tipo_2 = cat2.probt2_cod AND
+                -- p.prob_tipo_3 = cat3.probt3_cod AND
+                -- p.prob_tipo_4 = cat4.probt4_cod AND 
                 {$terms}
+                {$termsCategories}
 
             GROUP BY 
                 
-                a.prob_id, p.prob_descricao, p.problema, p.prob_profile_form
+                a.prob_id, p.prob_descricao, p.problema, p.prob_profile_form, 
+                cat1.probt1_cod, cat2.probt2_cod, cat3.probt3_cod, 
+                cat4.probt4_cod,
+                cat5.probt5_cod,
+                cat6.probt6_cod,
+                cat1.probt1_desc, cat2.probt2_desc, cat3.probt3_desc, 
+                cat4.probt4_desc,
+                cat5.probt5_desc,
+                cat6.probt6_desc
             
             ORDER BY
                 problema";
@@ -3658,7 +5392,9 @@ function getIssuesByArea4(
             }
             return $data;
         }
-        // return array("sql" => $sql);
+        // return [
+        //     "sql" => $sql
+        // ];
         return [];
     }
     catch (Exception $e) {
@@ -3666,6 +5402,36 @@ function getIssuesByArea4(
         return [];
     }
 }
+
+
+
+function getUsedCatsFromPossibleIssues(int $catSufix, array $possibleIssues): array
+{
+    // Sufixos possíveis para compor as categorias: prob_tipo_1, prob_tipo_2, prob_tipo_3, prob_tipo_4, prob_tipo_5, prob_tipo_6
+    $acceptSufixes = [1, 2, 3, 4, 5, 6];
+    if (!in_array($catSufix, $acceptSufixes)) {
+        return [];
+    }
+
+    $usedCats = [];
+    
+    if (!empty($possibleIssues)) {
+        foreach ($possibleIssues as $issue) {
+            
+            if ($issue['probt' . $catSufix . '_cod']) {
+                $usedCats[$issue['probt' . $catSufix . '_cod']] = ['id' => $issue['probt' . $catSufix . '_cod'], 'name' => $issue['probt' . $catSufix . '_desc']];
+            }
+            
+        }
+        $usedCats = arraySortByColumn($usedCats, 'name');
+        return $usedCats;
+    }
+
+    return [];
+}
+
+
+
 
 /**
  * hiddenAreasByIssue
@@ -3745,19 +5511,28 @@ function getIssueDetailed(\PDO $conn, int $id, ?int $areaId = null): array
     
     $sql = "SELECT 
                 p.prob_id, p.problema, sl.slas_desc, 
-                pt1.probt1_desc, pt2.probt2_desc, pt3.probt3_desc
+                pt1.probt1_desc, 
+                pt2.probt2_desc, 
+                pt3.probt3_desc,
+                pt4.probt4_desc,
+                pt5.probt5_desc,
+                pt6.probt6_desc
             FROM areas_x_issues ai, problemas as p 
             
             LEFT JOIN sla_solucao as sl on sl.slas_cod = p.prob_sla 
             LEFT JOIN prob_tipo_1 as pt1 on pt1.probt1_cod = p.prob_tipo_1 
             LEFT JOIN prob_tipo_2 as pt2 on pt2.probt2_cod = p.prob_tipo_2 
             LEFT JOIN prob_tipo_3 as pt3 on pt3.probt3_cod = p.prob_tipo_3 
+            LEFT JOIN prob_tipo_4 as pt4 on pt4.probt4_cod = p.prob_tipo_4 
+            LEFT JOIN prob_tipo_5 as pt5 on pt5.probt5_cod = p.prob_tipo_5 
+            LEFT JOIN prob_tipo_6 as pt6 on pt6.probt6_cod = p.prob_tipo_6 
 
             WHERE p.prob_id = ai.prob_id 
                 {$termsIssueName} {$terms} 
 
             GROUP BY
-                prob_id, problema, slas_desc, probt1_desc, probt2_desc, probt3_desc
+                prob_id, problema, slas_desc, probt1_desc, probt2_desc, 
+                probt3_desc, probt4_desc, probt5_desc, probt6_desc
 
             ORDER BY p.problema";
     try {
@@ -3806,6 +5581,78 @@ function getIssueById(\PDO $conn, int $id):array
         return [];
     }
 }
+
+
+
+/**
+ * getIssueCategoryNameBySufixAndId
+ * Retorna o nome da categoria correspondente à tabela do sufixo informado e o id da categoria
+ * @param \PDO $conn
+ * @param mixed $tableSufix
+ * @param mixed $id
+ * 
+ * @return string
+ */
+function getIssueCategoryNameBySufixAndId (\PDO $conn, $tableSufix, $id): string
+{
+    $allowedSufixes = ['1', '2', '3', '4', '5', '6'];
+    if (in_array($tableSufix, $allowedSufixes)) {
+        $sql = "SELECT probt{$tableSufix}_desc FROM prob_tipo_{$tableSufix} WHERE probt{$tableSufix}_cod = :id ";
+        try {
+            $res = $conn->prepare($sql);
+            $res->bindParam(':id',$id);
+            $res->execute();
+            if ($res->rowCount()) {
+                return $res->fetch()['probt'.$tableSufix.'_desc'];
+            }
+            return '';
+        }
+        catch (Exception $e) {
+            return '';
+        }
+    }
+    return '';
+}
+
+
+
+
+
+/**
+ * getIssuesToCostcards
+ * Retorna as informações sobre os tipos de solicitações que estão marcadas para serem
+ * exibidas nos cards do dashboard de custos
+ *
+ * @param \PDO $conn
+ * 
+ * @return array
+ */
+function getIssuesToCostcards(\PDO $conn):array
+{
+    $sql = "SELECT 
+                * 
+            FROM 
+                problemas 
+            WHERE 
+                prob_active = 1 AND 
+                card_in_costdash = 1
+            ORDER BY 
+                problema    
+            ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetchAll();
+        }
+        return [];
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
+
+
 
 
 /**
@@ -4174,6 +6021,86 @@ function getAreaInDynamicMode(\PDO $conn, int $issueType, int $userPrimaryArea, 
 }
 
 
+
+/**
+ * getCommitmentModels
+ * Retorna a listagem de modelos de termos de compromisso cadastrados no sistema
+ * ou o termo especificado pelo id
+ *
+ * @param \PDO $conn
+ * @param int|null $id
+ * @param int|null $unit
+ * @param int|null $client
+ * @param int|null $type
+ * 
+ * @return array
+ */
+function getCommitmentModels(\PDO $conn, ?int $id = null, ?int $unit = null, ?int $client = null, ?int $type = null): array
+{
+
+    $filterType = false;
+    $terms = "";
+
+    if ($id !== null) {
+        $terms = " WHERE cm.id = :id "; 
+                
+    } elseif ($unit !== null) {
+        $terms = " WHERE cm.unit_id = :unit ";
+        
+    } elseif ($client !== null) {
+        $terms = " WHERE cm.client_id = :client ";
+    }
+
+    if (!$id && $type !== null) {
+        $filterType = true;
+        $terms .= (strlen($terms) > 0 ? " AND " : " WHERE ") . " cm.type = :type ";
+    }
+
+    $sql = "SELECT
+                cm.*, c.nickname, u.inst_nome 
+            FROM 
+                commitment_models cm
+                LEFT JOIN clients c ON c.id = cm.client_id
+                LEFT JOIN instituicao u ON u.inst_cod = cm.unit_id 
+                $terms
+                ORDER BY
+                    cm.type, c.nickname, u.inst_nome
+            ";
+
+    try {
+        $res = $conn->prepare($sql);
+        if ($id !== null) {
+            $res->bindParam(':id', $id);
+        } elseif ($unit !== null) {
+            $res->bindParam(':unit', $unit);
+        } elseif ($client !== null) {
+            $res->bindParam(':client', $client);
+        }
+        if ($filterType) {
+            $res->bindParam(':type', $type);
+        }
+        $res->execute();
+        
+        if ($res->rowCount()) {
+            foreach ($res->fetchAll() as $row) {
+                $data[] = $row;
+            }
+            // if ($id)
+            //     return $data[0];
+            return $data;
+        }
+        return [];
+    }
+    catch (Exception $e) {
+        return [];
+    }
+}
+
+
+
+
+
+
 /**
  * Retorna o departamento de uma tag (com unidade) informada
  * @param PDO $conn
@@ -4233,25 +6160,119 @@ function issueHasScript(\PDO $conn, int $id):bool
  */
 function issueHasEnduserScript(\PDO $conn, int $id):bool
 {
-    $sql = "SELECT script.scpt_enduser FROM problemas as p 
-            LEFT JOIN prob_x_script as sc on sc.prscpt_prob_id = p.prob_id 
-            LEFT JOIN scripts as script on script.scpt_id = sc.prscpt_scpt_id 
-            WHERE p.prob_id = :id ";
+    $sql = "SELECT 
+                sr.scpt_nome, pr.prob_id
+            FROM 
+                problemas as pr, 
+                scripts AS sr, 
+                prob_x_script as prsc
+            WHERE 
+                pr.prob_id = prsc.prscpt_prob_id AND 
+                prsc.prscpt_scpt_id = sr.scpt_id AND 
+                pr.prob_id = :id AND
+                sr.scpt_enduser = 1
+    ";
     try {
         $res = $conn->prepare($sql);
         $res->bindParam(':id', $id);
         $res->execute();
         if ($res->rowCount()) {
-            foreach ($res->fetchAll() as $row) {
-                if ($row['scpt_enduser'] == 1)
-                    return true;
-            }
-            return false;
+            return true;
         }
         return false;
     }
     catch (Exception $e) {
+        echo $e->getMessage();
         return false;
+    }
+}
+
+
+function getScripts(\PDO $conn, ?int $scpt_id = null, ?int $prob_id = null, ?bool $enduser = null):array
+{
+
+    $terms = "";
+
+    if ($scpt_id !== null) {
+        $terms .= " AND sr.scpt_id = :scpt_id ";
+    } elseif ($prob_id !== null) {
+        $terms .= " AND pr.prob_id = :prob_id ";
+    }
+
+    if ($scpt_id === null && $enduser !== null) {
+        $terms .= " AND sr.scpt_enduser = :enduser ";
+    }
+
+    
+    $sql = "SELECT 
+                sr.*
+            FROM 
+                problemas AS pr,
+                scripts AS sr, 
+                -- LEFT JOIN prob_x_script as prsc on prsc.prscpt_scpt_id = sr.scpt_id 
+                prob_x_script as prsc
+            WHERE 
+                pr.prob_id = prsc.prscpt_prob_id AND 
+                prsc.prscpt_scpt_id = sr.scpt_id 
+                {$terms}
+            GROUP BY 
+                sr.scpt_id, sr.scpt_nome, sr.scpt_desc, sr.scpt_script, sr.scpt_enduser 
+            ORDER BY sr.scpt_nome ";
+
+    try {
+        $res = $conn->prepare($sql);
+        if ($scpt_id !== null) {
+            $res->bindParam(':scpt_id', $scpt_id);
+        } elseif ($prob_id !== null) {
+            $res->bindParam(':prob_id', $prob_id);
+        }
+
+        if ($scpt_id === null && $enduser !== null) {
+            $res->bindParam(':enduser', $enduser);
+        }
+        
+        $res->execute();
+        if ($res->rowCount()) {
+            if ($scpt_id !== null) {
+                return $res->fetch();
+            }
+            return $res->fetchAll();
+        }
+        return [];
+    }
+    catch (Exception $e) {
+        echo $e->getMessage();
+        return [];
+    }
+}
+
+
+function getIssuesByScript(\PDO $conn, int $scpt_id):array
+{
+    $sql = "SELECT 
+                pr.prob_id, pr.problema
+            FROM 
+                problemas AS pr,
+                scripts AS sr, 
+                prob_x_script as prsc 
+            WHERE 
+                pr.prob_id = prsc.prscpt_prob_id AND
+                prsc.prscpt_scpt_id = sr.scpt_id AND
+                sr.scpt_id = :scpt_id
+            GROUP BY 
+                pr.prob_id, pr.problema
+            ORDER BY pr.problema ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':scpt_id', $scpt_id);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetchAll();
+        }
+        return [];
+    } catch (Exception $e) {
+        echo $e->getMessage();
+        return [];
     }
 }
 
@@ -4271,6 +6292,22 @@ function getOpenerLevel (\PDO $conn, int $ticket): int
     $result->execute();
 
     return $result->fetch()['nivel'];
+}
+
+
+function getUserLevel (\PDO $conn, int $user_id): int
+{
+    $sql = "SELECT u.nivel FROM usuarios u WHERE u.user_id = :user_id ";
+    try {
+        $result = $conn->prepare($sql);
+        $result->bindParam(':user_id', $user_id);
+        $result->execute();
+
+        return $result->fetch()['nivel'];
+    }
+    catch (Exception $e) {
+        return 0;
+    }
 }
 
 
@@ -4306,6 +6343,83 @@ function getOpenerInfo (\PDO $conn, int $ticket): array
     return $data;
 }
 
+
+function getOpenerIdByEntry (\PDO $conn, int $entryId): ?int
+{
+    $sql = "SELECT 
+                aberto_por
+            FROM 
+                ocorrencias o,
+                assentamentos a
+            WHERE
+                o.numero = a.ocorrencia AND
+                a.numero = :entryId
+            ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':entryId', $entryId);
+        $res->execute();
+
+        if ($res->rowCount()) {
+            return $res->fetch()['aberto_por'];
+        }
+        return null;
+    } catch (Exception $e) {
+        echo $e->getMessage();
+        return null;
+    }
+}
+
+
+/**
+ * getRegistrationOperatorInfo
+ * Retorna as informações sobre o usuário autor do registro do chamado no sistema
+ *
+ * @param \PDO $conn
+ * @param int $ticket
+ * 
+ * @return array
+ */
+function getRegistrationOperatorInfo (\PDO $conn, int $ticket): array
+{
+    $data = [];
+
+    $sql = "SELECT 
+                aberto_por, 
+                registration_operator 
+            FROM 
+                ocorrencias 
+            WHERE 
+                numero = :ticket ";
+    try {
+        
+        $result = $conn->prepare($sql);
+        $result->bindParam(':ticket', $ticket);
+        $result->execute();
+        if ($result->rowCount()) {
+            $data = $result->fetch();
+
+            $userId = $data['aberto_por'];
+
+            if (!empty($data['registration_operator'])) {
+                $userId = $data['registration_operator'];
+            }
+
+            $userInfo = getUserInfo($conn, $userId);
+            
+            unset($userInfo['password']);
+            unset($userInfo['hash']);
+            
+            return $userInfo; 
+        }
+
+        return [];
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
+
 /**
  * isAreasIsolated
  * Retorna se a configuração atual está marcada para isolamento de visibilidade entre áreas
@@ -4326,11 +6440,18 @@ function isAreasIsolated($conn): bool
  * Busca as informacoes do ticket na tabela de ocorrencias
  * @param \PDO $conn
  * @param int $ticket
+ * @param array $columns array de colunas para serem retornadas
  * @return array
  */
-function getTicketData (\PDO $conn, int $ticket): array
+function getTicketData (\PDO $conn, int $ticket, ?array $columns = []): array
 {
-    $sql = "SELECT * 
+    $terms = "*";
+
+    if ($columns) {
+        $terms = implode(',', $columns);
+    }
+
+    $sql = "SELECT {$terms}
             FROM ocorrencias  
             WHERE 
                 numero = :ticket";
@@ -4346,6 +6467,88 @@ function getTicketData (\PDO $conn, int $ticket): array
     }
     catch (Exception $e) {
         return [];
+    }
+}
+
+
+
+/**
+ * setTicketEntry
+ * Grava um comentário em um chamado
+ *
+ * @param \PDO $conn
+ * @param int $ticket
+ * @param array $entryData: chaves do array: 'text', 'created_at' 'author', 'privated', 'type'
+ * 
+ * @return int|null Retorna o ID do comentário
+ */
+function setTicketEntry(\PDO $conn, int $ticket, array $entryData): ?int
+{
+    $mandatoyKeys = ['text', 'author', 'type'];
+    
+    foreach ($mandatoyKeys as $key) {
+        if (!isset($entryData[$key])) {
+            return null;
+        }
+    }
+    
+    $text = noHtml($entryData['text']);
+    $created_at = $entryData['created_at'] ?? date('Y-m-d H:i:s');
+    $author = (int)$entryData['author'];
+    $privated = (array_key_exists('privated', $entryData) && $entryData['privated']) ? 1 : 0;
+    $type = $entryData['type'];
+
+    $sql = "INSERT 
+            INTO 
+                assentamentos
+            (
+                ocorrencia, assentamento, created_at, responsavel, asset_privated, tipo_assentamento
+            )
+            VALUES
+            (
+                :ticket, :text, :created_at, :author, :privated, :type
+            ) 
+    ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':ticket', $ticket, PDO::PARAM_INT);
+        $res->bindParam(':text', $text, PDO::PARAM_STR);
+        $res->bindParam(':created_at', $created_at, PDO::PARAM_STR);
+        $res->bindParam(':author', $author, PDO::PARAM_INT);
+        $res->bindParam(':privated', $privated, PDO::PARAM_INT);
+        $res->bindParam(':type', $type, PDO::PARAM_INT);
+        $res->execute();
+        return $conn->lastInsertId();
+    } catch (Exception $e) {
+        echo $e->getMessage();
+        return null;
+    }
+}
+
+
+
+
+function getTicketByEntryId (\PDO $conn, int $entryId): ?array
+{
+    $sql = "SELECT o.* 
+            FROM 
+                ocorrencias o, 
+                assentamentos a 
+            WHERE 
+                o.numero = a.ocorrencia AND 
+                a.numero = :entryId";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':entryId', $entryId);
+        $res->execute();
+        
+        if ($res->rowCount()) {
+            return $res->fetch();
+        }
+        return null;
+    }
+    catch (Exception $e) {
+        return null;
     }
 }
 
@@ -4374,7 +6577,7 @@ function isTicketTreater (\PDO $conn, int $ticket, int $user): bool
                 o.operador = u.user_id AND
                 u.nivel < 3 AND
                 o.status = st.stat_id AND
-                st.stat_painel = 1 AND 
+                st.stat_painel IN (1,3) AND 
                 u.user_id = :user
     ";
     try {
@@ -4388,7 +6591,74 @@ function isTicketTreater (\PDO $conn, int $ticket, int $user): bool
         return false;
     }
     catch (Exception $e) {
+        echo $e->getMessage();
         return false;
+    }
+}
+
+
+function getTicketTreater (\PDO $conn, int $ticket): array
+{
+    $sql = "SELECT 
+                u.user_id, u.nome
+            FROM
+                ocorrencias o,
+                usuarios u,
+                `status` st
+            WHERE
+                o.numero = :ticket AND
+                o.operador = u.user_id AND
+                u.nivel < 3 AND
+                o.status = st.stat_id AND
+                st.stat_painel IN (1,3)
+    ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':ticket', $ticket, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch();
+        }
+        return [];
+    }
+    catch (Exception $e) {
+        return [];
+    }
+
+}
+
+
+function userHasTicketWaitingToBeRated(\PDO $conn, int $userId): array
+{
+    $sql = "SELECT 
+        o.numero
+    FROM 
+        ocorrencias o, 
+        tickets_rated tr
+    WHERE
+        o.numero = tr.ticket AND
+        o.`aberto_por` = :userId AND
+        o.`operador` <> o.`aberto_por` AND
+        -- o.`status` = 39 AND
+        o.`status` <> 4 AND
+        o.`data_fechamento` IS NOT NULL AND
+        tr.rate IS NULL";
+    
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':userId', $userId, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            $data = [];
+            foreach ($res->fetchAll() as $row) {
+                $data[] = $row['numero'];
+            }
+            return $data;
+        }
+        return [];
+    }
+    catch (Exception $e) {
+        return [];
     }
 }
 
@@ -4741,7 +7011,7 @@ function renderRate (
 
     $tagId = ($id ? "id=" . $id : "");
 
-    $html = '<span class="badge ' . $class . ' text-white align-middle" '. $tagId .'>'. $label .'</span>'; /* p-2 m-2 mb-2 */
+    $html = '<span class="btn btn-sm cursor-no-event ' . $class . ' text-white align-middle" '. $tagId .'>'. $label .'</span>'; /* p-2 m-2 mb-2 */
 
     return $html;
 }
@@ -4976,6 +7246,97 @@ function hasCustomFields(\PDO $conn, int $key, ?string $table = null) : bool
 }
 
 
+
+function insertCfieldCaseNotExists(\PDO $conn, int $ticket, int $cfield, ?bool $isKey = false): bool
+{
+    $sql = "SELECT id FROM tickets_x_cfields WHERE ticket = :ticket AND cfield_id = :cfield";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':ticket', $ticket, PDO::PARAM_INT);
+        $res->bindParam(':cfield', $cfield, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            return true;
+        }
+        
+        $sql = "INSERT INTO tickets_x_cfields (ticket, cfield_id, cfield_is_key) VALUES (:ticket, :cfield, :isKey)";
+        try {
+            $res = $conn->prepare($sql);
+            $res->bindParam(':ticket', $ticket, PDO::PARAM_INT);
+            $res->bindParam(':cfield', $cfield, PDO::PARAM_INT);
+            $res->bindParam(':isKey', $isKey, PDO::PARAM_INT);
+            $res->execute();
+            return true;
+        }
+        catch (Exception $e) {
+            return false;
+        }
+    } catch (Exception $e) {
+        return false;
+    }
+} 
+
+
+/**
+ * updateOrSetTicketCustomFieldValue
+ * Define ou atualiza o valor de um campo personalizado em um ticket a partir de seu ID
+ * Se o campo não existir para o chamado, ele é adicionado.
+ * @param \PDO $conn
+ * @param int $ticket
+ * @param int $field_id
+ * @param string $field_value
+ * 
+ * @return bool
+ */
+function updateOrSetTicketCustomFieldValue(\PDO $conn, int $ticket, int $field_id, string $field_value): bool
+{
+    $sql = "SELECT 
+                field_type 
+            FROM 
+                custom_fields 
+            WHERE 
+                id = {$field_id} AND 
+                field_table_to = 'ocorrencias'
+                ";
+    $res = $conn->query($sql);
+    if (!$res->rowCount()) {
+        return false;
+    }
+    $row = $res->fetch();
+
+    $isKey = null;
+    $typesInt = [
+        'select',
+        'select_multi'
+    ];
+    if (in_array($row['field_type'], $typesInt)) {
+        $field_value = (int)$field_value;
+        $isKey = true;
+    }
+
+    insertCfieldCaseNotExists($conn, $ticket, $field_id, $isKey);
+
+    $sql = "UPDATE 
+                tickets_x_cfields 
+            SET 
+                cfield_value = :field_value 
+            WHERE 
+                ticket = :ticket AND 
+                cfield_id = :field_id
+            ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':ticket', $ticket, \PDO::PARAM_INT);
+        $res->bindParam(':field_value', $field_value, \PDO::PARAM_STR);
+        $res->bindParam(':field_id', $field_id, \PDO::PARAM_INT);
+        $res->execute();
+        return true;
+    } catch (\PDOException $e) {
+        echo $e->getMessage();
+        return false;
+    }
+}
+
 /**
  * getTicketCustomFields
  * Retorna um array com todas as informações dos campos extras (campos personalizados) de um ticket informado
@@ -5058,6 +7419,31 @@ function getTicketCustomFields(\PDO $conn, int $ticket, ?int $fieldId = null): a
     catch (Exception $e) {
         return ['error' => $e->getMessage()];
     }
+}
+
+
+
+/**
+ * getOlderTicketInProgress
+ * Retorna o número do chamado mais antigo ainda em aberto no sistema
+ * @param \PDO $conn
+ * 
+ * @return int
+ */
+function getOlderTicketInProgress(\PDO $conn): int
+{
+    $sql = "SELECT 
+            MIN(numero) AS ticket_start 
+        FROM 
+            ocorrencias o, `status` s 
+        WHERE 
+            -- s.stat_painel NOT IN (3) AND 
+            -- s.stat_ignored <> 1 AND
+            s.not_done = 1 AND
+            o.status = s.stat_id 
+            ";
+    $res = $conn->query($sql);
+    return $res->fetch()['ticket_start'] ?? 1;
 }
 
 
@@ -5473,6 +7859,69 @@ function getUnits (\PDO $conn, ?int $status = 1, ?int $id = null, ?int $client =
 }
 
 
+/**
+ * getOrphansUnits
+ * Retorna listagem de unidades que não possuem clientes associados
+ *
+ * @param \PDO $conn
+ * 
+ * @return array
+ */
+function getOrphansUnits (\PDO $conn): array
+{
+    $sql = "SELECT 
+                * 
+            FROM 
+                instituicao 
+            WHERE 
+                inst_client IS NULL
+            ";
+    try {
+        $res = $conn->query($sql);
+        if ($res->rowCount()) {
+            return $res->fetchAll();
+        }
+        return [];
+    } catch (Exception $e) {
+        echo $e->getMessage();
+        return [];
+    }
+}
+
+
+function canAccessAssetInfo (\PDO $conn, int $assetId, string $allowedClients, string $allowedUnits): bool
+{
+    
+    if (empty($allowedClients) && empty($allowedUnits))
+        return true;
+
+    $sql = "SELECT 
+                e.comp_inst, 
+                i.inst_client 
+            FROM 
+                equipamentos e
+                LEFT JOIN instituicao i ON i.inst_cod = e.comp_inst
+            WHERE comp_cod = :assetId";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':assetId', $assetId, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            $data = $res->fetch();
+            if (!empty($allowedClients) && !in_array($data['inst_client'], explode(',', $allowedClients)))
+                return false;
+            if (!empty($allowedUnits) && !in_array($data['comp_inst'], explode(',', $allowedUnits)))
+                return false;
+            return true;
+        }
+        return false;
+    } catch (Exception $e) {
+        echo $e->getMessage();
+        return false;
+    }
+
+}
+
 
 /**
  * getDepartments
@@ -5557,6 +8006,31 @@ function getDepartments (\PDO $conn, ?int $status = 1, ?int $id = null, ?int $un
     }
 }
 
+
+function getUnitFromDepartment (\PDO $conn, int $id): array
+{
+    $sql = "SELECT
+                u.inst_nome,
+                u.inst_cod
+            FROM
+                localizacao l,
+                instituicao u
+            WHERE
+                l.loc_unit = u.inst_cod AND
+                l.loc_id = :id
+    ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':id', $id, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch();
+        }
+        return [];
+    } catch (Exception $e) {
+        return [];
+    }
+}
 
 /**
  * getBuildings
@@ -5828,6 +8302,122 @@ function updateLastLogon (\PDO $conn, int $userId): void
     }
 }
 
+
+function getTicketEmailReferences (\PDO $conn, int $ticket): ?array
+{
+    $sql = "SELECT * FROM tickets_email_references WHERE ticket = :ticket";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':ticket', $ticket, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            $row = $res->fetch();
+            $row['references_to'] = htmlspecialchars_decode($row['references_to'], ENT_QUOTES);
+            return $row;
+        }
+        return null;
+    }
+    catch (Exception $e) {
+        echo $e->getMessage();
+        return null;
+    }
+}
+
+
+/**
+ * setTicketEmailReferences
+ * Grava, caso ainda não exista, uma referência de email para um ticket
+ * Data indexes to provided: ticket, references_to
+ * @param \PDO $conn
+ * @param array $data
+ * 
+ * @return bool
+ */
+function setTicketEmailReferences (\PDO $conn, array $data): bool
+{
+    // $data = filter_var_array($data, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $ticket = (isset($data['ticket']) ? (int)$data['ticket'] : "");
+    $references_to = (isset($data['references_to']) && !empty($data['references_to']) ? htmlspecialchars($data['references_to'], ENT_QUOTES) : "");
+    $original_subject = (isset($data['original_subject']) && !empty($data['original_subject']) ? htmlspecialchars($data['original_subject'], ENT_QUOTES) : "");
+    $started_from = (isset($data['started_from']) && !empty($data['started_from']) ? htmlspecialchars($data['started_from'], ENT_QUOTES) : "");
+
+    if (empty($ticket) || empty($references_to)) {
+        echo "Dados incompletos";
+        return false;
+    }
+
+    if (empty(getTicketEmailReferences($conn, $ticket))) {
+        $sql = "INSERT INTO tickets_email_references 
+                    (ticket, references_to, started_from, original_subject) 
+                VALUES 
+                    (:ticket, :references_to, :started_from, :original_subject)";
+        try {
+            $res = $conn->prepare($sql);
+            $res->bindParam(':ticket', $ticket, PDO::PARAM_INT);
+            $res->bindParam(':references_to', $references_to, PDO::PARAM_STR);
+            $res->bindParam(':started_from', $started_from, PDO::PARAM_STR);
+            $res->bindParam(':original_subject', $original_subject, PDO::PARAM_STR);
+            $res->execute();
+            return true;
+        }
+        catch (Exception $e) {
+            echo $e->getMessage();
+            return false;
+        }
+    }
+}
+
+function findTicketByEmailReferences (\PDO $conn, string $references): ?array
+{
+    $references = htmlspecialchars($references);
+    
+    $sql = "SELECT * FROM tickets_email_references WHERE references_to = :references_to";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':references_to', $references, PDO::PARAM_STR);
+        $res->execute();
+        if ($res->rowCount()) {
+            $row = $res->fetch();
+            $row['references_to'] = htmlspecialchars_decode($row['references_to'], ENT_QUOTES);
+            $row['original_subject'] = htmlspecialchars_decode($row['original_subject'], ENT_QUOTES);
+            $row['started_from'] = htmlspecialchars_decode($row['started_from'], ENT_QUOTES);
+
+            return $row;
+        }
+        return null;
+    }
+    catch (Exception $e) {
+        echo $e->getMessage();
+        return null;
+    }
+}
+
+
+/**
+ * getClientInfoFromDomain
+ * Retorna as informações do cliente de acordo com o domínio fornecido - caso existam
+ * @param mixed $conn
+ * @param mixed $domain
+ * 
+ * @return array|null
+ */
+function getClientInfoFromDomain($conn, $domain): ?array
+{
+    $sql = "SELECT * FROM clients WHERE domain = :domain";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':domain', $domain, PDO::PARAM_STR);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch(PDO::FETCH_ASSOC);
+        }
+        return null;
+    } catch (PDOException $e) {
+        return null;
+    }
+}
+
+
 /**
  * getMailConfig
  * Retorna o array com as informações de configuração de e-mail
@@ -5947,7 +8537,10 @@ function getAreaInfo (\PDO $conn, int $areaId): array
                 sis_atende as atende, 
                 sis_screen as screen, 
                 sis_wt_profile as wt_profile, 
-                sis_months_done 
+                sis_months_done, 
+                sis_opening_mode,
+                use_own_config_cat_chain,
+                sis_cat_chain_at_opening
             FROM 
                 sistemas 
             WHERE 
@@ -6000,13 +8593,19 @@ function getAreaAdminsOld (\PDO $conn, int $areaId):array
  *
  * @param \PDO $conn
  * @param int $areaId
+ * @param float $maxCost - Valor máximo que o gerente pode aprovar
  * 
  * @return array
  */
-function getAreaAdmins (\PDO $conn, int $areaId):array
+function getAreaAdmins (\PDO $conn, int $areaId, ?float $maxCost = null):array
 {
     $dataPrimary = [];
     $dataSecundary = [];
+
+    $terms = '';
+    if ($maxCost !== null) {
+        $terms = " AND u.max_cost_authorizing >= :maxCost ";
+    }
 
     /**
      * Checagem na tabela sobre as áreas secundárias
@@ -6014,13 +8613,15 @@ function getAreaAdmins (\PDO $conn, int $areaId):array
     $sql = "SELECT 
                 u.user_id, 
                 u.nome, 
-                u.email
+                u.email,
+                u.max_cost_authorizing
             FROM
                 usuarios u, users_x_area_admin uadmin
             WHERE
                 u.user_id = uadmin.user_id AND
                 u.user_admin = 1 AND
-                uadmin.area_id = :areaId
+                uadmin.area_id = :areaId 
+                {$terms}
             ORDER BY
                 u.nome
             ";
@@ -6028,6 +8629,9 @@ function getAreaAdmins (\PDO $conn, int $areaId):array
     try {
         $res = $conn->prepare($sql);
         $res->bindParam(":areaId", $areaId, PDO::PARAM_INT);
+        if ($maxCost !== null) {
+            $res->bindParam(":maxCost", $maxCost, PDO::PARAM_STR);
+        }
         $res->execute();
         if ($res->rowCount()) {
             foreach ($res->fetchAll() as $row) {
@@ -6045,10 +8649,25 @@ function getAreaAdmins (\PDO $conn, int $areaId):array
     /**
      * Checagem sobre as áreas primárias
      */
-    $sql = "SELECT user_id, nome, email FROM usuarios WHERE AREA = :areaId AND user_admin = 1 ORDER BY nome";
+    $sql = "SELECT 
+                u.user_id, 
+                u.nome, 
+                u.email, 
+                u.max_cost_authorizing
+            FROM 
+                usuarios u 
+            WHERE 
+                u.AREA = :areaId AND 
+                u.user_admin = 1 
+                {$terms}
+            ORDER BY 
+                u.nome";
     try {
         $res = $conn->prepare($sql);
         $res->bindParam(':areaId', $areaId);
+        if ($maxCost !== null) {
+            $res->bindParam(":maxCost", $maxCost, PDO::PARAM_STR);
+        }
         $res->execute();
         if ($res->rowCount()) {
             foreach ($res->fetchAll() as $row) {
@@ -6281,9 +8900,9 @@ function getStatus (\PDO $conn, int $all = 1, string $painel = '1,2,3', string $
     
     $data = [];
     $sql = "SELECT 
-                *
+                s.*, stc.*
             FROM 
-                status 
+                status s LEFT JOIN status_categ stc ON s.stat_cat = stc.stc_cod
             WHERE 
                 1 = 1 
                 {$terms}
@@ -6389,7 +9008,7 @@ function getTicketEntries(\PDO $conn, int $ticket, ?bool $private = false): ?arr
 /**
  * getLastEntry
  * Retorna o array com as informações do último assentamento do chamado:
- * [numero], [ocorrencia], [assentamento], [data], [responsavel], [asset_privated], [tipo_assentamento]
+ * [numero], [ocorrencia], [assentamento], [created_at], [responsavel], [asset_privated], [tipo_assentamento]
  * @param \PDO $conn
  * @param int $ticket
  * @param bool $onlyPublic Define se também será considerado assentamento privado
@@ -6401,7 +9020,7 @@ function getLastEntry (\PDO $conn, int $ticket, bool $onlyPublic = true): array
     $empty['numero'] = "";
     $empty['ocorrencia'] = "";
     $empty['assentamento'] = "";
-    $empty['data'] = "";
+    $empty['created_at'] = "";
     $empty['responsavel'] = "";
     $empty['asset_privated'] = "";
     $empty['tipo_assentamento'] = "";
@@ -6409,7 +9028,13 @@ function getLastEntry (\PDO $conn, int $ticket, bool $onlyPublic = true): array
     $terms = ($onlyPublic ? " AND asset_privated = 0 " : "");
     
     $sql = "SELECT 
-                * 
+                numero,
+                ocorrencia,
+                assentamento,
+                created_at as `data`,
+                responsavel,
+                asset_privated,
+                tipo_assentamento
             FROM 
                 assentamentos 
             WHERE 
@@ -6731,6 +9356,97 @@ function generateFamilyTree(array $relations, ?int $parentId = null, string $nod
 }
 
 
+/**
+ * getTicketProjectId
+ *
+ * @param \PDO $conn
+ * @param int $ticket
+ * 
+ * @return int|null
+ */
+function getTicketProjectId(\PDO $conn, int $ticket): ?int
+{
+    $sql = "SELECT * FROM ocodeps WHERE dep_pai = :ticket OR dep_filho = :ticket AND proj_id IS NOT NULL";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(":ticket", $ticket, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch()['proj_id'];
+        }
+        return null;
+    }
+    catch (Exception $e) {
+        return null;
+    }
+}
+
+
+/**
+ * getProjectDefinition
+ * Retorna um array com as informações sobre o projeto: id, name e description
+ *
+ * @param \PDO $conn
+ * @param int $projectID
+ * 
+ * @return array
+ */
+function getProjectDefinition(\PDO $conn, int $projectID): array
+{
+    $sql = "SELECT * FROM projects WHERE id = :projectID";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(":projectID", $projectID, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetch();
+        }
+        return [];
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
+
+/**
+ * getTicketsFromProject
+ * Retorna a listagem de todos os chamados de um projeto - ordenados pelo número
+ *
+ * @param \PDO $conn
+ * @param int $projectID
+ * 
+ * @return array
+ */
+function getTicketsFromProject (\PDO $conn, int $projectID): array
+{
+    $data = [];
+    $data['fathers'] = [];
+    $data['sons'] = [];
+    $sql = "SELECT * FROM ocodeps WHERE proj_id = :projectID";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(":projectID", $projectID, PDO::PARAM_INT);
+        $res->execute();
+        if ($res->rowCount()) {
+            foreach ($res->fetchAll() as $row) {
+                $data['fathers'][] = $row['dep_pai'];
+                $data['sons'][] = $row['dep_filho'];
+            }
+            // Combinar os dois arrays para retornar apenas um array com números únicos
+            $data['tickets'] = array_unique(array_merge($data['fathers'], $data['sons']));
+            sort($data['tickets']);
+
+            return $data['tickets'];
+        }
+        return [];
+    }
+    catch (Exception $e) {
+        return [];
+    }
+}
+
+
+
 
 /**
  * hasDependency
@@ -6828,15 +9544,16 @@ function getGlobalUri (\PDO $conn, int $ticket): string
     $res = $conn->query($sql);
     if ( $res->rowCount() ) {
         $row = $res->fetch();
-        return $config['conf_ocomon_site'] . "/ocomon/geral/ticket_show.php?numero=" . $ticket . "&id=" . urlencode($row['gt_id']);
+        return $config['conf_ocomon_site'] . "/ocomon/geral/ticket_show.php?numero=" . $ticket . "&id=" . $row['gt_id'];
     }
 
     $rand = random64();
     $rand = str_replace(" ", "+", $rand);
+    $rand = noHtml($rand);
     $sql = "INSERT INTO global_tickets (gt_ticket, gt_id) VALUES ({$ticket}, '" . $rand . "')";
     $conn->exec($sql);
     
-    return $config['conf_ocomon_site'] . "/ocomon/geral/ticket_show.php?numero=" . $ticket . "&id=" . urlencode($rand);
+    return $config['conf_ocomon_site'] . "/ocomon/geral/ticket_show.php?numero=" . $ticket . "&id=" . $rand;
 }
 
 
@@ -6888,7 +9605,7 @@ function getGlobalTicketRatingId (\PDO $conn, int $ticket): ?string
             $row = $res->fetch();
 
             if (!empty($row['gt_rating_id'])) {
-                return $row['gt_rating_id'];
+                return str_replace(" ", "+", $row['gt_rating_id']);
             }
 
             $rand = random64();
@@ -7005,17 +9722,33 @@ function getEnvVarsValues (\PDO $conn, int $ticket, ?array $row = null): array
  * getEnvVars
  * Retorna o registro gravado com as variáveis de ambiente disponíveis
  * @param \PDO $conn
- * @return bool | array
+ * @param int|null $context: null = padrão para tickets, 1 = nao definido, 2 = termo de compromisso, 4 = usuários
+ * @param string|null $event
+ * @return string |null
  */
-function getEnvVars (\PDO $conn)
+function getEnvVars (\PDO $conn, ?int $context = null, ?string $event = null): ?string
 {
-    $sql = "SELECT vars FROM environment_vars";
+    
+    $terms = "";
+    if (empty($context) && empty($event)) {
+        $terms = " WHERE id = 1 ";
+    } 
+    
+    if (!empty($context)) {
+        $terms .= " WHERE context = '{$context}' ";
+    } 
+
+    if (!empty($event)) {
+        $terms = (!empty($terms) ? $terms . " AND event = '{$event}' " : " WHERE event = '{$event}' ");
+    }
+    
+    $sql = "SELECT vars FROM environment_vars {$terms} ";
     try {
         $res = $conn->query($sql);
         return $res->fetch()['vars'];
     }
     catch (Exception $e) {
-        return false;
+        return null;
     }
 }
 
@@ -7032,7 +9765,13 @@ function getEnvVars (\PDO $conn)
  * @return bool
  * 
 */
-function insert_ticket_stage (\PDO $conn, int $ticket, string $stageType, int $tkStatus, string $specificDate = ''): bool
+function insert_ticket_stage (
+    \PDO $conn, 
+    int $ticket, 
+    string $stageType, 
+    int $tkStatus, 
+    ?int $treaterId = null, 
+    string $specificDate = ''): bool
 {
 
     $date = (!empty($specificDate) ? $specificDate : date("Y-m-d H:i:s"));
@@ -7045,8 +9784,8 @@ function insert_ticket_stage (\PDO $conn, int $ticket, string $stageType, int $t
     /* Nenhum registro do chamado na tabela. Nesse caso posso apenas inserir um novo */
     if (!$recordsTkt && $stageType == 'start') {
         
-        $sql = "INSERT INTO tickets_stages (id, ticket, date_start, status_id) 
-        values (null, {$ticket}, '" . $date . "', {$tkStatus}) ";
+        $sql = "INSERT INTO tickets_stages (id, ticket, date_start, status_id, treater_id) 
+        values (null, {$ticket}, '" . $date . "', {$tkStatus}, {$treaterId}) ";
     
     } elseif (!$recordsTkt && $stageType == 'stop') {
         
@@ -7063,8 +9802,8 @@ function insert_ticket_stage (\PDO $conn, int $ticket, string $stageType, int $t
 
         /* Chamado já existia - nesse caso adiciono um período de start e stop com data de abertura registrada para o chamado*/
         /* o Status zero será para identificar que o período foi inserido nessa condição especial */
-        $sql = "INSERT INTO tickets_stages (id, ticket, date_start, date_stop, status_id) 
-        values (null, {$ticket}, '" . $recordDate . "', '" . $date . "', 0) ";
+        $sql = "INSERT INTO tickets_stages (id, ticket, date_start, date_stop, status_id, treater_id) 
+        values (null, {$ticket}, '" . $recordDate . "', '" . $date . "', 0, {$treaterId}) ";
         try {
             $conn->exec($sql);
         }
@@ -7085,8 +9824,8 @@ function insert_ticket_stage (\PDO $conn, int $ticket, string $stageType, int $t
         if (!empty($row['date_stop'])) {
             /* Então preciso inserir novo registro de start */
             if ($stageType == 'start') {
-                $sql = "INSERT INTO tickets_stages (id, ticket, date_start, status_id) 
-                        values (null, {$ticket}, '" . $date . "', {$tkStatus}) ";
+                $sql = "INSERT INTO tickets_stages (id, ticket, date_start, status_id, treater_id) 
+                        values (null, {$ticket}, '" . $date . "', {$tkStatus}, {$treaterId}) ";
             } elseif ($stageType == 'stop') {
                 return false;
             }
@@ -7110,6 +9849,304 @@ function insert_ticket_stage (\PDO $conn, int $ticket, string $stageType, int $t
 }
 
 
+
+/**
+ * getTicketTreaters
+ * Retorna a listagem de ID e nome dos operadores do chamado informado.
+ * A busca é realizada na tickets_stages com base em status de fila direta (stat_painel = 1) e
+ * usuários com nível de operação e administração.
+ * @param \PDO $conn
+ * @param int $ticket
+ * 
+ * @return array
+ */
+function getTicketTreaters(\PDO $conn, int $ticket): array
+{
+    $sql = "SELECT
+                u.user_id,
+                u.nome
+            FROM 
+                tickets_stages ts,
+                status st,
+                usuarios u
+            WHERE 
+                ts.status_id = st.stat_id AND
+                ts.treater_id = u.user_id AND
+                st.stat_painel = 1 AND
+                u.nivel < 3 AND
+                ts.ticket = :ticket
+            GROUP BY 
+                u.user_id, u.nome";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':ticket', $ticket, PDO::PARAM_INT);
+        $res->execute();
+
+        if ($res->rowCount()) {
+            return $res->fetchAll();
+        }
+        return [];
+    } catch (Exception $e) {
+        echo $e->getMessage();
+        return [];
+    }
+}
+
+
+/**
+ * getStagesFromTicket
+ * Retorna todos os stages de um ticket fornecido
+ * Pode ser filtrado pelos options informados: 
+ *  - panel: 1(fila direta), 2(fila aberta), 3(oculto) 
+ *  - treater: id do operador
+ *  - freeze: se é status de parada do relógio - 0|1
+ * @param \PDO $conn
+ * @param int $ticket
+ * @param array|null $options
+ * 
+ * @return array
+ */
+function getStagesFromTicket(\PDO $conn, int $ticket, ?array $options = null): array
+{
+    $defaults = [
+        'panel' => '*',
+        'treater' => null,
+        'freeze' => null
+    ];
+
+    $allowed_panels = ['*', 1, 2, 3];
+    $allowed_freeze_values = [0, 1];
+    $whereTerms = "";
+    $fromTerms = " LEFT JOIN usuarios u ON u.user_id = ts.treater_id ";
+
+    $options = (!is_null($options) ? array_merge($defaults, $options) : $defaults);
+
+    if (!in_array($options['panel'], $allowed_panels)) {
+        echo "Panel not allowed! Accepted panels: " . implode(", ", $allowed_panels);
+        return [];
+    }
+
+    if (!is_null($options['freeze']) && !in_array($options['freeze'], $allowed_freeze_values)) {
+        echo "Freeze value not allowed! Accepted freeze values: " . implode(", ", $allowed_freeze_values);
+        return [];
+    }
+
+    if (!is_null($options['treater'])) {
+        $fromTerms = ", usuarios u ";
+        $whereTerms = " AND ts.treater_id = u.user_id AND ts.treater_id = :treater ";
+    }
+
+    if ($options['panel'] != '*') {
+        $whereTerms .= " AND st.stat_painel = :panel ";
+    }
+
+    if (!is_null($options['freeze'])) {
+        $whereTerms .= " AND st.stat_time_freeze = :freeze ";
+    }
+
+    $sql = "SELECT 
+                ts.date_start,
+                ts.date_stop,
+                st.status,
+                u.user_id
+            FROM 
+                status st,
+                tickets_stages ts
+                
+                {$fromTerms}
+            WHERE 
+                ts.status_id = st.stat_id AND
+                ts.ticket = :ticket 
+                {$whereTerms}
+            ORDER BY id";
+
+    try {
+        $res = $conn->prepare($sql);
+        
+        $res->bindValue(':ticket', $ticket, PDO::PARAM_INT);
+
+        if (!is_null($options['treater'])) {
+            $res->bindValue(':treater', $options['treater'], PDO::PARAM_INT);
+        }
+
+        if ($options['panel'] != '*') {
+            $res->bindValue(':panel', $options['panel'], PDO::PARAM_INT);
+        }
+
+        if (!is_null($options['freeze'])) {
+            $res->bindValue(':freeze', $options['freeze'], PDO::PARAM_INT);
+        }
+        $res->execute();
+        if ($res->rowCount()) {
+            return $res->fetchAll();
+        }
+        return [];
+    } catch (Exception $e) {
+        echo 'Erro: ', $e->getMessage(), "<br/>";
+        echo $sql . "<br/>";
+        return [];
+    }
+}
+
+
+/**
+ * insertTreaterManualStageInTicket
+ * Realiza a inserção de períodos de atendimento fornecidos manualmente
+ * @param \PDO $conn
+ * @param int $ticket
+ * @param array $treaters
+ * @param array $startDates
+ * @param array $stopDates
+ * @param int $author
+ * @return bool
+ */
+function insertTreaterManualStageInTicket(
+    \PDO $conn, 
+    int $ticket, 
+    array $treaters, 
+    array $startDates, 
+    array $stopDates, 
+    int $author): bool
+{
+
+    $treaters = array_filter($treaters);
+    $startDates = array_filter($startDates);
+    $stopDates = array_filter($stopDates);
+
+    if (count($treaters) == 0) {
+        return false;
+    }
+
+    if (count($treaters) != count($startDates) || count($treaters) != count($stopDates)) {
+        return false;
+    }
+
+    $now = date("Y-m-d H:i:s");
+
+    /* 
+    $time1 = strtotime($startTime);
+    $time2 = strtotime($endTime);
+    $inSeconds = $time2 - $time1;
+    */
+
+    $sql = "INSERT INTO tickets_treaters_stages (ticket, treater_id, date_start, date_stop, author, created_at) VALUES ";
+    for ($i = 0; $i < count($treaters); $i++) {
+
+        // $seconds = strtotime($stopDates[$i]) - strtotime($startDates[$i]);
+        $sql .= "({$ticket}, {$treaters[$i]}, '{$startDates[$i]}', '{$stopDates[$i]}', {$author}, '{$now}'), ";
+    }
+    $sql = rtrim($sql, ", ");
+    try {
+        $res = $conn->prepare($sql);
+        $res->execute();
+        return true;
+    } catch (Exception $e) {
+        echo "Error: " . $e->getMessage();
+        return false;
+    }
+}
+
+/**
+ * getTreatersManualStagesByTicket
+ * Retorna os tratadores e os respectivos períodos de tempo em que atuaram em um ticket.
+ * Essas informações foram informadas manualmente no sistema. 
+ *
+ * @param \PDO $conn
+ * @param int $ticket
+ * 
+ * @return array
+ */
+function getTreatersManualStagesByTicket (\PDO $conn, int $ticket): array
+{
+    $sql = "SELECT 
+                u.nome, u.user_id,
+                ttr.date_start,
+                ttr.date_stop,
+                ua.nome AS author
+            FROM 
+                tickets_treaters_stages ttr,
+                usuarios u,
+                usuarios ua
+            WHERE
+                ttr.ticket = :ticket AND
+                ttr.treater_id = u.user_id AND
+                ttr.author = ua.user_id
+            ORDER BY
+                ttr.date_start
+    ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':ticket', $ticket, PDO::PARAM_INT);
+        $res->execute();
+
+        if ($res->rowCount() > 0) {
+            return $res->fetchAll();
+        }
+        return [];
+    } catch (Exception $e) {
+        echo $e->getMessage();
+        return [];
+    }
+}
+
+
+
+
+/**
+ * Registra um log de ação do usuário no banco de dados.
+ *
+ * @param \PDO $conn Conexão PDO para o banco de dados.
+ * @param int $user_id Código do usuário que realizou a ação.
+ * @param string $action_type Tipo de açao realizada pelo usuario. 
+ * Alguns tipos de $action_type: LOGIN | CREATE_USER | DELETE_USER | UPDATE_USER | DELETE_ASSET | UPDATE_ASSET
+ * @param string $action_details [optional] Detalhes sobre a açao realizada.
+ * @param string $ip_address [optional] Endere o IP do usuário que realizou a açao.
+ *
+ * @return bool Verdadeiro se o registro foi bem sucedido, falso caso contrário.
+ */
+function recordUserLog(
+    \PDO $conn, 
+    int $user_id, 
+    string $action_type, 
+    string $action_details = null, 
+    string $ip_address = null
+): bool
+{
+    $sql = "INSERT 
+            INTO 
+                user_logs 
+                (
+                    user_id, 
+                    action_type, 
+                    action_details, 
+                    ip_address
+                ) 
+                VALUES 
+                (
+                    :user_id, 
+                    :action_type, 
+                    :action_details, 
+                    :ip_address
+                )";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':user_id', $user_id, \PDO::PARAM_INT);
+        $res->bindParam(':action_type', $action_type, \PDO::PARAM_STR);
+        $res->bindParam(':action_details', $action_details, \PDO::PARAM_STR);
+        $res->bindParam(':ip_address', $ip_address, \PDO::PARAM_STR);
+        $res->execute();
+        return true;
+    } catch (Exception $e) {
+        echo $e->getMessage();
+        return false;
+    }
+}
+
+
+
+
+
+
 /**
  * firstLog
  * Insere um registro em ocorrencias_log com o estado atual do chamado caso esse registro não exista
@@ -7121,7 +10158,7 @@ function insert_ticket_stage (\PDO $conn, int $ticket, string $stageType, int $t
  */
 function firstLog(\PDO $conn, int $numero, $tipo_edicao='NULL', $auto_record = ''): bool
 {
-    
+       
     /* $tipo_edicao='NULL' */
     include ("../../includes/queries/queries.php");
     
@@ -7150,6 +10187,8 @@ function firstLog(\PDO $conn, int $numero, $tipo_edicao='NULL', $auto_record = '
         $base_operador = $rowfull->operador_cod;
         $base_data_agendamento = $rowfull->oco_scheduled_to;
         $base_status = $rowfull->status_cod;
+        $base_authorization_status = $rowfull->authorization_status;
+        $base_requester = $rowfull->aberto_por_cod;
         
         $val = array();
         $val['log_numero'] = $rowfull->numero;
@@ -7158,6 +10197,8 @@ function firstLog(\PDO $conn, int $numero, $tipo_edicao='NULL', $auto_record = '
             $val['log_quem'] = $_SESSION['s_uid'];
         } else
             $val['log_quem'] = $base_operador;            
+        
+        $val['log_requester'] = $base_requester;
         
         // $val['log_data'] = date("Y-m-d H:i:s");            
         $val['log_data'] = $rowfull->oco_real_open_date;            
@@ -7175,22 +10216,25 @@ function firstLog(\PDO $conn, int $numero, $tipo_edicao='NULL', $auto_record = '
         $val['log_responsavel'] = ($rowfull->operador_cod == "" || $rowfull->operador_cod =="-1")?'NULL':"'$base_operador'";  
         $val['log_data_agendamento'] = ($rowfull->oco_scheduled_to == "")?'NULL':"'$base_data_agendamento'";  
         $val['log_status'] = ($rowfull->status_cod == "" || $rowfull->status_cod =="-1")?'NULL':"'$base_status'";  
+        $val['log_authorization_status'] = ($rowfull->authorization_status == "" || $rowfull->authorization_status =="-1")?'NULL':"'$base_authorization_status'";  
         $val['log_tipo_edicao'] = $tipo_edicao;
         
     
         //GRAVA O REGISTRO DE LOG DO ESTADO ANTERIOR A EDICAO
         $sql_base = "INSERT INTO `ocorrencias_log` ".
-            "\n\t(`log_numero`, `log_quem`, `log_data`, `log_descricao`, `log_prioridade`, ".
+            "\n\t(`log_numero`, `log_quem`, `log_requester`, `log_data`, `log_descricao`, `log_prioridade`, ".
             "\n\t`log_area`, `log_problema`, `log_unidade`, `log_etiqueta`, ".
             "\n\t`log_contato`, `log_contato_email`, `log_telefone`, `log_departamento`, `log_responsavel`, `log_data_agendamento`, ".
             "\n\t`log_status`, ".
+            "\n\t`log_authorization_status`, ".
             "\n\t`log_cliente`, ".
             "\n\t`log_tipo_edicao`) ".
             "\nVALUES ".
-            "\n\t('".$val['log_numero']."', '".$val['log_quem']."', '".$val['log_data']."', ".$val['log_descricao'].", ".$val['log_prioridade'].", ".
+            "\n\t('".$val['log_numero']."', '".$val['log_quem']."', '".$val['log_requester']."', '".$val['log_data']."', ".$val['log_descricao'].", ".$val['log_prioridade'].", ".
             "\n\t".$val['log_area'].", ".$val['log_problema'].", ".$val['log_unidade'].", ".$val['log_etiqueta'].", ".
             "\n\t".$val['log_contato'].", ".$val['log_contato_email'].", ".$val['log_telefone'].", ".$val['log_departamento'].", ".$val['log_responsavel'].", ".$val['log_data_agendamento'].", ".
             "\n\t".$val['log_status'].", ".
+            "\n\t".$val['log_authorization_status'].", ".
             "\n\t".$val['log_cliente'].", ".
             "\n\t".$val['log_tipo_edicao']." ".
             "\n\t )";
@@ -7233,6 +10277,7 @@ function recordLog(\PDO $conn, int $ticket, array $beforePost, array $afterPost,
 
 
     $logStatus = (array_key_exists("status", $afterPost) ? $afterPost['status'] : "dontCheck");
+    $logAuthorizationStatus = (array_key_exists("authorization_status", $afterPost) ? $afterPost['authorization_status'] : "dontCheck");
     $logAgendadoPara = (array_key_exists("agendadoPara", $afterPost) ? $afterPost['agendadoPara'] : "dontCheck");
 
     $val = array();
@@ -7276,6 +10321,9 @@ function recordLog(\PDO $conn, int $ticket, array $beforePost, array $afterPost,
     if ($logStatus == "dontCheck") $val['log_status'] = 'NULL'; else
         $val['log_status'] = ($beforePost['status_cod'] == $logStatus)?'NULL':"'$logStatus'";
 
+    if ($logAuthorizationStatus == "dontCheck" || $logAuthorizationStatus == "") $val['log_authorization_status'] = 'NULL'; else
+        $val['log_authorization_status'] = ($beforePost['authorization_status'] == $logAuthorizationStatus)?'NULL':"'$logAuthorizationStatus'";
+
     if ($logAgendadoPara == "dontCheck") $val['log_data_agendamento'] = 'NULL'; else
         $val['log_data_agendamento'] = ($beforePost['oco_scheduled_to'] == $logAgendadoPara || $logAgendadoPara == "")?'NULL':"'$logAgendadoPara'";
 
@@ -7287,14 +10335,15 @@ function recordLog(\PDO $conn, int $ticket, array $beforePost, array $afterPost,
     (`log_numero`, `log_quem`, `log_data`, `log_prioridade`, 
     `log_area`, `log_problema`, `log_unidade`, `log_etiqueta`, `log_departamento`, 
     `log_contato`, `log_contato_email`, `log_telefone`, `log_responsavel`, 
-    `log_data_agendamento`, `log_status`, `log_cliente`,
+    `log_data_agendamento`, `log_status`, `log_authorization_status`, `log_cliente`,
     `log_tipo_edicao`) 
     VALUES 
     ('".$val['log_numero']."', '".$val['log_quem']."', '".$val['log_data']."', ".$val['log_prioridade'].", 
     ".$val['log_area'].", ".$val['log_problema'].", ".$val['log_unidade'].", ".$val['log_etiqueta'].", 
     ".$val['log_departamento'].",
     ".$val['log_contato'].", ".$val['log_contato_email'].", ".$val['log_telefone'].", ".$val['log_responsavel'].", ". $val['log_data_agendamento'].", 
-    ".$val['log_status'].", ".$val['log_cliente'].", ".$val['log_tipo_edicao'].")";
+    ".$val['log_status'].", ".$val['log_authorization_status'].",
+    ".$val['log_cliente'].", ".$val['log_tipo_edicao'].")";
 
     try {
         $conn->exec($sqlLog);
@@ -7305,6 +10354,24 @@ function recordLog(\PDO $conn, int $ticket, array $beforePost, array $afterPost,
         return false;
     }
 }
+
+
+function getTicketLastChangeDateByLogKey(\PDO $conn, int $ticket, string $logKey): string
+{
+    $sql = "SELECT
+                MAX(log_data) AS log_data
+            FROM
+                ocorrencias_log
+            WHERE 
+                log_numero = :ticket AND 
+                {$logKey} IS NOT NULL
+            ";
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':ticket', $ticket, PDO::PARAM_INT);
+    $stmt->execute();
+    return $stmt->fetch()['log_data'];
+}
+
 
 
 /*************************
@@ -7343,9 +10410,157 @@ function getEquipmentInfo (\PDO $conn, ?int $unit, ?string $tag, ?int $cod = nul
         return [];
     }
     catch (Exception $e) {
+        // return ['error' => $e->getMessage()];
+        echo $e->getMessage();
+        return [];
+    }
+}
+
+
+
+
+/**
+ * getAssetBasicInfo
+ *
+ * @param \PDO $conn
+ * @param int $assetID
+ * 
+ * @return array
+ */
+function getAssetBasicInfo (
+    \PDO $conn, 
+    ?int $assetID = null, 
+    ?string $assetTag = null, 
+    ?int $unitID = null, 
+    ?bool $exceptResource = null
+    ): array
+{
+    $terms = "";
+
+    if (!$assetID && (!$assetTag || !$unitID)) {
+        return [];
+    }
+    
+    
+    if ($assetID !== null) {
+        $terms = " AND c.comp_cod = {$assetID} ";
+    } else {
+        $assetTag = noHtml($assetTag);
+        $unitID = (int)$unitID;
+        $terms = " AND c.comp_inv = '{$assetTag}' AND c.comp_inst = '{$unitID}' ";
+    }
+    
+    if ($exceptResource) {
+        $terms .= " AND (c.is_product IS NULL OR c.is_product = 0 )";
+    }
+
+    $sql = "SELECT
+                c.comp_cod,
+                c.comp_inv,
+                c.comp_sn,
+                COALESCE (cl.nickname, 'N/A') AS 
+                            'cliente',
+                i.inst_cod,
+                i.inst_nome,
+                l.local,
+                l.loc_id,
+                t.tipo_nome,
+                f.fab_nome,
+                m.marc_nome
+            FROM
+                equipamentos c, tipo_equip t, marcas_comp m, fabricantes f, localizacao l, instituicao i
+                LEFT JOIN clients cl ON cl.id = i.inst_client
+            WHERE
+                c.comp_inst = i.inst_cod AND
+                c.comp_tipo_equip = t.tipo_cod AND
+                c.comp_marca = m.marc_cod AND 
+                c.comp_fab = f.fab_cod AND
+                c.comp_local = l.loc_id 
+                {$terms} 
+            ORDER BY
+                t.tipo_nome, f.fab_nome, m.marc_nome
+            ";
+    try {
+        $res = $conn->query($sql);
+        if ($res->rowCount())
+            return $res->fetch();
+        return [];
+    } catch (Exception $e) {
         return ['error' => $e->getMessage()];
     }
 }
+
+
+
+
+function getUnitsByAssetTag (\PDO $conn, string $tag, ?int $client = null, ?bool $except_resource = null): array
+{
+    $tag = noHtml($tag);
+
+    $terms = ($client !== null ? " AND i.inst_client = {$client} " : "");
+
+    $terms2 = ($except_resource !== null ? " AND (c.is_product IS NULL OR c.is_product = 0 ) " : "");
+
+    $sql = "SELECT 
+                i.inst_cod,
+                i.inst_nome,
+                COALESCE (cl.nickname, 'N/A') AS 
+                'cliente'
+            FROM
+                equipamentos c, instituicao i
+                LEFT JOIN clients cl ON cl.id = i.inst_client
+            WHERE
+                c.comp_inst = i.inst_cod AND
+                c.comp_inv = :tag
+                {$terms}
+                {$terms2}
+            ORDER BY
+                i.inst_nome
+        ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':tag', $tag);
+        $res->execute();
+        if ($res->rowCount())
+            return $res->fetchAll();
+        return [];
+    } catch (Exception $e) {
+        return ['error' => $e->getMessage()];
+    }
+}
+
+
+
+function getTrafficInfoFilesFromAsset($conn, int $assetID): array
+{
+    /* Tabelas envolvidas: assets_traffic_info, assets_x_traffic, traffic_files */
+    $sql = "SELECT
+                info.*, 
+                axt.*, 
+                f.id as file_id, 
+                f.file_name
+            FROM
+                assets_traffic_info as info,
+                assets_x_traffic as axt,
+                traffic_files as f
+            WHERE
+                info.id = axt.info_id AND
+                axt.info_id = f.info_id AND
+                axt.asset_id = :asset_id
+        ";
+    try {
+        $res = $conn->prepare($sql);
+        $res->bindParam(':asset_id', $assetID);
+        $res->execute();
+        if ($res->rowCount())
+            return $res->fetchAll();
+        return [];
+    } catch (Exception $e) {
+        return [];
+    }
+    return [];
+}
+
 
 
 /**

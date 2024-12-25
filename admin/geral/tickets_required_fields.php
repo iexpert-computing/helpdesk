@@ -52,8 +52,9 @@ $fieldsClose = $formfields::getInstance($entity, "close");
     <link rel="stylesheet" type="text/css" href="../../includes/css/switch_radio.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -229,7 +230,7 @@ $fieldsClose = $formfields::getInstance($entity, "close");
 
 				
                    <!-- Etiqueta -->
-                   <label class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('ASSET_TAG'); ?>"><?= firstLetterUp(TRANS('ASSET_TAG')); ?></label>
+                   <label class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('ASSET_TAG_TAG'); ?>"><?= firstLetterUp(TRANS('ASSET_TAG_TAG')); ?></label>
 					
                     <div class="form-group col-md-5 ">
 						<div class="switch-field">
@@ -535,7 +536,7 @@ $fieldsClose = $formfields::getInstance($entity, "close");
 
 				
                    <!-- Etiqueta -->
-                   <label class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('ASSET_TAG'); ?>"><?= firstLetterUp(TRANS('ASSET_TAG')); ?></label>
+                   <label class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('ASSET_TAG_TAG'); ?>"><?= firstLetterUp(TRANS('ASSET_TAG_TAG')); ?></label>
 					
                     <div class="form-group col-md-5 ">
 						<div class="switch-field">

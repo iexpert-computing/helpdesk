@@ -79,8 +79,9 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -92,14 +93,16 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
 
     <div id="divResult"></div>
 
-
+    <input type="hidden" name="empty_address" id="empty_address" value="<?= TRANS('HELPER_BASE_UNIT_ADDRESS'); ?>">
     <div class="container-fluid">
         <!-- fas fa house-user -->
         <h5 class="my-4"><i class="fas fa-user-tie text-secondary"></i>&nbsp;<?= TRANS('CLIENTS'); ?></h5>
+        <div id="div_flash"></div>
         <div class="modal" id="modal" tabindex="-1" style="z-index:9001!important">
             <div class="modal-dialog modal-xl">
                 <div class="modal-content">
-                    <div id="divDetails">
+                    <div id="divDetails" style="position:relative">
+                        <iframe id="iframe-content"  frameborder="1" style="position:absolute;top:0px;width:100%;height:100vh;"></iframe>
                     </div>
                 </div>
             </div>
@@ -153,16 +156,16 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
                             <td class="line fullname"><?= TRANS('COL_NAME'); ?></td>
                             <td class="line nickname"><?= TRANS('ALIAS'); ?></td>
                             <td class="line client_type"><?= TRANS('CLIENT_TYPE'); ?></td>
-                            <td class="line document_type"><?= TRANS('DOCUMENT_TYPE'); ?></td>
-                            <td class="line document_value"><?= TRANS('DOCUMENT_VALUE'); ?></td>
                             <td class="line contact_name"><?= TRANS('CONTACT'); ?></td>
                             <td class="line contact_email"><?= TRANS('CONTACT_EMAIL'); ?></td>
                             <td class="line contact_phone"><?= TRANS('CONTACT_PHONE'); ?></td>
+                            <td class="line client_address"><?= TRANS('BASE_UNIT'); ?></td>
                             <td class="line editar"><?= TRANS('BT_EDIT'); ?></td>
                             <td class="line remover"><?= TRANS('BT_REMOVE'); ?></td>
                         </tr>
                     </thead>
                     <?php
+                    $addressKeys = ['addr_street', 'addr_number', 'addr_complement', 'addr_neighborhood', 'addr_cep', 'addr_city', 'addr_uf'];
                     foreach ($clients as $client) {
                         ?>
                             <tr>
@@ -174,17 +177,24 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
                                         $clientType = getClientsTypes($conn, $client['type'])['type_name'];
                                     }
 
-                                    // $areaName = "";
-                                    // if (!empty($client['area'])) {
-                                    //     $areaName = getAreaInfo($conn, $client['area'])['area_name'];
-                                    // }
+                                    $baseunitName = "";
+                                    $address = "";
+                                    $unitInfo = [];
+                                    if (!empty($client['base_unit'])) {
+                                        $unitInfo = getUnits($conn, null, (int)$client['base_unit']);
+                                        $baseunitName = '<p class="font-weight-bold">' . $unitInfo["inst_nome"] . '</p>';
+                                        $locationArray = [];
+                                        foreach ($addressKeys as $key) {
+                                            $locationArray[] = $unitInfo[$key];
+                                        }
+                                        $address = implode(" - ", array_filter($locationArray));
+                                    }
                                 ?>
                                 <td class="line"><?= $clientType; ?></td>
-                                <td class="line"><?= $client['document_type']; ?></td>
-                                <td class="line"><?= $client['document_value']; ?></td>
                                 <td class="line"><?= $client['contact_name']; ?></td>
                                 <td class="line"><?= $client['contact_email']; ?></td>
                                 <td class="line"><?= $client['contact_phone']; ?></td>
+                                <td class="line"><?= $baseunitName . $address; ?></td>
                                 
                                 <td class="line"><button type="button" class="btn btn-secondary btn-sm" onclick="redirect('<?= $_SERVER['PHP_SELF']; ?>?action=edit&cod=<?= $client['id']; ?>')"><?= TRANS('BT_EDIT'); ?></button></td>
                                 <td class="line"><button type="button" class="btn btn-danger btn-sm" onclick="confirmDeleteModal('<?= $client['id']; ?>')"><?= TRANS('REMOVE'); ?></button></td>
@@ -212,6 +222,31 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
                     <label for="nickname" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('ALIAS'); ?></label>
                     <div class="form-group col-md-4 ">
                         <input type="text" class="form-control " id="nickname" name="nickname" />
+                    </div>
+
+                    <label for="base_unit" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('BASE_UNIT'); ?></label>
+                    <div class="form-group col-md-4 ">
+                        <div class="input-group">
+                            <select class="form-control bs-select" id="base_unit" name="base_unit">
+                                <option value=""><?= TRANS('SEL_SELECT'); ?></option>
+                            </select>
+                            <div class="input-group-append">
+                                <div class="input-group-text manage_popups" data-location="units" data-params="action=new" title="<?= TRANS('NEW'); ?>" data-placeholder="<?= TRANS('NEW'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+                                    <i class="fas fa-plus"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <label for="domain" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_CLIENT_DOMAIN'); ?>"><?= TRANS('CLIENT_DOMAIN'); ?></label>
+                    <div class="form-group col-md-4 ">
+                        <input type="text" class="form-control " id="domain" name="domain" />
+                    </div>
+
+                    <div class="w-100"></div>
+                    <label for="client_address" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CLIENT_ADDRESS'); ?></label>
+                    <div class="form-group col-md-10 ">
+                        <textarea class="form-control " id="client_address" name="client_address" readonly></textarea>
                     </div>
 
                     <label for="doc_type" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('DOCUMENT_TYPE'); ?></label>
@@ -262,11 +297,7 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
                         <input type="tel" class="form-control " id="contact_phone_2" name="contact_phone_2" />
                     </div>
 
-                    <div class="w-100"></div>
-                    <label for="client_address" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CLIENT_ADDRESS'); ?></label>
-                    <div class="form-group col-md-10 ">
-                        <textarea class="form-control " id="client_address" name="client_address"></textarea>
-                    </div>
+                    
 
                     <label for="client_type" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CLIENT_TYPE'); ?></label>
                     <div class="form-group col-md-4 ">
@@ -456,6 +487,8 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
 
                         <input type="hidden" name="client_type_selected" value="" id="client_type_selected" />
                         <input type="hidden" name="client_status_selected" value="" id="client_status_selected" />
+                        <input type="hidden" name="base_unit_selected" value="" id="base_unit_selected" />
+                        <input type="hidden" name="cod" value="" id="cod" />
                         <input type="hidden" name="action" id="action" value="new">
                         <button type="submit" id="idSubmit" name="submit" class="btn btn-primary btn-block"><?= TRANS('BT_OK'); ?></button>
                     </div>
@@ -485,6 +518,32 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
                     <label for="nickname" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('ALIAS'); ?></label>
                     <div class="form-group col-md-4 ">
                         <input type="text" class="form-control " id="nickname" name="nickname" value="<?= $clients['nickname']; ?>"/>
+                    </div>
+
+
+                    <label for="base_unit" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('BASE_UNIT'); ?></label>
+                    <div class="form-group col-md-4 ">
+                        <div class="input-group">
+                            <select class="form-control bs-select" id="base_unit" name="base_unit">
+                                <option value=""><?= TRANS('SEL_SELECT'); ?></option>
+                            </select>
+                            <div class="input-group-append">
+                                <div class="input-group-text manage_popups" data-location="units" data-params="action=new" title="<?= TRANS('NEW'); ?>" data-placeholder="<?= TRANS('NEW'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+                                    <i class="fas fa-plus"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <label for="domain" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_CLIENT_DOMAIN'); ?>"><?= TRANS('CLIENT_DOMAIN'); ?></label>
+                    <div class="form-group col-md-4 ">
+                        <input type="text" class="form-control " id="domain" name="domain" value="<?= $clients['domain']; ?>"/>
+                    </div>
+
+                    <div class="w-100"></div>
+                    <label for="client_address" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CLIENT_ADDRESS'); ?></label>
+                    <div class="form-group col-md-10 ">
+                        <textarea class="form-control " id="client_address" name="client_address" readonly><?= $clients['address'];?></textarea>
                     </div>
 
                     <label for="doc_type" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('DOCUMENT_TYPE'); ?></label>
@@ -537,11 +596,7 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
                         <input type="tel" class="form-control " id="contact_phone_2" name="contact_phone_2" value="<?= $clients['contact_phone_2']; ?>"/>
                     </div>
 
-                    <div class="w-100"></div>
-                    <label for="client_address" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CLIENT_ADDRESS'); ?></label>
-                    <div class="form-group col-md-10 ">
-                        <textarea class="form-control " id="client_address" name="client_address"><?= $clients['address'];?></textarea>
-                    </div>
+                    
 
                     <label for="client_type" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CLIENT_TYPE'); ?></label>
                     <div class="form-group col-md-4 ">
@@ -652,7 +707,7 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
                             // if (!empty($field_value['field_id'])) {
                             ?>
                                 <?= ($cfield['field_type'] == 'textarea' ? '<div class="w-100"></div>'  : ''); ?>
-                                <label for="<?= $cfield['field_name']; ?>" class="col-sm-<?= $labelColSize; ?> col-md-<?= $labelColSize; ?> col-form-label col-form-label-sm text-md-right " title="<?= $cfield['field_title']; ?>" data-pop="popover" data-placement="top" data-trigger="hover" data-content="<?= $cfield['field_description']; ?>"><?= $cfield['field_label']; ?></label>
+                                <label for="<?= $cfield['field_name']; ?>" class="col-sm-<?= $labelColSize; ?> col-md-<?= $labelColSize; ?> col-form-label col-form-label-sm text-md-right " title="<?= $cfield['field_title']; ?>" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= $cfield['field_description']; ?>"><?= $cfield['field_label']; ?></label>
                                 <div class="form-group col-md-<?= ($cfield['field_type'] == 'textarea' ? $fieldRowSize  : $fieldColSize); ?>">
                                     <?php
                                     if ($cfield['field_type'] == 'select') {
@@ -748,6 +803,7 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
 
                     <input type="hidden" name="client_type_selected" value="<?= $clients['type']; ?>" id="client_type_selected" />
                     <input type="hidden" name="client_status_selected" value="<?= $clients['status']; ?>" id="client_status_selected" />
+                    <input type="hidden" name="base_unit_selected" value="<?= $clients['base_unit']; ?>" id="base_unit_selected" />
                     <input type="hidden" name="cod" id="cod" value="<?= $_GET['cod']; ?>">
                     <input type="hidden" name="action" id="action" value="edit">
 
@@ -789,6 +845,16 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
                 trigger: 'focus'
             });
 
+            loadPossibleUnits();
+
+            
+            // if ($('#base_unit').length > 0) {
+            //     loadUnitAddress();
+            // }
+            $('#base_unit').on('change', function() {
+                loadUnitAddress();
+            });
+
 
             maskDynamically('doc_type');
             $('#doc_type').on('change', function() {
@@ -800,6 +866,7 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
 				/* placeholder */
 				title: "<?= TRANS('SEL_SELECT', '', 1); ?>",
 				liveSearch: true,
+                showSubtext: true,
 				liveSearchNormalize: true,
 				liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
 				noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
@@ -822,11 +889,14 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
 				}
 			});
 
+            $('#modal').on('hidden.bs.modal', function (e) {
+                $("#iframe-content").attr('src','');
+            })
+
             $('.manage_popups').css('cursor', 'pointer').on('click', function() {
 				var params = $(this).attr('data-params');
 				var location = $(this).attr('data-location');
-				
-				loadInPopup(location, params);
+				loadInIframe(location, params);
 			});
 
             $('input, select, textarea').on('change', function() {
@@ -919,6 +989,41 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
             });
         }
 
+        function loadPossibleUnits(selected_id = '') {
+            
+            if ($('#base_unit').length > 0) {
+                $.ajax({
+                    url: './get_possible_units_to_client.php',
+                    method: 'POST',
+                    data: {
+                        unit: selected_id,
+                        client: $('#cod').val() ?? ''
+                    },
+                    dataType: 'json',
+                }).done(function(response) {
+                    $('#base_unit').empty().append('<option value=""><?= TRANS('SEL_TYPE'); ?></option>');
+                    for (var i in response) {
+
+                        let addr = {};
+                        addr['city'] = response[i].addr_city;
+                        addr['uf'] = response[i].addr_uf;
+                        let subtext = Object.values(addr).filter(value => value !== undefined && value !== null && value !== '').join(', ');
+
+                        var option = '<option data-subtext="' + subtext + '" value="' + response[i].inst_cod + '">' + response[i].inst_nome + '</option>';
+                        $('#base_unit').append(option);
+                        $('#base_unit').selectpicker('refresh');
+
+
+                        if (selected_id !== '') {
+                            $('#base_unit').val(selected_id).change();
+                        } else
+                        if ($('#base_unit_selected').val() != '') {
+                            $('#base_unit').val($('#base_unit_selected').val()).change();
+                        }
+                    }
+                });
+            }
+        }
 
         function loadClientsStatus(selected_id = '') {
             $.ajax({
@@ -1007,6 +1112,45 @@ $requesterAreas = getAreas($conn, 0, 1, 0);
 			x = window.open(url, '', 'dependent=yes,width=800,scrollbars=yes,statusbar=no,resizable=yes');
 			x.moveTo(window.parent.screenX + 100, window.parent.screenY + 100);
 		}
+
+
+        function getFlashMessage() {
+            $.ajax({
+                url: './get_flash_message.php',
+                method: 'POST',
+            }).done(function(response) {
+                if (response.length > 0) {
+                    $('#div_flash').html(response);
+                }
+            })
+        }
+
+        function loadUnitAddress() {
+            $.ajax({
+                url: './get_unit_address.php',
+                method: 'POST',
+                data: {
+                    unit: $('#base_unit').val()
+                }
+            }).done(function(response) {
+                $('#client_address').val(response);
+                if (response == '') {
+                    $('#client_address').val($('#empty_address').val());
+                }
+            })
+        }
+
+        function loadInIframe(pageBase, params) {
+            let url = pageBase + '.php?' + params;
+            $("#iframe-content").attr('src',url)
+            $('#modal').modal();
+        }
+
+        function closeIframe() {
+            $('#modal').modal('hide');
+            $("#iframe-content").attr('src','');
+            getFlashMessage();
+        }
 
 
     </script>

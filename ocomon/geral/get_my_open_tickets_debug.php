@@ -143,6 +143,8 @@ foreach ($sqlResult->fetchAll() as $row){
         $cor_font = $row['cor_fonte'];
     }
 
+    $renderTicketStatus = "<span class='btn btn-sm p-2' style='color: " . $row['textcolor'] . "; background-color: " . ($row['bgcolor'] ?? '#FFFFFF') . "'>" . $row['chamado_status'] . "</span>";
+
     $referenceDate = (!empty($row['oco_real_open_date']) ? $row['oco_real_open_date'] : $row['data_abertura']);
     $dataAtendimento = $row['data_atendimento']; //data da primeira resposta ao chamado
     $dataFechamento = $row['data_fechamento'];
@@ -185,9 +187,9 @@ foreach ($sqlResult->fetchAll() as $row){
 	$nestedData[] = $linkImg."&nbsp;".$row['problema'];
     $nestedData[] = "<b>" . $row['contato'] . "</b><br/>" . $row['telefone'];
     $nestedData[] = "<b>" . $row['setor'] . "</b><br/>" . $texto;
-    $nestedData[] = "<b>" . $row['chamado_status'] . "</b>";
+    $nestedData[] = $renderTicketStatus;
     $nestedData[] = $colTVNew;
-    $nestedData[] = "<span class='badge p-2' style='color: " . $cor_font . "; background-color: " . $COR . "'>" . $row['pr_descricao'] . "</span>";
+    $nestedData[] = "<span class='btn btn-sm ' style='color: " . $cor_font . "; background-color: " . $COR . "'>" . $row['pr_descricao'] . "</span>";
     $nestedData[] = "<img height='20' src='" . $imgsPath . "" . $ledSlaResposta . "' title='" . TRANS('HNT_RESPONSE_LED') . "'>&nbsp;<img height='20' src='" . $imgsPath . "" . $ledSlaSolucao . "' title='" . TRANS('HNT_SOLUTION_LED') . "'>";
     $nestedData['DT_RowId'] = 'id_' . $row['numero']; //DT_RowId é reservado
     

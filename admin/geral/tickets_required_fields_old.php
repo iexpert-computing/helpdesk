@@ -52,8 +52,9 @@ $fieldsClose = $formfields::getInstance($entity, "close");
     <link rel="stylesheet" type="text/css" href="../../includes/css/switch_radio.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>

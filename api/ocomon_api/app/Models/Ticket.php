@@ -115,6 +115,13 @@ class Ticket extends DataLayer
         return (new User())->findById($this->data()->aberto_por);
     }
 
+    public function registrationOperator()
+    {
+        if ($this->data()->registration_operator)
+            return (new User())->findById($this->data()->registration_operator);
+        return null;
+    }
+
     public function openedByArea(): int
     {
         $user = (new User())->findById($this->data()->aberto_por);
@@ -214,15 +221,10 @@ class Ticket extends DataLayer
     }
 
 
-    // public function files()
-    // {
-    //     return (new File())->find
-    //     (
-    //         "img_oco = :numero", 
-    //         "numero={$this->data()->numero}",
-    //         "*"
-    //     )->fetch(true);
-    // }
+    public function files()
+    {
+        return (new File())->findByTicket($this->data()->numero);
+    }
 
     /**
      * Retorna o tempo absoluto entre duas datas

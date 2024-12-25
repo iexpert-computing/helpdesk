@@ -50,8 +50,9 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -76,6 +77,9 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 		</div>
 
 		<?php
+
+		echo message('danger', TRANS('TXT_IMPORTANT'), TRANS('MSG_SOFTWARES_DEPRECATED'), '', '', true);
+
 		if (isset($_SESSION['flash']) && !empty($_SESSION['flash'])) {
 			echo $_SESSION['flash'];
 			$_SESSION['flash'] = '';

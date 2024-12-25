@@ -39,10 +39,11 @@ if (!isset($_SESSION['s_logado']) || empty($_SESSION['s_logado']) || $_SESSION['
 	} else {
 
 		$numero = noHtml($_GET['numero']);
-		$id = noHtml($_GET['id']);
-
+		$id = $_GET['id'];
 		$id = str_replace(" ", "+", $id);
-		if ($id == getGlobalTicketId($conn, $numero)) {
+		$id = noHtml($id);
+
+		if (asEquals($id, getGlobalTicketId($conn, $numero))) {
 			$GLOBALACCESS = true;
 		} else {
 			echo "<script>top.window.location = '../../login.php'</script>";
@@ -69,6 +70,7 @@ $isAdmin = (isset($_SESSION['s_nivel']) && $_SESSION['s_nivel'] == 1) ? true : f
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
 	<style>
 		body {
@@ -78,9 +80,16 @@ $isAdmin = (isset($_SESSION['s_nivel']) && $_SESSION['s_nivel'] == 1) ? true : f
 		.row {
 			flex-wrap: nowrap !important;
 		}
+
+		.list-resources {
+			/* list-style: none; */
+            line-height: 1.5em;
+			/* Margem */
+			margin-left: 24px;			
+        }
 	</style>
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 
@@ -132,6 +141,7 @@ if (isset($_SESSION['s_uid'])) {
 	$isAreaAdmin = in_array($row['aberto_por_area'], $managebleAreas);
 }
 
+
 /* Controle para evitar acesso ao chamado por usuarios operadores que não fazem parte da area do chamado */
 if (!$isAdmin && !$isRequester && !$isAreaAdmin) {
 	$uareas = explode(',', $_SESSION['s_uareas']);
@@ -165,29 +175,52 @@ if (!empty($customFields['field_id'])) {
 $sqlPriorityDesc = "SELECT * FROM prior_atend WHERE pr_cod = '" . $row['oco_prior'] . "'";
 $resPriority = $conn->query($sqlPriorityDesc);
 $rowPriority = $resPriority->fetch();
-$rowCatProb = [];
+$categories = "";
+$issueDetails = (!empty($row['prob_cod'] && $row['prob_cod'] != '-1') ? getIssueDetailed($conn, $row['prob_cod'])[0] : []);
+if ($issueDetails) {
+	$catKeys = ["probt1_desc", "probt2_desc", "probt3_desc", "probt4_desc", "probt5_desc", "probt6_desc"];
 
-$qryCatProb = "SELECT * FROM problemas as p " .
-	"LEFT JOIN sla_solucao as sl on sl.slas_cod = p.prob_sla " .
-	"LEFT JOIN prob_tipo_1 as pt1 on pt1.probt1_cod = p.prob_tipo_1 " .
-	"LEFT JOIN prob_tipo_2 as pt2 on pt2.probt2_cod = p.prob_tipo_2 " .
-	"LEFT JOIN prob_tipo_3 as pt3 on pt3.probt3_cod = p.prob_tipo_3 " .
-	" WHERE p.prob_id = " . $row['prob_cod'] . " ";
-try {
-	$execCatprob = $conn->query($qryCatProb);
-
-	if ($execCatprob->rowCount()) {
-		$rowCatProb = $execCatprob->fetch();
-	} else {
-		$rowCatProb["probt1_desc"] = "";
-		$rowCatProb["probt2_desc"] = "";
-		$rowCatProb["probt3_desc"] = "";
+	foreach ($catKeys as $catKey) {
+		if (!empty($categories) && !empty($issueDetails[$catKey])) {
+			$categories .= " | ";
+}
+		$categories .= $issueDetails[$catKey];
 	}
-} catch (Exception $e) {
-	echo "<hr>" . $e->getMessage();
 }
 
 
+// Recursos do chamado
+$resources = getResourcesFromTicket($conn, $row['numero']);
+$resourcesList = '';
+$resources_info = [];
+if (!empty($resources)) {
+	foreach ($resources as $resource) {
+		$modelInfo = getAssetsModels($conn, $resource['model_id'], null, null, 1, ['t.tipo_nome']);
+		
+		$resources_info[$resource['model_id']]['model_id'][] = $resource['model_id'];
+		$resources_info[$resource['model_id']]['modelo_full'][] = $modelInfo['tipo'] . ' ' . $modelInfo['fabricante'] . ' ' . $modelInfo['modelo'];
+		$resources_info[$resource['model_id']]['categoria'][] = $modelInfo['cat_name'];
+		$resources_info[$resource['model_id']]['amount'][] = $resource['amount'];
+		$resources_info[$resource['model_id']]['unitary_price'][] = $resource['unitary_price'];
+	}
+
+	foreach ($resources_info as $key => $value) {
+		$resources_info[$key]['model_id'] = implode(', ', $resources_info[$key]['model_id']);
+		$resources_info[$key]['modelo_full'] = implode(', ', $resources_info[$key]['modelo_full']);
+		$resources_info[$key]['categoria'] = implode(', ', $resources_info[$key]['categoria']);
+		$resources_info[$key]['amount'] = implode(', ', $resources_info[$key]['amount']);
+		$resources_info[$key]['unitary_price'] = implode(', ', $resources_info[$key]['unitary_price']);
+	}
+
+	$resources_info = arraySortByColumn($resources_info, 'modelo_full');
+
+	/* Recursos do chamado em lista */
+	if (!empty($resources_info)) {
+		foreach ($resources_info as $resInfo) {
+			$resourcesList .= '<li class="list-resources">' . $resInfo['modelo_full'] . ' (' . $resInfo['amount'] . ')</li>';
+		}
+	}
+}
 $defaultFields = [];
 $defaultFields[0]['field_id'] = '1';
 $defaultFields[0]['field_label'] = TRANS('OPENED_BY');
@@ -212,7 +245,7 @@ $defaultFields[6]['field_label'] = TRANS('ISSUE_TYPE');
 $defaultFields[6]['field_value'] = $row['problema'];
 $defaultFields[7]['field_id'] = '8';
 $defaultFields[7]['field_label'] = TRANS('COL_CAT_PROB');
-$defaultFields[7]['field_value'] = $rowCatProb['probt1_desc'] . " | " . $rowCatProb['probt2_desc'] . " | " . $rowCatProb['probt3_desc'];
+$defaultFields[7]['field_value'] = $categories;
 $defaultFields[8]['field_id'] = '9';
 $defaultFields[8]['field_label'] = TRANS('COL_UNIT');
 $defaultFields[8]['field_value'] = $row['unidade'];
@@ -223,6 +256,10 @@ $defaultFields[10]['field_id'] = '11';
 $defaultFields[10]['field_label'] = TRANS('IDX_AGENDAMENTO');
 // $defaultFields[10]['field_value'] = dateScreen($row['oco_scheduled_to']);
 $defaultFields[10]['field_value'] = dateScreen(getLastScheduledDate($conn, (int)$_GET['numero']));
+$defaultFields[11]['field_id'] = '12';
+$defaultFields[11]['field_label'] = TRANS('RESOURCES');
+$defaultFields[11]['field_value'] = $resourcesList;
+
 
 $sqlAssentamentos = "SELECT a.*, u.* 
 						FROM assentamentos a, usuarios u 
@@ -237,8 +274,9 @@ $countAssentamentos = $resAssentamentos->rowCount();
 
 	<div class="container-fluid" id="toPrint">
 		<div class="row ">
-			<div class="col-sm-6 mt-md "><img src="../../includes/logos/MAIN_LOGO.png" width="240" class="float-left" alt="logomarca"></div>
-			<div class="col-sm-6 mt-md "></div>
+			<!--<div class="col-sm-6 mt-md "><img src="../../includes/logos/MAIN_LOGO.png" width="240" class="float-left" alt="logomarca"></div>
+			<div class="col-sm-6 mt-md "></div>-->
+			<div class="col-sm-12 mt-md print-mainlogo"></div>
 		</div>
 		<div class="w-100"></div>
 		<h5 class="my-4"><i class="fas fa-print text-secondary"></i>&nbsp;<?= TRANS('PRINT_TO_TREATING'); ?></h5>
@@ -368,7 +406,7 @@ $countAssentamentos = $resAssentamentos->rowCount();
 							<tr>
 								<td><?= $rowEntries['assentamento']; ?></td>
 								<td><?= getEntryType($rowEntries['tipo_assentamento']); ?></td>
-								<td><?= dateScreen($rowEntries['data']); ?></td>
+								<td><?= dateScreen($rowEntries['created_at']); ?></td>
 								<td><?= $rowEntries['nome']; ?></td>
 							</tr>
 						<?php

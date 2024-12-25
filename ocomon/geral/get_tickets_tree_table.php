@@ -42,6 +42,7 @@ $iconOutOfWorktime = "<span class='text-oc-teal' title='" . TRANS('HNT_TIMER_OUT
 $iconTicketClosed = "<span class='text-oc-teal' title='" . TRANS('HNT_TICKET_CLOSED') . "'><i class='fas fa-check fa-lg'></i></i></span>";
 $config = getConfig($conn);
 $percLimit = $config['conf_sla_tolerance']; 
+$exception = "";
 
 $calc_slas = (isset($post['calc_slas']) && $post['calc_slas'] == 'on' ? true : false);
 
@@ -153,6 +154,18 @@ $options = [
         'sql_alias' => 'o.aberto_por',
         'alias' => 'ua',
         'value' => ''
+    ],
+    'authorization_status' => [
+        'label' => TRANS('AUTHORIZATION_STATUS'),
+        'table' => 'authorization_status',
+        'field_id' => 'id',
+        'field_name' => 'name_key',
+        'table_reference' => 'ocorrencias',
+        'table_reference_alias' => 'o',
+        'field_reference' => 'authorization_status',
+        'sql_alias' => 'o.authorization_status',
+        'alias' => 'aus',
+        'value' => ''
     ]
 ];
 
@@ -205,11 +218,17 @@ if (!empty($post)) {
         }
     }
 
+    /* Chamado mais antigo em aberto */
+    $ticketStart = getOlderTicketInProgress($conn);
+    $ticketInfo = getTicketData($conn, $ticketStart, ['data_abertura']);
+    $terms = (!empty($ticketInfo['data_abertura']) ? " o.data_abertura >= '{$ticketInfo['data_abertura']}' AND " : "");
 
-    $sql = $QRY["ocorrencias_full_ini"] . " WHERE 
-            stat_ignored <> 1 AND 
-            o.sistema IN ({$uareas}) AND 
-            s.stat_painel IN (1,2) 
+    $sql = $QRY["tickets_in_queues"] . " AND 
+            {$terms}
+            -- s.stat_ignored <> 1 AND 
+            -- s.stat_painel in (1,2) AND 
+            s.not_done = 1 AND
+            o.sistema IN ({$uareas}) 
             {$sql_terms}
     ";
 
@@ -218,7 +237,6 @@ if (!empty($post)) {
 
         try {
             $res = $conn->query($sql);
-
         ?>
         <div id="tables">
             <!-- Listagem dos chamados -->
@@ -333,6 +351,8 @@ if (!empty($post)) {
                             $cor_font = $rowDetail['cor_fonte'];
                         }
 
+                        $renderTicketStatus = "<span class='btn btn-sm cursor-no-event text-wrap' style='color: " . $rowDetail['textcolor'] . "; background-color: " . ($rowDetail['bgcolor'] ?? '#FFFFFF') . "'>" . $rowDetail['chamado_status'] . "</span>";
+
                         $absoluteTime = absoluteTime($rowDetail['data_abertura'], date('Y-m-d H:i:s'));
 
 
@@ -383,8 +403,8 @@ if (!empty($post)) {
                             <td class="line"><b><?= $rowDetail['area_solicitante']; ?></b><br /><?= $texto; ?></td>
                             <td class="line" data-sort="<?= $rowDetail['data_abertura']; ?>"><?= dateScreen($rowDetail['data_abertura']); ?></td>
                             <td class="line" data-sort="<?= $absoluteTime['inSeconds']; ?>"><?= $absoluteTime['inTime']; ?></td>
-                            <td class="line"><?= noHtml($rowDetail['chamado_status']); ?></td>
-                            <td class="line" data-sort="<?= $rowDetail['pr_atendimento']; ?>"><?= "<span class='badge p-2' style='color: " . $cor_font . "; background-color: " . $COR . "'>" . $rowDetail['pr_descricao'] . "</span>"; ?></td>
+                            <td class="line"><?= $renderTicketStatus; ?></td>
+                            <td class="line" data-sort="<?= $rowDetail['pr_atendimento']; ?>"><?= "<span class='btn btn-sm cursor-no-event text-wrap' style='color: " . $cor_font . "; background-color: " . $COR . "'>" . $rowDetail['pr_descricao'] . "</span>"; ?></td>
                             <?php
                                 if ($calc_slas) {
                                     ?>

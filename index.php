@@ -97,7 +97,7 @@ $adminPath = "./admin/geral/";
 
 /* Páginas que serão carregadas por padrão em cada aba */
 $simplesHome = (isset($_SESSION['s_page_simples']) ? $_SESSION['s_page_simples'] : $ocomonPath . "tickets_main_user.php?action=listall");
-$homeHome = (isset($_SESSION['s_page_home']) ? $_SESSION['s_page_home'] : "home.php");
+$homeHome = (isset($_SESSION['s_page_home']) ? $_SESSION['s_page_home'] : $ocomonPath . "home.php");
 $ocoHome = (isset($_SESSION['s_page_ocomon']) ? $_SESSION['s_page_ocomon'] : $ocomonPath . "tickets_main.php");
 $invHome = (isset($_SESSION['s_page_invmon']) ? $_SESSION['s_page_invmon'] : $invmonPath . "inventory_main.php");
 $admHome = (isset($_SESSION['s_page_admin']) ? $_SESSION['s_page_admin'] : $adminPath . "users.php");
@@ -112,7 +112,7 @@ $admAreaHome = $adminPath . "users.php";
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="<?= TRANS('TTL_OCOMON'); ?>">
-    <title>Helpdesk&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <!-- using local links -->
     <link rel="stylesheet" href="./includes/components/bootstrap/custom.css">
@@ -121,10 +121,25 @@ $admAreaHome = $adminPath . "users.php";
     <link rel="stylesheet" href="./includes/components/sidebar/css/main.css">
     <link rel="stylesheet" href="./includes/components/sidebar/css/sidebar-themes.css">
     <link rel="stylesheet" type="text/css" href="./includes/css/estilos.css" />
-    <link rel="stylesheet" type="text/css" href="./includes/css/estilos_custom.css" />
     <link rel="stylesheet" type="text/css" href="./includes/css/index_css.css" />
     <link rel="stylesheet" type="text/css" href="./includes/css/util.css" />
-    <link rel="shortcut icon" href="./includes/icons/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="./includes/css/notices.css" />
+    <link rel="stylesheet" type="text/css" href="./includes/css/estilos_custom.css" />
+    <link id="favicon" rel="shortcut icon" href="./includes/icons/favicon.webp">
+
+
+
+    <style>
+        
+        .new-notification-anime > i::before {
+            display: inline-block;
+            -webkit-animation: swing ease-in-out .5s 1 alternate;
+            animation: swing ease-in-out .5s 1 alternate;
+        }
+
+    </style>
+
+
 
 </head>
 
@@ -169,6 +184,17 @@ $admAreaHome = $adminPath . "users.php";
         $textProfile = "";
         $profile = '&nbsp;&nbsp;<span id="profile" title="'.TRANS('MY_PROFILE') . $textProfile . '" data-toggle="popover" data-content="" data-placement="left" data-trigger="hover"><i class="' . $userProfileIcon . ' fs-13"></i></span>';
 
+        $spanHasNotices = '<span class="fa-stack fa-1x has-badge" data-count="0"><i class="fas fa-bell fa-stack-1x"></i></span>';
+
+        $spanNoNotices = '&nbsp;&nbsp;<span><i class="fas fa-bell"></i></span>';
+        
+        $messageIcon = '<div id="notices-badge" title="'.TRANS('MY_MESSAGES') . '" data-toggle="popover" data-content="" data-placement="left" data-trigger="hover">'.$spanNoNotices.'</div>&nbsp;&nbsp;';
+        
+        $messageIconSm = '<div id="notices-badge-sm" title="'.TRANS('MY_MESSAGES') . '" data-toggle="popover" data-content="" data-placement="left" data-trigger="hover">'.$spanNoNotices.'</div>&nbsp;&nbsp;';
+
+        
+        
+
 
         $userName = '<span>' . $_SESSION["s_usuario_nome"] . '</span>';
         ?>
@@ -176,14 +202,15 @@ $admAreaHome = $adminPath . "users.php";
             <div class="topo topo-color fixed-top " style="z-index:4;">
 
                 <div id="header_logo">
-                    <span class="logo"><img src="MAIN_LOGO.svg" width="120" class=""></span>
+                    <!-- <span class="logo"><img src="MAIN_LOGO.svg" width="240" class=""></span> -->
+                    <span class="logo header-mainlogo"></span>
                 </div>
                 <div id="header_elements" class=" fs-14">
-                    <span class=" d-none d-sm-block align-items-center"> <?=  $userName . $profile . "&nbsp;&nbsp;|&nbsp;&nbsp;"; ?>
+                    <span class=" d-none d-sm-block align-items-center"> <?=  $userName . $profile . "". $messageIcon ."|&nbsp;&nbsp;"; ?>
                         <a class="text-danger" href="<?= $commonPath; ?>logout.php" title="<?= $hnt ?>" data-toggle="popover" data-content="" data-placement="left" data-trigger="hover"><i class="fas fa-sign-out-alt fs-18"></i></a>
                     </span>
 
-                    <span class="d-block d-sm-none text-right">
+                    <span class="d-block d-sm-none text-right"> <?= $messageIconSm ."&nbsp;"; ?>
                         <a class="text-danger" href="<?= $commonPath; ?>logout.php" title="<?= $hnt ?>" data-toggle="popover" data-content="" data-placement="left" data-trigger="hover"><i class="fas fa-sign-out-alt fs-18"></i></a>
                     </span>
                 </div>
@@ -263,15 +290,17 @@ $admAreaHome = $adminPath . "users.php";
         <!-- FOOTER -->
         <div class="fixed-bottom toggle-footer cursor_to_down" id="footer_fixed">
             <!-- style="margin-top:50px;" -->
-            <div class=" fixed-bottom border-top bg-light text-center footer-content p-2">
+            <div class=" fixed-bottom border-top bg-light text-center footer-content p-2" style="z-index:4; ">
                 <!-- w3-card  -->
                 <div class="footer-text">
-
-                    <a href="https://iexpert.net.br/" target="_blank">
-                      HelpDesk
-                    </a>&nbsp;-&nbsp;
-                    <?= TRANS('OCOMON_ABSTRACT'); ?><br />
-                    <?= TRANS('COL_VERSION') . ": " . VERSAO . " - " . TRANS('MNS_MSG_LIC') . " GPL"; ?>
+                    <span>
+                        <a href="<?= APP_URL; ?>" target="_blank">
+                            <strong><?= APP_NAME; ?></strong>
+                        </a>
+                        &nbsp;-&nbsp;
+                        <?= TRANS('OCOMON_ABSTRACT'); ?><br />
+                        <?= TRANS('COL_VERSION') . ": <strong>" . VERSAO . "</strong> - " . TRANS('MNS_MSG_LIC') . " GPL"; ?>
+                    </span>
                 </div>
             </div>
         </div>
@@ -315,16 +344,24 @@ $admAreaHome = $adminPath . "users.php";
                 });
             }
 
-            
+            getCountUserNotifications();
 
             $('#profile').on('click', function() {
                 $("#iframeMain").attr("src", "./admin/geral/users.php?action=profile");
+            }).css({ cursor: "pointer"});
+            
+            $('#notices-badge, #notices-badge-sm').on('click', function() {
+                $("#iframeMain").attr("src", "./ocomon/geral/user_notifications.php");
             }).css({ cursor: "pointer"});
 
 
             setInterval(function() {
                 showCurrentDate();
             }, 50000);
+
+            setInterval(function() {
+                getCountUserNotifications();
+            }, 10000);
         });
 
         function autosubscribeform() {
@@ -348,11 +385,63 @@ $admAreaHome = $adminPath . "users.php";
             }).done(function(data) {
                 $("#current_date").empty();
                 $("#current_date").html(data);
-            }).fail(function() {
-                // $('#divError').html('<p class="text-danger text-center"><?= TRANS('FETCH_ERROR'); ?></p>');
             });
             return false;
         }
+
+        function getCountUserNotifications() {
+            $.ajax({
+                url: './ocomon/geral/get_count_user_notifications.php',
+                method: 'POST',
+                dataType: 'json',
+
+            }).done(function(data) {
+                faviconNotifications(data.notices_count);
+                showBadgeNotifications(data.notices_count);
+            });
+            return false;   
+        }
+
+
+        function showBadgeNotifications (hasNewNotices) {
+            
+            
+
+            let currentNotiticationCount = parseInt($('#notices-count').attr('data-count'));
+            hasNewNotices = parseInt(hasNewNotices);
+
+            if (currentNotiticationCount == hasNewNotices) {
+                return;
+            }
+
+            let htmlHasNotices = '';
+            if (currentNotiticationCount < hasNewNotices) {
+                htmlHasNotices = '<span id="notices-count" class="fa-stack fa-1x has-badge new-notification-anime" data-count="' + hasNewNotices + '"><i class="fas fa-bell fa-stack-1x"></i></span>';
+            } else {
+                htmlHasNotices = '<span id="notices-count" class="fa-stack fa-1x has-badge" data-count="' + hasNewNotices + '"><i class="fas fa-bell fa-stack-1x"></i></span>';
+            }
+            
+            let htmlNoNotices = '&nbsp;&nbsp;<span id="notices-count"><i class="fas fa-bell"></i></span>';
+            let html = '';
+            
+            if (hasNewNotices) {
+                html = htmlHasNotices;
+            } else {
+                html = htmlNoNotices;
+            }
+            $('#notices-badge').html(html);
+            $('#notices-badge-sm').html(html);
+        }
+
+
+        function faviconNotifications(count) {
+            const favicon = $("link[rel='shortcut icon']");
+            favicon.attr("href", "./includes/icons/favicon.webp");
+            if (count > 0) {
+                favicon.attr("href", "./includes/icons/favicon-notification.webp");
+            }
+        }
+
     </script>
 
 </body>

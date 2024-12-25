@@ -34,7 +34,10 @@ use includes\classes\ConnectPDO;
 $conn = ConnectPDO::getInstance();
 
 $uareas = $_SESSION['s_uareas'];
+$exception = "";
 $post = (isset($_POST) ? $_POST : '');
+
+// var_dump($post);
 
 $imgsPath = "../../includes/imgs/";
 $iconFrozen = "<span class='text-oc-teal' title='" . TRANS('HNT_TIMER_STOPPED') . "'><i class='fas fa-pause fa-lg'></i></span>";
@@ -149,6 +152,30 @@ if (!empty($post)) {
 
     // var_dump($post); exit;
 
+    // $queryForResources = [
+    //     1 => "",
+    //     2 => " AND cat.cat_is_product = 0 ",
+    //     3 => " AND cat.cat_is_product = 1 "
+    // ];
+
+    $queryForResources = [
+        1 => "",
+        2 => " AND (c.is_product IS NULL OR c.is_product = 0) ",
+        3 => " AND c.is_product = 1 "
+    ];
+    $terms_resources = "";
+    $terms_resources = (isset($post['group_0']) ? $queryForResources[$post['group_0']] : "");
+
+
+    $queryAvailability = [
+        1 => "",
+        2 => " AND uxa.id IS NULL ", /* disponíveis */
+        3 => " AND uxa.id IS NOT NULL " /* Nao disponíveis */
+    ];
+    $terms_availability = "";
+    $terms_availability = (isset($post['group_00']) ? $queryAvailability[$post['group_00']] : "");
+
+
     /* Níveis possíveis de agrupamento */
     $groups = [
         'group_1' => '',
@@ -201,12 +228,16 @@ if (!empty($post)) {
         $terms = " AND inst.inst_cod IN ({$_SESSION['s_allowed_units']}) ";
     }
 
-    $sql = $QRY["full_detail_ini"];
+    // $sql = $QRY["full_detail_ini"];
+    $sql = $QRY["assets_queues"];
     $sql .= $sql_terms;
     $sql .= $terms;
-    $sql .= $QRY["full_detail_fim"];
+    $sql .= $terms_resources;
+    $sql .= $terms_availability;
+    // $sql .= $QRY["full_detail_fim"];
     // $sql .= " ORDER BY instituicao, etiqueta";
 
+    // dump($sql);
 
     /* Só enviará dados se for o último nível do agrupamento selecionado */
     if (count($params) == count($groups)) {
@@ -216,7 +247,10 @@ if (!empty($post)) {
         //     'params' => $params,
         //     'sql_terms' => $sql_terms,
         //     'terms' => $terms,
-        // ]); return;
+        // ]); 
+        
+        // dump($sql);
+        // return;
 
 
         try {
@@ -234,6 +268,7 @@ if (!empty($post)) {
                         <th class="line"><?= TRANS('COL_TYPE'); ?><br /><?= TRANS('COL_MANUFACTURER'); ?><br /><?= TRANS('COL_MODEL'); ?></th>
                         <th class="line direct-attributes"><?= TRANS('DIRECT_ATTRIBUTES'); ?></th>
                         <th class="line aggregated-attributes"><?= TRANS('AGGREGATED_ATTRIBUTES'); ?></th>
+                        <th class="line"><?= TRANS('AVAILABILITY'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -266,6 +301,9 @@ if (!empty($post)) {
                         }
 
 
+                        /* Disponibilidade */
+                        $availabilityArray = getUserFromAssetId($conn, $rowDetail['comp_cod']);
+                        $availability = (!empty($availabilityArray) ? TRANS('IN_USE') : TRANS('AVAILABLE'));
 
                     
                     ?>
@@ -276,6 +314,7 @@ if (!empty($post)) {
                             <td class="line"><b><?= $rowDetail['equipamento'] . $categorieBadge ?></b><br /><?= $rowDetail['fab_nome']; ?><br /><?= $rowDetail['modelo']; ?></td>
                             <td class="line"><?= $directAttributes; ?></td>
                             <td class="line"><?= $aggregatedAttributes; ?></td>
+                            <td class="line"><?= $availability; ?></td>
                             
                             
                         </tr>

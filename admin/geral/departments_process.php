@@ -76,8 +76,11 @@ if ($data['action'] == "new" || $data['action'] == "edit") {
 
 if ($data['action'] == 'new') {
 
+    $terms = (!empty($data['unit']) ? " AND loc_unit = '{$data['unit']}' " : " AND loc_unit IS NULL ");
+    
 
-    $sql = "SELECT loc_id FROM localizacao WHERE local = '" . $data['department'] . "' AND loc_unit = '" . $data['unit'] . "' ";
+
+    $sql = "SELECT loc_id FROM localizacao WHERE local = '" . $data['department'] . "' {$terms} ";
     $res = $conn->query($sql);
     if ($res->rowCount()) {
         $data['success'] = false; 
@@ -137,7 +140,9 @@ if ($data['action'] == 'new') {
 } elseif ($data['action'] == 'edit') {
 
 
-    $sql = "SELECT loc_id FROM localizacao WHERE local = '" . $data['department'] . "' AND loc_unit = '". $data['unit'] ."' AND loc_id <> '" . $data['cod'] . "' ";
+    $terms = (!empty($data['unit']) ? " AND loc_unit = '{$data['unit']}' " : " AND loc_unit IS NULL ");
+
+    $sql = "SELECT loc_id FROM localizacao WHERE local = '" . $data['department'] . "' {$terms} AND loc_id <> '" . $data['cod'] . "' ";
     $res = $conn->query($sql);
     if ($res->rowCount()) {
         $data['success'] = false; 
@@ -163,7 +168,7 @@ if ($data['action'] == 'new') {
                 loc_dominio = " . dbField($data['net_domain']) . ", 
                 loc_predio = " . dbField($data['building']) . ", 
                 loc_status = '" . $data['department_status'] . "', 
-                loc_unit = '" . $data['unit'] . "' 
+                loc_unit = " . dbField($data['unit']) . " 
 
             WHERE loc_id = '" . $data['cod'] . "'";
 

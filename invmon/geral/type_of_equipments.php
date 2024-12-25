@@ -50,8 +50,9 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
 	<style>
 		.list-types-parted-of {
@@ -132,6 +133,8 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 							<td class="line issue_type"><?= TRANS('CAN_BE_PART_OF'); ?></td>
 							<td class="line issue_type"><?= TRANS('CAN_BE_PARENT_OF'); ?></td>
 							<td class="line issue_type"><?= TRANS('FIELD_PROFILE'); ?></td>
+							<td class="line issue_type"><?= TRANS('ALLOCABLE'); ?></td>
+							<td class="line issue_type"><?= TRANS('TYPE_DIGITAL'); ?></td>
 							<td class="line editar" width="10%"><?= TRANS('BT_EDIT'); ?></td>
 							<td class="line remover" width="10%"><?= TRANS('BT_REMOVE'); ?></td>
 						</tr>
@@ -155,14 +158,25 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 									$listParentOf .= '<li class="list-types-parted-of">'.$parentOf["tipo_nome"].'</li>';
 								}
 							}
-							
+
+							// $categorieBadge = ($row['is_digital'] == 1 ? '<span class="badge badge-info">'. TRANS('CATEGORY_DIGITAL') .'</span>' : '');
+							// $categorieBadge .= ($row['can_be_product'] == 1 ? '<span class="badge badge-info">'. TRANS('CATEGORY_PRODUCT') .'</span>' : '');
+							// $categorie = (!empty($row['cat_name']) ? $row['cat_name'] . "&nbsp;" . $categorieBadge : '');
+							$categorie = (!empty($row['cat_name']) ? $row['cat_name'] : '');
+
+							$allocable = ($row['can_be_product'] ? '<span class="text-success"><i class="fas fa-check"></i></span>' : '');
+
+							$digital = ($row['is_digital'] ? '<span class="text-success"><i class="fas fa-check"></i></span>' : '');
+
 						?>
 							<tr>
 								<td class="line"><?= $row['tipo_nome']; ?></td>
-								<td class="line"><?= $row['cat_name']; ?></td>
+								<td class="line"><?= $categorie; ?></td>
 								<td class="line"><?= $listPartOf; ?></td>
 								<td class="line"><?= $listParentOf; ?></td>
 								<td class="line"><?= $row['profile_name']; ?></td>
+								<td class="line"><?= $allocable; ?></td>
+								<td class="line"><?= $digital; ?></td>
 								<td class="line"><button type="button" class="btn btn-secondary btn-sm" onclick="redirect('<?= $_SERVER['PHP_SELF']; ?>?action=edit&cod=<?= $row['tipo_cod']; ?>')"><?= TRANS('BT_EDIT'); ?></button></td>
 								<td class="line"><button type="button" class="btn btn-danger btn-sm" onclick="confirmDeleteModal('<?= $row['tipo_cod']; ?>')"><?= TRANS('REMOVE'); ?></button></td>
 							</tr>
@@ -195,8 +209,10 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 								<?php
 									$categories = getAssetsCategories($conn);
 									foreach ($categories as $cat) {
+										$subtext = ($cat['cat_is_product'] == 1 ? TRANS('CATEGORY_PRODUCT') : '');
+										$subtext .= ($cat['cat_is_digital'] == 1 ? TRANS('CATEGORY_DIGITAL') : '');
 										?>
-											<option value="<?= $cat['id']; ?>"
+											<option data-subtext="<?= $subtext; ?>" value="<?= $cat['id']; ?>"
 											><?= $cat['cat_name']; ?></option>
 										<?php
 									}
@@ -255,6 +271,28 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 						</select>
                     </div>
 
+					<label class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_CAN_BE_ALLOCATED_IN_TICKETS'); ?>"><?= firstLetterUp(TRANS('CAN_BE_ALLOCATED_IN_TICKETS')); ?></label>
+					<div class="form-group col-md-4 ">
+						<div class="switch-field">
+							
+							<input type="radio" id="can_be_product" name="can_be_product" value="yes"  />
+							<label for="can_be_product"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="can_be_product_no" name="can_be_product" value="no" checked />
+							<label for="can_be_product_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
+					<label class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_TYPE_DIGITAL'); ?>"><?= firstLetterUp(TRANS('TYPE_DIGITAL')); ?></label>
+					<div class="form-group col-md-4 ">
+						<div class="switch-field">
+							
+							<input type="radio" id="is_digital" name="is_digital" value="yes"  />
+							<label for="is_digital"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="is_digital_no" name="is_digital" value="no" checked />
+							<label for="is_digital_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
                     
 
 					<div class="row w-100"></div>
@@ -297,8 +335,10 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 								<?php
 									$categories = getAssetsCategories($conn);
 									foreach ($categories as $cat) {
+										$subtext = ($cat['cat_is_product'] == 1 ? TRANS('CATEGORY_PRODUCT') : '');
+										$subtext .= ($cat['cat_is_digital'] == 1 ? "&nbsp;" . TRANS('CATEGORY_DIGITAL') : '');
 										?>
-											<option value="<?= $cat['id']; ?>"
+											<option data-subtext="<?= $subtext; ?>" value="<?= $cat['id']; ?>"
 											<?= ($cat['id'] == $row['tipo_categoria'] ? " selected" : ""); ?>
 											><?= $cat['cat_name']; ?></option>
 										<?php
@@ -365,6 +405,34 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 							?>
 						</select>
                     </div>
+
+					<label class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_CAN_BE_ALLOCATED_IN_TICKETS'); ?>"><?= firstLetterUp(TRANS('CAN_BE_ALLOCATED_IN_TICKETS')); ?></label>
+					<div class="form-group col-md-4 ">
+						<div class="switch-field">
+							<?php
+							$yesChecked = ($row['can_be_product'] == 1 ? "checked" : "");
+							$noChecked = (!$row['can_be_product'] == 1 ? "checked" : "");
+							?>
+							<input type="radio" id="can_be_product" name="can_be_product" value="yes" <?= $yesChecked; ?> />
+							<label for="can_be_product"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="can_be_product_no" name="can_be_product" value="no" <?= $noChecked; ?> />
+							<label for="can_be_product_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
+					<label class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_TYPE_DIGITAL'); ?>"><?= firstLetterUp(TRANS('TYPE_DIGITAL')); ?></label>
+					<div class="form-group col-md-4 ">
+						<div class="switch-field">
+							<?php
+							$yesChecked = ($row['is_digital'] == 1 ? "checked" : "");
+							$noChecked = (!$row['is_digital'] == 1 ? "checked" : "");
+							?>
+							<input type="radio" id="is_digital" name="is_digital" value="yes" <?= $yesChecked; ?> />
+							<label for="is_digital"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="is_digital_no" name="is_digital" value="no" <?= $noChecked; ?> />
+							<label for="is_digital_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
                     
 
 					<div class="row w-100"></div>
@@ -424,6 +492,7 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 				title: "<?= TRANS('SEL_SELECT', '', 1); ?>",
 				liveSearch: true,
 				liveSearchNormalize: true,
+				showSubtext: true,
 				liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
 				noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
 				style: "",
@@ -503,6 +572,7 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 				var url = '<?= $_SERVER['PHP_SELF'] ?>';
 				$(location).prop('href', url);
 			});
+
 		});
 
 

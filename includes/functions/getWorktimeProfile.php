@@ -23,18 +23,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 // $conn = ConnectPDO::getInstance();
 
-function getWorktimeProfile($conn, $profile_id) {
-        
-    if (empty($profile_id)) {
+function getWorktimeProfile($conn, $profileId)
+{
+
+    if (empty($profileId)) {
         //NESSE CASO UTILIZO O CODIGO DO PERFIL MARCADO COMO PADRAO
         $sql = "SELECT id FROM worktime_profiles WHERE is_default = 1";
         $result = $conn->query($sql);
-        $profile_id = $result->fetch()['id'];
-    } 
+        $profileId = $result->fetch()['id'];
+    }
 
     $data = array();
 
-    $sql = "SELECT * FROM worktime_profiles WHERE id = {$profile_id} ";
+    $sql = "SELECT * FROM worktime_profiles WHERE id = {$profileId} ";
     $sql = $conn->query($sql);
 
     foreach ($sql->fetchAll(PDO::FETCH_ASSOC) as $row) {
@@ -61,7 +62,7 @@ function getWorktimeProfile($conn, $profile_id) {
         $data['sun']['endTimeMinute'] = $row['sun_end_time_minute'];
         $data['sun']['dayFullWorkTime'] = (int)$row['sun_day_full_worktime'];
         $data['sun']['dayFullWorkTimeInSecs'] = $row['sun_day_full_worktime'] * 60;
-        
+
 
         $data['off']['iniTimeHour'] = $row['off_ini_time_hour'];
         $data['off']['iniTimeMinute'] = $row['off_ini_time_minute'];
@@ -74,20 +75,20 @@ function getWorktimeProfile($conn, $profile_id) {
     }
 
     return (array)$data;
-
 }
 
 /**
  * RETORNA O ARRAY DE FERIADOS QUE SERÁ UTILIZADO PARA O CÁLCULO DO TEMPO FILTRADO
  * $conn: conexão
  */
-function getHolidays($conn) {
-        
+function getHolidays($conn)
+{
+
     $data = array();
     $year = date('Y');
     $holidayYear = (int) $year;
     /* Para os casos de feriados fixos, o array adiciona as datas para os 5 anos anteriores do ano atual e tamem para os 5 anos seguintes */
-    $yearBase = $holidayYear - 5; 
+    $yearBase = $holidayYear - 5;
     $yearLimit = $holidayYear + 5;
 
     $sql = "SELECT 
@@ -104,24 +105,24 @@ function getHolidays($conn) {
             for ($i = $yearBase; $i <= $yearLimit; $i++) {
                 $data[] = $i . '-' . $row['mes'] . '-' . $row['dia'];
             }
-        } else 
+        } else
             $data[] = $row['ano'] . '-' . $row['mes'] . '-' . $row['dia'];
-        
     }
     return (array)$data;
 }
 
 
 
-function daysFullWorkTime($startTime, $endTime, $fullTime = false){
-    
+function daysFullWorkTime($startTime, $endTime, $fullTime = false)
+{
+
     //PRESEATS - 24/7
-    if ($fullTime === true){
+    if ($fullTime === true) {
         return 1440;
     }
 
-    $startTime = new DateTime($startTime);
-    $endTime = new DateTime($endTime);
+    $startTime = new \DateTime($startTime);
+    $endTime = new \DateTime($endTime);
 
     $diff = $startTime->diff($endTime);
 
@@ -130,7 +131,7 @@ function daysFullWorkTime($startTime, $endTime, $fullTime = false){
 
     /** The only case when the result should return 1439 is from 00:00 to 23h59, but this represents a full day,
      * so its changed to 1440 for the best representation of a full day
-    */
+     */
     return ((($min + $hour == 1439) ? 1440 : $min + $hour)); //in minutes
 }
 
@@ -142,18 +143,19 @@ function daysFullWorkTime($startTime, $endTime, $fullTime = false){
  * $startTime: data de início do período
  * $endTime: data de fim do feríodo
  */
-function absoluteTime (string $startTime, string $endTime) {
-    
+function absoluteTime(string $startTime, string $endTime)
+{
+
     $time1 = strtotime($startTime);
     $time2 = strtotime($endTime);
     $inSeconds = $time2 - $time1;
 
 
-    $startTime = new DateTime($startTime);
-    $endTime = new DateTime($endTime);
+    $startTime = new \DateTime($startTime);
+    $endTime = new \DateTime($endTime);
 
     $diff = $startTime->diff($endTime);
-    
+
     $years = ($diff->y ? $diff->y : '');
     $months = ($diff->m ? $diff->m : '');
     $days = ($diff->d ? $diff->d : '');
@@ -162,7 +164,7 @@ function absoluteTime (string $startTime, string $endTime) {
     $seconds = ($diff->s ? $diff->s : '');
 
     $inTime = "";
-    
+
     /* $inTime = (!empty($years) && (int)$years > 1 ? $years . " anos " : (!empty($years) ? $years . " ano " : ''));
     $inTime .= (!empty($months) && (int)$months > 1 ? $months . " meses " : (!empty($months) ? $months . " mês " : ''));
     $inTime .= (!empty($days) && (int)$days > 1 ? $days . " dias " : (!empty($days) ? $days . " dia " : ''));
@@ -192,18 +194,18 @@ function absoluteTime (string $startTime, string $endTime) {
  * $ticket: número do chamado
  * $specific: ignora os demais parãmetros e retorna diretamente o codigo de perfil passado
  *              para os casos de determinar o perfil de jornada diretamente no chamado
-*/
-function getProfileCod ($conn, $conf, $ticket, $specific = '') {
+ */
+function getProfileCod($conn, $conf, $ticket, $specific = '')
+{
 
-    
+
     if (empty($specific)) {
         /* pegar o usuário que abriu o chamado */
         $sql = "SELECT sistema, aberto_por FROM ocorrencias WHERE numero = {$ticket} ";
 
         try {
             $result = $conn->query($sql);
-        }
-        catch (Exception $e) {
+        } catch (Exception $e) {
             // echo 'Erro: ', $e->getMessage(), "<br/>";
             return false;
         }
@@ -211,21 +213,18 @@ function getProfileCod ($conn, $conf, $ticket, $specific = '') {
 
         if ($conf == 1) { //ÁREA DE ORIGEM DO CHAMADO - NESSE CASO, BASEADO NO USUÁRIO QUE ABRIU O CHAMADO
             $sql = "SELECT u.AREA, s.sis_id, w.id  FROM usuarios u, sistemas s, worktime_profiles w 
-                WHERE user_id = ".$row['aberto_por']." AND u.AREA = s.sis_id AND s.sis_wt_profile = w.id ";
+                WHERE user_id = " . $row['aberto_por'] . " AND u.AREA = s.sis_id AND s.sis_wt_profile = w.id ";
             try {
                 $result = $conn->query($sql);
-            }
-            catch (Exception $e) {
+            } catch (Exception $e) {
                 // echo 'Erro: ', $e->getMessage(), "<br/>";
                 return false;
-                
             }
-            
+
             $rowConf1 = $result->fetch();
             return $rowConf1['id'];
-            
         } elseif ($conf == 2) { //ÁREA DE ATENDIMENTO DO CHAMADO
-            
+
             if (empty($row['sistema'])) {
                 /* Se o chamado não possuir área, então utilizo o perfil definido como padrão */
                 $sql = "SELECT id FROM worktime_profiles WHERE is_default = 1 ";
@@ -233,16 +232,15 @@ function getProfileCod ($conn, $conf, $ticket, $specific = '') {
                 $rowProfile = $result->fetch();
                 return $rowProfile['id'];
             }
-            
+
             $sql = "SELECT sis_wt_profile FROM sistemas WHERE sis_id = " . $row['sistema'] . " ";
             try {
                 $result = $conn->query($sql);
-            }
-            catch (Exception $e) {
+            } catch (Exception $e) {
                 // echo 'Erro: ', $e->getMessage(), "<br/>";
                 return false;
             }
-            
+
             $rowConf2 = $result->fetch();
             return $rowConf2['sis_wt_profile'] ?? null;
         }
@@ -256,7 +254,8 @@ function getProfileCod ($conn, $conf, $ticket, $specific = '') {
  * $conn: conexão
  * $statusId: código do status do chamado
  */
-function isStatusFreeze ($conn, $statusId) {
+function isStatusFreeze($conn, $statusId)
+{
     if (empty($statusId))
         return 0;
     $sql = "SELECT stat_time_freeze FROM status WHERE stat_id = '{$statusId}' ";
@@ -268,11 +267,12 @@ function isStatusFreeze ($conn, $statusId) {
 /**
  * Retorna se o chamado está com o relógio parado
  */
-function isTicketFrozen ($conn, $ticket) {
+function isTicketFrozen($conn, $ticket)
+{
     $sqlTkt = "SELECT * FROM `tickets_stages` 
                 WHERE ticket = {$ticket} AND id = (SELECT max(id) FROM tickets_stages WHERE ticket = {$ticket}) ";
     $resultTkt = $conn->query($sqlTkt);
-    
+
     if ($resultTkt->rowCount()) {
         $row = $resultTkt->fetch();
         return isStatusFreeze($conn, $row['status_id']);
@@ -289,7 +289,8 @@ function isTicketFrozen ($conn, $ticket) {
  * $ticketLifetime: tempo de vida do chamado em segundos (retornado pela classe Worktime)
  * $tolerance: percentual de tolerância sobre os tempos definidos para o SLA
  */
-function getSlaResult ($ticketLifetime, $tolerance, $definedSLA = '') {
+function getSlaResult($ticketLifetime, $tolerance, $definedSLA = '')
+{
 
     if (empty($definedSLA)) {
         return 1; /* Não identificado */
@@ -312,7 +313,8 @@ function getSlaResult ($ticketLifetime, $tolerance, $definedSLA = '') {
  * $ticketLifetime: tempo de vida do chamado em segundos (retornado pela classe Worktime)
  * $tolerance: percentual de tolerância sobre os tempos definidos para o SLA
  */
-function showLedSLA ($ticketLifetime, $tolerance, $definedSLA = '') {
+function showLedSLA($ticketLifetime, $tolerance, $definedSLA = '')
+{
 
     if (empty($definedSLA)) {
         return 'gray-circle.svg';
@@ -341,8 +343,8 @@ function showLedSLA ($ticketLifetime, $tolerance, $definedSLA = '') {
  * $closureDate: data de encerramento do chamado
  * $ticketStatus: status do chamado
  * $objWT: Objeto Worktime para checagem se o momento atual está coberto pela jornada de trabalho associada
-*/
-function getTicketTimeInfo ($conn, Worktime $newWT, Worktime $newWTResponse, $ticket, $openDate, $responseDate, $closureDate = '', $ticketStatus = '', Worktime $objWT = null): array
+ */
+function getTicketTimeInfo($conn, Worktime $newWT, Worktime $newWTResponse, $ticket, $openDate, $responseDate, $closureDate = '', $ticketStatus = '', Worktime $objWT = null): array
 {
     $output = [];
     $dateResponse = (!empty($responseDate) ? strtotime($responseDate) : "");
@@ -376,12 +378,13 @@ function getTicketTimeInfo ($conn, Worktime $newWT, Worktime $newWTResponse, $ti
             $newWT->stopTimer($closureDate);
         } elseif (isStatusFreeze($conn, $ticketStatus)) {
             if (!empty($responseDate))
-                $newWT->stopTimer($responseDate); else
+                $newWT->stopTimer($responseDate);
+            else
                 $newWT->stopTimer($openDate);
-        } else 
+        } else
             $newWT->stopTimer(date("Y-m-d H:i:s"));
     }
-    
+
 
     /* Tempo válido de RESPOSTA baseado no perfil de jornada de trabalho e nas etapas em cada status */
     $sqlStages = "SELECT * FROM tickets_stages WHERE ticket = " . $ticket . " ORDER BY id";
@@ -389,7 +392,7 @@ function getTicketTimeInfo ($conn, Worktime $newWT, Worktime $newWTResponse, $ti
     if ($resultStage->rowCount()) {
         $hasValidStage = false;
         $foundResponse = false;
-        
+
         foreach ($resultStage->fetchAll() as $rowStage) {
             /* Só considera os status que não param o relógio */
             /* Faço a busca em cada estágio até encontrar a primeira resposta - 
@@ -414,12 +417,11 @@ function getTicketTimeInfo ($conn, Worktime $newWT, Worktime $newWTResponse, $ti
                             $newWTResponse->stopTimer($responseDate);
                             $foundResponse = true;
                         }
-
                     } else {
 
                         if (!empty($rowStage['date_stop'])) {
                             $newWTResponse->stopTimer($rowStage['date_stop']);
-                        } else 
+                        } else
                             $newWTResponse->stopTimer(date("Y-m-d H:i:s"));
                     }
                 }
@@ -446,18 +448,18 @@ function getTicketTimeInfo ($conn, Worktime $newWT, Worktime $newWTResponse, $ti
     $output['running'] = 0;
     if ($objWT != null) {
 
-        $now = (array) new DateTime( date("Y-m-d H:i:s") );
+        $now = (array) new \DateTime(date("Y-m-d H:i:s"));
         $now = explode(".", $now['date']); //now[0] = date part
 
-        $before = new DateTime( date("Y-m-d H:i:s"));
-        $before = $before->modify( '-1 second' ); 
-		$before = (array)$before;
-		$before = explode(".", $before['date']);
-        
-        $later = new DateTime( date("Y-m-d H:i:s"));
-        $later = (array)$later->modify( '+1 second' ); 
+        $before = new \DateTime(date("Y-m-d H:i:s"));
+        $before = $before->modify('-1 second');
+        $before = (array)$before;
+        $before = explode(".", $before['date']);
+
+        $later = new \DateTime(date("Y-m-d H:i:s"));
+        $later = (array)$later->modify('+1 second');
         $later = explode(".", $later['date']);
-        
+
         $objWT->startTimer($now[0]);
         $objWT->stopTimer($later[0]);
 
@@ -472,14 +474,11 @@ function getTicketTimeInfo ($conn, Worktime $newWT, Worktime $newWTResponse, $ti
             }
         }
     }
-    
+
     $output['response']['time'] = $newWTResponse->getTime();
     $output['response']['seconds'] = $newWTResponse->getSeconds();
     $output['solution']['time'] = $newWT->getTime();
     $output['solution']['seconds'] = $newWT->getSeconds();
 
     return $output;
-
 }
-
-

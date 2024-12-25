@@ -13,8 +13,12 @@ $conn = ConnectPDO::getInstance();
 $post = $_POST;
 $data = array();
 
+$data['is_product'] = null;
+if (isset($post['is_product']) && !empty($post['is_product'])) {
+    $data['is_product'] = (int)$post['is_product'];
+}
 
-$types = getAssetsTypes($conn);
+$types = getAssetsTypes($conn, null, null, null, null, null, $data['is_product']);
 
 $data = $types;
 

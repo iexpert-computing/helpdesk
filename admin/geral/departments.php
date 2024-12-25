@@ -51,9 +51,10 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -376,7 +377,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 									$units = getUnits($conn);
 									foreach ($units as $unit) {
 										?>
-											<option value="<?= $unit['inst_cod']; ?>"
+											<option data-subtext="<?= $unit['nickname']; ?>" value="<?= $unit['inst_cod']; ?>"
 											<?= ($unit['inst_cod'] == $departments['loc_unit'] ? " selected" : ""); ?>
 											><?= $unit['inst_nome']; ?></option>
 										<?php
@@ -551,6 +552,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 				/* placeholder */
 				title: "<?= TRANS('SEL_SELECT', '', 1); ?>",
 				liveSearch: true,
+				showSubtext: true,
 				liveSearchNormalize: true,
 				liveSearchPlaceholder: "<?= TRANS('BT_SEARCH', '', 1); ?>",
 				noneResultsText: "<?= TRANS('NO_RECORDS_FOUND', '', 1); ?> {0}",
@@ -660,7 +662,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 					$('#unit').append('<option value=""><?= TRANS("SEL_SELECT"); ?></option>');
 				}
 				$.each(data, function(key, data) {
-					$('#unit').append('<option value="' + data.inst_cod + '">' + data.inst_nome + '</option>');
+					$('#unit').append('<option data-subtext="'+ (data.nickname ?? '') +'" value="' + data.inst_cod + '">' + data.inst_nome + '</option>');
 				});
 
 				$('#unit').selectpicker('refresh');

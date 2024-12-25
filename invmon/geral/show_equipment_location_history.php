@@ -47,8 +47,9 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 2);
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -133,7 +134,7 @@ $row = $resultado->fetch();
 
 ?>
     <h6><?= TRANS('COL_UNIT'); ?>: <?= $row['instituicao_nome']; ?></h6>
-    <h6><?= TRANS('ASSET_TAG'); ?>: <?= $row['etiqueta']; ?></h6>
+    <h6><?= TRANS('ASSET_TAG_TAG'); ?>: <?= $row['etiqueta']; ?></h6>
     <h6><?= TRANS('FIELD_TYPE_EQUIP'); ?>: <?= $row['equipamento']; ?></h6>
 
     <table id="table_lists" class="stripe hover order-column row-border" border="0" cellspacing="0" width="100%">

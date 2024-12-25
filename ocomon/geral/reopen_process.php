@@ -44,7 +44,8 @@ if (!isset($_POST['numero'])) {
 
 $numero = (int) $_POST['numero'];
 
-$sqlTicket = "SELECT * FROM ocorrencias WHERE numero = {$numero} AND status = 4 ";
+// $sqlTicket = "SELECT * FROM ocorrencias WHERE numero = {$numero} AND status = 4 ";
+$sqlTicket = "SELECT * FROM ocorrencias WHERE numero = {$numero} AND data_fechamento IS NOT NULL ";
 $resultTicket = $conn->query($sqlTicket);
 if ($resultTicket->rowCount() == 0) {
     $_SESSION['flash'] = message('danger', '', TRANS('MSG_TICKET_CANT_REOPEN'), '', '');
@@ -62,13 +63,17 @@ if (!count($row)) {
     return false;
 }
 
+$isRated = isRated($conn, $numero);
+$isRequester = $row['aberto_por'] == $_SESSION['s_uid'];
+$isResponsible = isTicketTreater($conn, $numero, $_SESSION['s_uid']);
 
-
-
-/* Apenas o solicitante ou o responsável técnico podem reabrir o chamado */
-if ($_SESSION['s_uid'] != $row['aberto_por'] && $_SESSION['s_uid'] != $row['operador']) {
+/* A partir da implementação da avaliação de atendimento, agora apenas os responsáveis pode reabrir */
+if (!$isResponsible || $isRated) {
     return false;
 }
+
+
+
 
 /* Avalia se está no prazo para reabrir */
 if ($config['conf_reopen_deadline']) {
@@ -128,20 +133,24 @@ try {
 
     /* Tipo de assentamento: 9 - reabertura */
     $sql = "INSERT INTO assentamentos 
-                (ocorrencia, assentamento, `data`, responsavel, tipo_assentamento) 
+                (ocorrencia, assentamento, created_at, responsavel, tipo_assentamento) 
             values 
                 ({$numero}, '{$entry}', '".date('Y-m-d H:i:s')."', {$user}, 9 )";
 
     try {
         $result = $conn->exec($sql);
+        $notice_id = $conn->lastInsertId();
+        if ($_SESSION['s_uid'] != $row['aberto_por']) {
+            setUserTicketNotice($conn, 'assentamentos', $notice_id);
+        }
     }
     catch (Exception $e) {
         $exception .= "<hr>" . $e->getMessage();
     }
 
     /* Gravação da data na tabela tickets_stages */
-    $stopTimeStage = insert_ticket_stage($conn, $numero, 'stop', $reopeningStatus);
-    $startTimeStage = insert_ticket_stage($conn, $numero, 'start', $reopeningStatus);
+    $stopTimeStage = insert_ticket_stage($conn, $numero, 'stop', $reopeningStatus, $user);
+    $startTimeStage = insert_ticket_stage($conn, $numero, 'start', $reopeningStatus, $user);
 
     /* Array para a função recordLog */
     $afterPost = [];

@@ -37,7 +37,11 @@ if (isset($_SESSION['s_area_admin']) && $_SESSION['s_area_admin'] == '1' && $_SE
 }
 $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 1);
 
-$_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
+$currentUrl = $_SERVER['PHP_SELF'];
+/* Alterar o basename para ficar compatível com o data-app para marcação no menu lateral */
+$dataAppUrl = str_replace(basename($currentUrl), 'types_of_issues.php', $currentUrl);
+$_SESSION['s_page_admin'] = $dataAppUrl;
+
 
 ?>
 <!DOCTYPE html>
@@ -54,8 +58,9 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
 	<style>
 		li.except_areas {
@@ -74,6 +79,8 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 
 	<div id="divResult"></div>
 
+	<input type="hidden" name="label_close" id="label_close" value="<?= TRANS('BT_CLOSE'); ?>">
+	<input type="hidden" name="label_return" id="label_return" value="<?= TRANS('TXT_RETURN'); ?>">
 
 	<div class="container-fluid">
 		<h4 class="my-4"><i class="fas fa-exclamation-circle text-secondary"></i>&nbsp;<?= TRANS('PROBLEM_TYPES'); ?></h4>
@@ -98,16 +105,31 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 
 		$query = "SELECT DISTINCT 
 					p.prob_id, p.problema, p.prob_sla, 
-					p.prob_tipo_1, p.prob_tipo_2, p.prob_tipo_3,
+					p.prob_tipo_1, 
+					p.prob_tipo_2, 
+					p.prob_tipo_3, 
+					p.prob_tipo_4,
+					p.prob_tipo_5,
+					p.prob_tipo_6,
 					p.prob_descricao, p.prob_active, p.prob_profile_form, 
 					p.prob_area_default,
+					p.need_authorization, 
+					p.card_in_costdash, 
 					sl.slas_desc, sl.slas_cod, 
-					pt1.probt1_desc, pt2.probt2_desc, pt3.probt3_desc 
+					pt1.probt1_desc, 
+					pt2.probt2_desc, 
+					pt3.probt3_desc, 
+					pt4.probt4_desc,
+					pt5.probt5_desc,
+					pt6.probt6_desc
 				FROM areas_x_issues as ai, problemas as p 
                     LEFT JOIN sla_solucao as sl on sl.slas_cod = p.prob_sla 
                     LEFT JOIN prob_tipo_1 as pt1 on pt1.probt1_cod = p.prob_tipo_1 
                     LEFT JOIN prob_tipo_2 as pt2 on pt2.probt2_cod = p.prob_tipo_2 
                     LEFT JOIN prob_tipo_3 as pt3 on pt3.probt3_cod = p.prob_tipo_3 
+					LEFT JOIN prob_tipo_4 as pt4 on pt4.probt4_cod = p.prob_tipo_4
+					LEFT JOIN prob_tipo_5 as pt5 on pt5.probt5_cod = p.prob_tipo_5
+					LEFT JOIN prob_tipo_6 as pt6 on pt6.probt6_cod = p.prob_tipo_6
                 WHERE 
 					p.prob_id = ai.prob_id
 				";
@@ -164,6 +186,9 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 			<?= TRANS('MANAGE_RELATED_ITENS'); ?>:&nbsp;<button class="btn btn-sm btn-secondary manage" data-location="cat_prob1" name="probtp1"><?= $row_config['conf_prob_tipo_1']; ?></button>
 			<button class="btn btn-sm btn-secondary manage" data-location="cat_prob2" name="probtp2"><?= $row_config['conf_prob_tipo_2']; ?></button>
 			<button class="btn btn-sm btn-secondary manage" data-location="cat_prob3" name="probtp3"><?= $row_config['conf_prob_tipo_3']; ?></button>
+			<button class="btn btn-sm btn-secondary manage" data-location="cat_prob4" name="probtp4"><?= $row_config['conf_prob_tipo_4']; ?></button>
+			<button class="btn btn-sm btn-secondary manage" data-location="cat_prob5" name="probtp5"><?= $row_config['conf_prob_tipo_5']; ?></button>
+			<button class="btn btn-sm btn-secondary manage" data-location="cat_prob6" name="probtp6"><?= $row_config['conf_prob_tipo_6']; ?></button>
 			<br /><br />
 			<?php
 			if ($registros == 0) {
@@ -182,7 +207,12 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 							<td class="line tipo_1"><?= $row_config['conf_prob_tipo_1']; ?></td>
 							<td class="line tipo_2"><?= $row_config['conf_prob_tipo_2']; ?></td>
 							<td class="line tipo_3"><?= $row_config['conf_prob_tipo_3']; ?></td>
+							<td class="line tipo_3"><?= $row_config['conf_prob_tipo_4']; ?></td>
+							<td class="line tipo_3"><?= $row_config['conf_prob_tipo_5']; ?></td>
+							<td class="line tipo_3"><?= $row_config['conf_prob_tipo_6']; ?></td>
 							<td class="line tipo_3"><?= TRANS('ACTIVE_O') ?></td>
+							<td class="line tipo_3"><?= TRANS('AUTHORIZATION') ?></td>
+							<td class="line tipo_3"><?= TRANS('CARD_IN_DASHBOARD') ?></td>
 							<td class="line editar"><?= TRANS('BT_EDIT'); ?></td>
 							<td class="line remover"><?= TRANS('BT_REMOVE'); ?></td>
 						</tr>
@@ -198,6 +228,8 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 							$inactive_class = (empty($active) ? 'table-danger' : '');
 							$listAreas = "";
 
+							$need_authorization_signal = ($row['need_authorization'] ? '<span class="text-success"><i class="fas fa-check"></i></span>' : '<span class="text-danger"><i class="fas fa-ban"></i></span>');
+							$card_in_dashboard = ($row['card_in_costdash'] ? '<span class="text-success"><i class="fas fa-check"></i></span>' : '<span class="text-danger"><i class="fas fa-ban"></i></span>');
 
 
 							if (count($hiddenInAreas = hiddenAreasByIssue($conn, $row['prob_id']))) {
@@ -237,7 +269,12 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 								<td class="line"><?= ($row['probt1_desc'] == '' ? '<span class="text-danger"><i class="fas fa-ban"></i></span>' : $row['probt1_desc']); ?></td>
 								<td class="line"><?= ($row['probt2_desc'] == '' ? '<span class="text-danger"><i class="fas fa-ban"></i></span>' : $row['probt2_desc']); ?></td>
 								<td class="line"><?= ($row['probt3_desc'] == '' ? '<span class="text-danger"><i class="fas fa-ban"></i></span>' : $row['probt3_desc']); ?></td>
+								<td class="line"><?= ($row['probt4_desc'] == '' ? '<span class="text-danger"><i class="fas fa-ban"></i></span>' : $row['probt4_desc']); ?></td>
+								<td class="line"><?= ($row['probt5_desc'] == '' ? '<span class="text-danger"><i class="fas fa-ban"></i></span>' : $row['probt5_desc']); ?></td>
+								<td class="line"><?= ($row['probt6_desc'] == '' ? '<span class="text-danger"><i class="fas fa-ban"></i></span>' : $row['probt6_desc']); ?></td>
 								<td class="line"><?= $active; ?></td>
+								<td class="line"><?= $need_authorization_signal; ?></td>
+								<td class="line"><?= $card_in_dashboard; ?></td>
 								<td class="line"><button type="button" class="btn btn-secondary btn-sm" onclick="redirect('<?= $_SERVER['PHP_SELF']; ?>?action=edit&cod=<?= $row['prob_id']; ?>')"><?= TRANS('BT_EDIT'); ?></button></td>
 								<td class="line"><button type="button" class="btn btn-danger btn-sm" onclick="confirmDeleteModal('<?= $row['prob_id']; ?>')"><?= TRANS('REMOVE'); ?></button></td>
 							</tr>
@@ -377,6 +414,75 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						</div>
 					</div>
 
+					<label for="tipo_4" class="col-md-2 col-form-label col-form-label-sm text-md-right"><span id="label_cat_4"><?= $row_config['conf_prob_tipo_4']; ?></span></label>
+					<div class="form-group col-md-10">
+						<div class="input-group">
+							<select class="form-control" name="tipo_4" id="tipo_4">
+								<option value="-1" selected><?= TRANS('SEL_SELECT'); ?></option>
+								<?php
+								$sql = "SELECT * FROM prob_tipo_4 ORDER BY probt4_desc";
+								$resType4 = $conn->query($sql);
+								foreach ($resType4->fetchall() as $rowType4) {
+								?>
+									<option value="<?= $rowType4['probt4_cod']; ?>"><?= $rowType4['probt4_desc']; ?></option>
+								<?php
+								}
+								?>
+							</select>
+							<div class="input-group-append">
+								<div class="input-group-text manage_categories" data-location="cat_prob4" data-params="action=new" title="<?= TRANS('ADD_CATEGORY'); ?>" data-placeholder="<?= TRANS('ADD_CATEGORY'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+									<i class="fas fa-plus"></i>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<label for="tipo_5" class="col-md-2 col-form-label col-form-label-sm text-md-right"><span id="label_cat_5"><?= $row_config['conf_prob_tipo_5']; ?></span></label>
+					<div class="form-group col-md-10">
+						<div class="input-group">
+							<select class="form-control" name="tipo_5" id="tipo_5">
+								<option value="-1" selected><?= TRANS('SEL_SELECT'); ?></option>
+								<?php
+								$sql = "SELECT * FROM prob_tipo_5 ORDER BY probt5_desc";
+								$resType5 = $conn->query($sql);
+								foreach ($resType5->fetchall() as $rowType5) {
+								?>
+									<option value="<?= $rowType5['probt5_cod']; ?>"><?= $rowType5['probt5_desc']; ?></option>
+								<?php
+								}
+								?>
+							</select>
+							<div class="input-group-append">
+								<div class="input-group-text manage_categories" data-location="cat_prob5" data-params="action=new" title="<?= TRANS('ADD_CATEGORY'); ?>" data-placeholder="<?= TRANS('ADD_CATEGORY'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+									<i class="fas fa-plus"></i>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<label for="tipo_6" class="col-md-2 col-form-label col-form-label-sm text-md-right"><span id="label_cat_6"><?= $row_config['conf_prob_tipo_6']; ?></span></label>
+					<div class="form-group col-md-10">
+						<div class="input-group">
+							<select class="form-control" name="tipo_6" id="tipo_6">
+								<option value="-1" selected><?= TRANS('SEL_SELECT'); ?></option>
+								<?php
+								$sql = "SELECT * FROM prob_tipo_6 ORDER BY probt6_desc";
+								$resType6 = $conn->query($sql);
+								foreach ($resType6->fetchall() as $rowType6) {
+								?>
+									<option value="<?= $rowType6['probt6_cod']; ?>"><?= $rowType6['probt6_desc']; ?></option>
+								<?php
+								}
+								?>
+							</select>
+							<div class="input-group-append">
+								<div class="input-group-text manage_categories" data-location="cat_prob6" data-params="action=new" title="<?= TRANS('ADD_CATEGORY'); ?>" data-placeholder="<?= TRANS('ADD_CATEGORY'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+									<i class="fas fa-plus"></i>
+								</div>
+							</div>
+						</div>
+					</div>
+
 					<label for="profile_form" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_DEFAULT_PROFILE_FORM'); ?>"><?= TRANS('SCREEN_NAME'); ?></label>
 					<div class="form-group col-md-10">
 						<select class="form-control sel_none" name="profile_form" id="profile_form">
@@ -400,6 +506,35 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						</small>
 					</div>
 
+
+					<label class="col-md-2 col-form-label text-md-right"><?= firstLetterUp(TRANS('NEED_AUTHORIZATION')); ?></label>
+					<div class="form-group col-md-4 ">
+						<div class="switch-field">
+							<?php
+							$yesChecked = "";
+							$noChecked = "checked";
+							?>
+							<input type="radio" id="need_authorization" name="need_authorization" value="yes" <?= $yesChecked; ?> />
+							<label for="need_authorization"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="need_authorization_no" name="need_authorization" value="no" <?= $noChecked; ?> />
+							<label for="need_authorization_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
+					<label class="col-md-2 col-form-label text-md-right"><?= firstLetterUp(TRANS('CARD_IN_DASHBOARD')); ?></label>
+					<div class="form-group col-md-4 ">
+						<div class="switch-field">
+							<?php
+							$yesChecked = "";
+							$noChecked = "checked";
+							?>
+							<input type="radio" id="card_in_costdash" name="card_in_costdash" value="yes" <?= $yesChecked; ?> />
+							<label for="card_in_costdash"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="card_in_costdash_no" name="card_in_costdash" value="no" <?= $noChecked; ?> />
+							<label for="card_in_costdash_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
 					<div class="row w-100"></div>
 					<div class="form-group col-md-8 d-none d-md-block">
 					</div>
@@ -408,6 +543,9 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						<input type="hidden" name="cat1_selected" value="" id="cat1_selected" />
 						<input type="hidden" name="cat2_selected" value="" id="cat2_selected" />
 						<input type="hidden" name="cat3_selected" value="" id="cat3_selected" />
+						<input type="hidden" name="cat4_selected" value="" id="cat4_selected" />
+						<input type="hidden" name="cat5_selected" value="" id="cat5_selected" />
+						<input type="hidden" name="cat6_selected" value="" id="cat6_selected" />
 						<input type="hidden" name="action" id="action" value="new">
 						<button type="submit" id="idSubmit" name="submit" class="btn btn-primary btn-block"><?= TRANS('BT_OK'); ?></button>
 					</div>
@@ -573,6 +711,77 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						</div>
 					</div>
 
+					<label for="tipo_4" class="col-md-2 col-form-label col-form-label-sm text-md-right"><span id="label_cat_4"><?= $row_config['conf_prob_tipo_4']; ?></span></label>
+					<div class="form-group col-md-10">
+						<div class="input-group">
+							<select class="form-control" name="tipo_4" id="tipo_4" required>
+								<option value="-1" selected><?= TRANS('SEL_SELECT'); ?></option>
+								<?php
+								$sql = "SELECT * FROM prob_tipo_4 ORDER BY probt4_desc";
+								$resType4 = $conn->query($sql);
+								foreach ($resType4->fetchall() as $rowType4) {
+								?>
+									<option value="<?= $rowType4['probt4_cod']; ?>" <?= ($row['prob_tipo_4'] == $rowType4['probt4_cod'] ? 'selected' : ''); ?>><?= $rowType4['probt4_desc']; ?></option>
+								<?php
+								}
+								?>
+							</select>
+							<input type="hidden" name="cat4_selected" value="<?= $row['prob_tipo_4']; ?>" id="cat4_selected" />
+							<div class="input-group-append">
+								<div class="input-group-text manage_categories" data-location="cat_prob4" data-params="action=new" title="<?= TRANS('ADD_CATEGORY'); ?>" data-placeholder="<?= TRANS('ADD_CATEGORY'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+									<i class="fas fa-plus"></i>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<label for="tipo_5" class="col-md-2 col-form-label col-form-label-sm text-md-right"><span id="label_cat_5"><?= $row_config['conf_prob_tipo_5']; ?></span></label>
+					<div class="form-group col-md-10">
+						<div class="input-group">
+							<select class="form-control" name="tipo_5" id="tipo_5" required>
+								<option value="-1" selected><?= TRANS('SEL_SELECT'); ?></option>
+								<?php
+								$sql = "SELECT * FROM prob_tipo_5 ORDER BY probt5_desc";
+								$resType5 = $conn->query($sql);
+								foreach ($resType5->fetchall() as $rowType5) {
+								?>
+									<option value="<?= $rowType5['probt5_cod']; ?>" <?= ($row['prob_tipo_5'] == $rowType5['probt5_cod'] ? 'selected' : ''); ?>><?= $rowType5['probt5_desc']; ?></option>
+								<?php
+								}
+								?>
+							</select>
+							<input type="hidden" name="cat5_selected" value="<?= $row['prob_tipo_5']; ?>" id="cat5_selected" />
+							<div class="input-group-append">
+								<div class="input-group-text manage_categories" data-location="cat_prob5" data-params="action=new" title="<?= TRANS('ADD_CATEGORY'); ?>" data-placeholder="<?= TRANS('ADD_CATEGORY'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+									<i class="fas fa-plus"></i>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<label for="tipo_6" class="col-md-2 col-form-label col-form-label-sm text-md-right"><span id="label_cat_6"><?= $row_config['conf_prob_tipo_6']; ?></span></label>
+					<div class="form-group col-md-10">
+						<div class="input-group">
+							<select class="form-control" name="tipo_6" id="tipo_6" required>
+								<option value="-1" selected><?= TRANS('SEL_SELECT'); ?></option>
+								<?php
+								$sql = "SELECT * FROM prob_tipo_6 ORDER BY probt6_desc";
+								$resType6 = $conn->query($sql);
+								foreach ($resType6->fetchall() as $rowType6) {
+								?>
+									<option value="<?= $rowType6['probt6_cod']; ?>" <?= ($row['prob_tipo_6'] == $rowType6['probt6_cod'] ? 'selected' : ''); ?>><?= $rowType6['probt6_desc']; ?></option>
+								<?php
+								}
+								?>
+							</select>
+							<input type="hidden" name="cat6_selected" value="<?= $row['prob_tipo_6']; ?>" id="cat6_selected" />
+							<div class="input-group-append">
+								<div class="input-group-text manage_categories" data-location="cat_prob6" data-params="action=new" title="<?= TRANS('ADD_CATEGORY'); ?>" data-placeholder="<?= TRANS('ADD_CATEGORY'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+									<i class="fas fa-plus"></i>
+								</div>
+							</div>
+						</div>
+					</div>
 
 					<label for="profile_form" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('SCREEN_NAME'); ?></label>
 					<div class="form-group col-md-10">
@@ -606,6 +815,36 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 					</div>
 
 
+					<label class="col-md-2 col-form-label text-md-right"><?= firstLetterUp(TRANS('NEED_AUTHORIZATION')); ?></label>
+					<div class="form-group col-md-4 ">
+						<div class="switch-field">
+							<?php
+							$yesChecked = ($row['need_authorization'] == 1 ? "checked" : "");
+							$noChecked = (!($row['need_authorization'] == 1) ? "checked" : "");
+							?>
+							<input type="radio" id="need_authorization" name="need_authorization" value="yes" <?= $yesChecked; ?> />
+							<label for="need_authorization"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="need_authorization_no" name="need_authorization" value="no" <?= $noChecked; ?> />
+							<label for="need_authorization_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
+
+					<label class="col-md-2 col-form-label text-md-right"><?= firstLetterUp(TRANS('CARD_IN_DASHBOARD')); ?></label>
+					<div class="form-group col-md-4 ">
+						<div class="switch-field">
+							<?php
+							$yesChecked = ($row['card_in_costdash'] == 1 ? "checked" : "");
+							$noChecked = (!($row['card_in_costdash'] == 1) ? "checked" : "");
+							?>
+							<input type="radio" id="card_in_costdash" name="card_in_costdash" value="yes" <?= $yesChecked; ?> />
+							<label for="card_in_costdash"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="card_in_costdash_no" name="card_in_costdash" value="no" <?= $noChecked; ?> />
+							<label for="card_in_costdash_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+					
+
 					<label class="col-md-2 col-form-label text-md-right"><?= firstLetterUp(TRANS('ACTIVE_O')); ?></label>
 					<div class="form-group col-md-4 ">
 						<div class="switch-field">
@@ -628,12 +867,15 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						<input type="hidden" name="cat1_selected" value="" id="cat1_selected" />
 						<input type="hidden" name="cat2_selected" value="" id="cat2_selected" />
 						<input type="hidden" name="cat3_selected" value="" id="cat3_selected" />
+						<input type="hidden" name="cat4_selected" value="" id="cat4_selected" />
+						<input type="hidden" name="cat5_selected" value="" id="cat5_selected" />
+						<input type="hidden" name="cat6_selected" value="" id="cat6_selected" />
 						<input type="hidden" name="cod" value="<?= $COD; ?>">
 						<input type="hidden" name="action" id="action" value="edit">
 						<button type="submit" id="idSubmit" name="submit" value="edit" class="btn btn-primary btn-block"><?= TRANS('BT_OK'); ?></button>
 					</div>
 					<div class="form-group col-12 col-md-2">
-						<button type="reset" class="btn btn-secondary btn-block" onClick="parent.history.back();"><?= TRANS('BT_CANCEL'); ?></button>
+						<button type="reset" id="close_details" class="btn btn-secondary btn-block" "><?= TRANS('BT_CANCEL'); ?></button> <!-- onClick="parent.history.back(); -->
 					</div>
 
 				</div>
@@ -737,9 +979,33 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 			});
 
 
+			/* Identificar se a janela está sendo carregada em uma popup (iframe dentro de uma modal) */
+			var isInIframe = (window.location !== window.parent.location) ? true : false;
+			
+			if (isInIframe) {
+				var iframeParent = window.parent.document.getElementById('iframeMain');
+				if (!iframeParent) {
+					$('#close_details').text($('#label_close').val()).on("click", function() {
+						window.parent.closeScriptDetails();
+					});
+				} else {
+					$('#close_details').text($('#label_return').val()).on("click", function() {
+						window.history.back();
+					});
+				}
+			} else {
+				$('#close_details').text($('#label_return').val()).on("click", function() {
+					window.history.back();
+				});
+			}
+
+
 			loadCat1();
 			loadCat2();
 			loadCat3();
+			loadCat4();
+			loadCat5();
+			loadCat6();
 
 			$('.manage_categories').on('click', function() {
 				loadInPopup($(this).attr('data-location'), $(this).attr('data-params'));
@@ -772,7 +1038,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 							options +='>' + val.sistema + '</option>';
 							// console.log('Encontradas: ' + val.sistema);
 						}
-					})
+					});
 
 					$('#area_default').empty().html(options);
 					$('#area_default').selectpicker('refresh');
@@ -808,11 +1074,18 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						}
 						$("#idSubmit").prop("disabled", false);
 					} else {
-						$('#divResult').html('');
-						$('input, select, textarea').removeClass('is-invalid');
-						$("#idSubmit").prop("disabled", false);
-						var url = '<?= $_SERVER['PHP_SELF'] ?>';
-						$(location).prop('href', url);
+
+						if (isInIframe && !iframeParent) {
+							// window.parent.location.reload();
+							window.parent.agroup();
+							window.parent.closeScriptDetails();
+						} else {
+							$('#divResult').html('');
+							$('input, select, textarea').removeClass('is-invalid');
+							$("#idSubmit").prop("disabled", false);
+							var url = '<?= $_SERVER['PHP_SELF'] ?>';
+							$(location).prop('href', url);
+						}
 						return false;
 					}
 				});
@@ -910,6 +1183,80 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 			});
 		}
 
+		function loadCat4(selected_id = '') {
+			$.ajax({
+				url: './get_issue_categories.php',
+				method: 'POST',
+				data: {
+					cat_type: 4
+				},
+				dataType: 'json',
+			}).done(function(response) {
+				$('#tipo_4').empty().append('<option value=""><?= TRANS('SEL_TYPE'); ?></option>');
+				for (var i in response) {
+
+					var option = '<option value="' + response[i].probt4_cod + '">' + response[i].probt4_desc + '</option>';
+					$('#tipo_4').append(option);
+
+					if (selected_id !== '') {
+						$('#tipo_4').val(selected_id).change();
+					} else
+					if ($('#cat4_selected').val() != '') {
+						$('#tipo_4').val($('#cat4_selected').val()).change();
+					}
+				}
+			});
+		}
+
+		function loadCat5(selected_id = '') {
+			$.ajax({
+				url: './get_issue_categories.php',
+				method: 'POST',
+				data: {
+					cat_type: 5
+				},
+				dataType: 'json',
+			}).done(function(response) {
+				$('#tipo_5').empty().append('<option value=""><?= TRANS('SEL_TYPE'); ?></option>');
+				for (var i in response) {
+
+					var option = '<option value="' + response[i].probt5_cod + '">' + response[i].probt5_desc + '</option>';
+					$('#tipo_5').append(option);
+
+					if (selected_id !== '') {
+						$('#tipo_5').val(selected_id).change();
+					} else
+					if ($('#cat5_selected').val() != '') {
+						$('#tipo_5').val($('#cat5_selected').val()).change();
+					}
+				}
+			});
+		}
+
+		function loadCat6(selected_id = '') {
+			$.ajax({
+				url: './get_issue_categories.php',
+				method: 'POST',
+				data: {
+					cat_type: 6
+				},
+				dataType: 'json',
+			}).done(function(response) {
+				$('#tipo_6').empty().append('<option value=""><?= TRANS('SEL_TYPE'); ?></option>');
+				for (var i in response) {
+
+					var option = '<option value="' + response[i].probt6_cod + '">' + response[i].probt6_desc + '</option>';
+					$('#tipo_6').append(option);
+
+					if (selected_id !== '') {
+						$('#tipo_6').val(selected_id).change();
+					} else
+					if ($('#cat6_selected').val() != '') {
+						$('#tipo_6').val($('#cat6_selected').val()).change();
+					}
+				}
+			});
+		}
 
 		function loadCatLabel(table) {
 			$.ajax({

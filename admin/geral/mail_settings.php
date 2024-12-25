@@ -46,6 +46,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 	<link rel="stylesheet" type="text/css" href="../../includes/css/switch_radio.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
 	<style>
 		hr.thick {
@@ -56,7 +57,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 		}
 	</style>
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>

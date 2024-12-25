@@ -109,6 +109,35 @@ $options = [
     ]
 ];
 
+/* $queryForTypes = [
+    1 => "",
+    2 => "AND cat.cat_is_product = 0",
+    3 => "AND cat.cat_is_product = 1"
+]; */
+$queryForTypes = [
+    1 => "",
+    2 => "AND (e.is_product IS NULL OR e.is_product = 0) ",
+    3 => "AND e.is_product = 1"
+];
+
+$titleForTypes = [
+    1 => TRANS('ASSETS_AND_RESOURCES_IN_SYSTEM'),
+    2 => TRANS('ASSETS_IN_SYSTEM'),
+    3 => TRANS('RESOURCES_IN_SYSTEM')
+];
+
+
+$queryAvailability = [
+    1 => "",
+    2 => " AND uxa.id IS NULL ", /* disponíveis */
+    3 => " AND uxa.id IS NOT NULL " /* Nao disponíveis */
+];
+
+$titleForAvailability = [
+    1 => TRANS('ANY_AVAILABILITY'),
+    2 => TRANS('AVAILABLE'),
+    3 => TRANS('IN_USE')
+];
 
 /* Controle para apenas unidades visíveis pela área primária do usuário */
 $terms = "";
@@ -116,16 +145,30 @@ if (!empty($_SESSION['s_allowed_units'])) {
     $terms = " AND un.inst_cod IN ({$_SESSION['s_allowed_units']}) ";
 }
 
-/** Traz o total de ativos, consolidado, com base nas configurações de acesso do usuário logado */
+
+
+$terms_resources = "";
+$terms_resources = (isset($post['group_0']) ? $queryForTypes[$post['group_0']] : "");
+
+$terms_availability = "";
+$terms_availability = (isset($post['group_00']) ? $queryAvailability[$post['group_00']] : "");
+
 $qryTotal = "SELECT 
-            COUNT(*) AS total  
-        FROM 
-            equipamentos e, 
-            instituicao un
-        WHERE 
-            e.comp_inst = un.inst_cod
-            {$terms}
-        ";
+                COUNT(*) AS total  
+                FROM 
+                    equipamentos e
+                    LEFT JOIN users_x_assets uxa ON e.comp_cod = uxa.asset_id AND uxa.is_current = 1,
+                    instituicao un,
+                    tipo_equip t
+                    LEFT JOIN assets_categories cat ON cat.id = t.tipo_categoria
+                WHERE 
+                    e.comp_inst = un.inst_cod AND
+                    e.comp_tipo_equip = t.tipo_cod 
+                    {$terms}
+                    {$terms_resources}
+                    {$terms_availability}
+                ";
+
 $execTotal = $conn->query($qryTotal);
 $regTotal = $execTotal->fetch()['total'];
 
@@ -136,7 +179,7 @@ if (isset($_SESSION['flash']) && !empty($_SESSION['flash'])) {
 
 ?>
     <div id="assets_group"> <!-- class="just-padding" -->
-        <p><?= TRANS('THEREARE'); ?>&nbsp;<span class="font-weight-bold text-danger"><?= $regTotal; ?></span>&nbsp;<?= TRANS('ASSETS_IN_SYSTEM'); ?>:</p>
+        <p><?= TRANS('THEREARE'); ?>&nbsp;<span class="font-weight-bold text-danger"><?= $regTotal; ?></span>&nbsp;<?= $titleForTypes[$post['group_0']]; ?>:</p>
 
         <div class="list-group list-group-root well">
 <?php
@@ -150,7 +193,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
             COALESCE ({$options[$post['group_1']]['alias']}.{$options[$post['group_1']]['field_name']}, 'N/A') AS 
                 \"{$options[$post['group_1']]['label']}\"
         FROM 
-            (((equipamentos e,
+            (((equipamentos e LEFT JOIN users_x_assets uxa ON e.comp_cod = uxa.asset_id AND uxa.is_current = 1,
             tipo_equip t,
             marcas_comp m,
             fabricantes f,
@@ -167,6 +210,8 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
             e.comp_fab = f.fab_cod AND 
             e.comp_local = l.loc_id 
             {$terms}
+            {$terms_resources}
+            {$terms_availability}
 
         GROUP BY
             {$options[$post['group_1']]['alias']}.{$options[$post['group_1']]['field_id']},
@@ -174,6 +219,9 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
         ORDER BY
             total DESC
     ";
+
+    // AND cat.cat_is_product = 0
+    // dump($sql_level_1);
 
     try {
         $res_level_1 = $conn->query($sql_level_1);
@@ -201,6 +249,9 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
         <?php
 
         if (isset($post['group_2']) && !empty($post['group_2'])) {
+
+            // echo "entrou no grupo 2";
+            // var_dump($post);
             /* Tratamento para os casos de comparação onde o campo não possui informações - nulo */
             $group_1_id_or_null = (empty($row_level_1[$options[$post['group_1']]['field_id']]) ? " IS NULL " : " = " . $row_level_1[$options[$post['group_1']]['field_id']]);
 
@@ -215,7 +266,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                     \"{$options[$post['group_2']]['label']}\"
                 
                 FROM 
-                    (((equipamentos e,
+                    (((equipamentos e LEFT JOIN users_x_assets uxa ON e.comp_cod = uxa.asset_id AND uxa.is_current = 1,
                     tipo_equip t,
                     marcas_comp m,
                     fabricantes f,
@@ -235,6 +286,8 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                     e.comp_fab = f.fab_cod AND 
                     e.comp_local = l.loc_id 
                     {$terms}
+                    {$terms_resources}
+                    {$terms_availability}
 
 
                 GROUP BY
@@ -250,8 +303,9 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
             try {
                 $res_level_2 = $conn->query($sql_level_2);
 
-            }
-            catch (Exception $e) {
+                // dump($sql_level_2);
+
+            } catch (Exception $e) {
                 $exception .= "<hr>" . $e->getMessage();
                 dump($sql_level_2);
                 echo message('danger', 'Ooops!', '<hr>' . $sql_level_2 . $exception, '', '', 1);
@@ -264,8 +318,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                 <div class="list-group collapse" id="<?= $post['group_1']; ?>-<?= $row_level_1[$options[$post['group_1']]['field_id']] ?>">
             <?php
 
-            foreach ($res_level_2 as $row_level_2) {
-
+            foreach ($res_level_2->fetchAll() as $row_level_2) {
                 ?>
                     <!-- Links no segundo nível -->
                     <a href="#<?= $post['group_1']; ?>-<?= $row_level_1[$options[$post['group_1']]['field_id']] ?>--<?= $post['group_2']; ?>-<?= $row_level_2[$options[$post['group_2']]['field_id']]; ?>" class="list-group-item" data-toggle="collapse">
@@ -303,7 +356,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                             \"{$options[$post['group_3']]['label']}\"
                         
                         FROM 
-                            (((equipamentos e,
+                            (((equipamentos e LEFT JOIN users_x_assets uxa ON e.comp_cod = uxa.asset_id AND uxa.is_current = 1,
                             tipo_equip t,
                             marcas_comp m,
                             fabricantes f,
@@ -323,6 +376,8 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                             e.comp_fab = f.fab_cod AND 
                             e.comp_local = l.loc_id 
                             {$terms}
+                            {$terms_resources}
+                            {$terms_availability}
 
                         GROUP BY
                             {$options[$post['group_1']]['alias']}.{$options[$post['group_1']]['field_id']},
@@ -346,7 +401,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                         <div class="list-group collapse" id="<?= $post['group_1']; ?>-<?= $row_level_1[$options[$post['group_1']]['field_id']]; ?>--<?= $post['group_2']; ?>-<?= $row_level_2[$options[$post['group_2']]['field_id']]; ?>">
                         <?php
 
-                        foreach ($res_level_3 as $row_level_3) {
+                        foreach ($res_level_3->fetchAll() as $row_level_3) {
                         ?>
                             <!-- Links no terceiro nível -->
                             <a href="#<?= $post['group_1']; ?>-<?= $row_level_1[$options[$post['group_1']]['field_id']]; ?>--<?= $post['group_2']; ?>-<?= $row_level_2[$options[$post['group_2']]['field_id']] ?>--<?= $post['group_3']; ?>-<?= $row_level_3[$options[$post['group_3']]['field_id']]; ?>" class="list-group-item" data-toggle="collapse">
@@ -392,7 +447,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                                         \"{$options[$post['group_4']]['label']}\"
                                     
                                     FROM 
-                                        (((equipamentos e,
+                                        (((equipamentos e LEFT JOIN users_x_assets uxa ON e.comp_cod = uxa.asset_id AND uxa.is_current = 1,
                                         tipo_equip t,
                                         marcas_comp m,
                                         fabricantes f,
@@ -414,6 +469,8 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                                         e.comp_fab = f.fab_cod AND 
                                         e.comp_local = l.loc_id 
                                         {$terms}
+                                        {$terms_resources}
+                                        {$terms_availability}
 
                                     GROUP BY
                                         {$options[$post['group_1']]['alias']}.{$options[$post['group_1']]['field_id']},
@@ -438,7 +495,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                                     <div class="list-group collapse" id="<?= $post['group_1']; ?>-<?= $row_level_1[$options[$post['group_1']]['field_id']] ?>--<?= $post['group_2']; ?>-<?= $row_level_2[$options[$post['group_2']]['field_id']] ?>--<?= $post['group_3']; ?>-<?= $row_level_3[$options[$post['group_3']]['field_id']]; ?>">
                                     <?php
             
-                                    foreach ($res_level_4 as $row_level_4) {
+                                    foreach ($res_level_4->fetchAll() as $row_level_4) {
                                     ?>
                                         <!-- Links no quarto nível -->
                                         <a href="#<?= $post['group_1']; ?>-<?= $row_level_1[$options[$post['group_1']]['field_id']]; ?>--<?= $post['group_2']; ?>-<?= $row_level_2[$options[$post['group_2']]['field_id']]; ?>--<?= $post['group_3']; ?>-<?= $row_level_3[$options[$post['group_3']]['field_id']]; ?>--<?= $post['group_4']; ?>-<?= $row_level_4[$options[$post['group_4']]['field_id']]; ?>" class="list-group-item" data-toggle="collapse">
@@ -494,7 +551,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                                                     \"{$options[$post['group_5']]['label']}\"
                                                 
                                                 FROM 
-                                                    (((equipamentos e,
+                                                    (((equipamentos e LEFT JOIN users_x_assets uxa ON e.comp_cod = uxa.asset_id AND uxa.is_current = 1,
                                                     tipo_equip t,
                                                     marcas_comp m,
                                                     fabricantes f,
@@ -516,6 +573,8 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                                                     e.comp_fab = f.fab_cod AND 
                                                     e.comp_local = l.loc_id 
                                                     {$terms}
+                                                    {$terms_resources}
+                                                    {$terms_availability}
                         
                                                 GROUP BY
                                                     {$options[$post['group_1']]['alias']}.{$options[$post['group_1']]['field_id']},
@@ -543,7 +602,7 @@ if (isset($post['group_1']) && !empty($post['group_1'])) {
                                                 <div class="list-group collapse" id="<?= $post['group_1']; ?>-<?= $row_level_1[$options[$post['group_1']]['field_id']] ?>--<?= $post['group_2']; ?>-<?= $row_level_2[$options[$post['group_2']]['field_id']] ?>--<?= $post['group_3']; ?>-<?= $row_level_3[$options[$post['group_3']]['field_id']] ?>--<?= $post['group_4']; ?>-<?= $row_level_4[$options[$post['group_4']]['field_id']] ?>">
                                                 <?php
                         
-                                                foreach ($res_level_5 as $row_level_5) {
+                                                foreach ($res_level_5->fetchAll() as $row_level_5) {
                                                 ?>
                                                     <!-- Links no quino nível -->
                                                     <a href="#<?= $post['group_1']; ?>-<?= $row_level_1[$options[$post['group_1']]['field_id']] ?>--<?= $post['group_2']; ?>-<?= $row_level_2[$options[$post['group_2']]['field_id']] ?>--<?= $post['group_3']; ?>-<?= $row_level_3[$options[$post['group_3']]['field_id']] ?>--<?= $post['group_4']; ?>-<?= $row_level_4[$options[$post['group_4']]['field_id']] ?>--<?= $post['group_5']; ?>-<?= $row_level_5[$options[$post['group_5']]['field_id']] ?>" class="list-group-item" data-toggle="collapse">

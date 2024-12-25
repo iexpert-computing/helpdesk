@@ -46,14 +46,6 @@ foreach ($custom_fields_full as $cfield) {
 $custom_fields_classes_text = implode(",", $custom_fields_classes);
 
 
-$logo = '../../includes/logos/MAIN_LOGO.png';
-// Read image path, convert to base64 encoding
-$logoType = pathinfo($logo, PATHINFO_EXTENSION);
-$logoData = file_get_contents($logo);
-$imgData = base64_encode($logoData);
-// Format the image SRC:  data:{mime};base64,{data};
-$imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
-
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -66,13 +58,15 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables-checkboxes-master/css/dataTables.checkboxes.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/switch_radio.css" />
 
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <style>
         .input-group >.input-group-prepend {
@@ -98,6 +92,13 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
             line-height: 1.5em;
         }
 
+        .traffic-term-button:before {
+            font-family: "Font Awesome\ 5 Free";
+            content: "\f474";
+            font-weight: 900;
+            font-size: 16px;
+        }
+
     </style>
 
 </head>
@@ -110,15 +111,60 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
 
     <div class="container-fluid">
 
-        <div class="modal" id="modal" tabindex="-1" style="z-index:9001!important" id="modalSubs">
+        <?php
+            if (isset($_SESSION['flash']) && !empty($_SESSION['flash'])) {
+                echo $_SESSION['flash'];
+                $_SESSION['flash'] = '';
+            }
+        ?>
+
+
+
+        <input type="hidden" name="report-mainlogo" class="report-mainlogo" id="report-mainlogo"/>
+        <input type="hidden" name="logo-base64" id="logo-base64"/>
+
+        <div id="div_flash"></div>
+        <div class="modal" id="modalIframe" tabindex="-1" style="z-index:9001!important">
             <div class="modal-dialog modal-xl">
                 <div class="modal-content">
-                    <div id="divDetails">
+                    <div id="divDetailsIframe" style="position:relative">
+                        <iframe id="iframe-content"  frameborder="1" style="position:absolute;top:0px;width:100%;height:100vh;"></iframe>
                     </div>
                 </div>
             </div>
         </div>
 
+        <div class="modal" id="modal" tabindex="-1" style="z-index:9001!important">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div id="divResultModal"></div>
+                    <div class="modal-header bg-light">
+                        <h5 class="modal-title" id="modal-title"><i class="fas fa-trash text-secondary"></i>&nbsp;<?= TRANS('ACTIONS_ASSETS_BATCH_DELETE'); ?></h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mx-2 mt-2 mb-0">
+                            <p class="font-weight-bold""><?= TRANS('WERE_SELECTED'); ?>&nbsp;<span class="text-danger font-weight-bold" id="assets_count"></span>&nbsp;<?= TRANS('ASSETS_TO_BE_DELETED'); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="row mx-2 mt-0 mb-0">
+                        <input type="hidden" name="assets_ids[]" id="assets_ids">
+                        <input type="hidden" name="batch_action" id="batch_action" value="delete">
+                       
+                        <div class="form-group col-md-12">
+                            <?= message('danger', TRANS('WARNING'), TRANS('MSG_BATCH_ACTIONS_REMOVE'), '', '', true); ?>
+                        </div>
+                    </div>
+                    <div class="modal-footer d-flex justify-content-end bg-light">
+                        <button id="confirmAction" class="btn btn-danger"><?= TRANS('BT_OK'); ?></button>
+                        <button id="cancelRemove" class="btn btn-secondary" data-dismiss="modal" aria-label="Close"><?= TRANS('BT_CANCEL'); ?></button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
 
         <h5 class="my-4"><i class="fas fa-filter text-secondary"></i>&nbsp;<?= TRANS('TTL_SMART_SEARCH_INVENTORY_TO_REPORT'); ?></h5>
@@ -210,6 +256,37 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                     </div>
                 </div>
 
+                <!-- Usuário -->
+                <label for="asset_user" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('FIELD_USER'); ?></label>
+                <div class="form-group col-md-4">
+                    <div class="input-group" name="terceiro-parent">
+                        <div class="input-group-prepend">
+                            <div class="input-group-text" title="<?= TRANS('SMART_NOT_EMPTY'); ?>" data-placeholder="<?= TRANS('SMART_NOT_EMPTY'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+                                <i class="fas fa-user"></i>&nbsp;
+                                <input type="checkbox" class="first-check" name="no_empty_asset_user" id="no_empty_asset_user" value="1">
+                            </div>
+                        </div>
+                        <select class="form-control sel2" id="asset_user" name="asset_user[]" multiple="multiple">
+                            <?php
+                            $users = getusers($conn);
+                            foreach ($users as $user) {
+                                $login = " (" . $user['login'] .")";
+                                ?>
+                                <option data-subtext="<?= $login; ?>" value="<?= $user['user_id']; ?>"><?= $user['nome']; ?></option>
+                                <?php
+                            }
+                            ?>
+                        </select>
+                        <div class="input-group-append">
+                            <div class="input-group-text" title="<?= TRANS('SMART_EMPTY'); ?>" data-placeholder="<?= TRANS('SMART_EMPTY'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+                                <i class="fas fa-times"></i>&nbsp;
+                                <input type="checkbox" class="last-check" name="no_asset_user" id="no_asset_user" value="1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="w-100"></div>
                 <!-- Etiqueta -->
                 <label for="etiqueta" class="col-md-2 col-form-label col-form-label-sm text-md-right text-nowrap"><?= TRANS('FIELD_TAG_EQUIP'); ?></label>
                 <div class="form-group col-md-4">
@@ -230,6 +307,7 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                         </div>
                     </div>
                 </div>
+                <div class="w-100"></div>
 
 
                 <!-- Tipo do equipamento -->
@@ -261,6 +339,40 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                         </div>
                     </div>
                 </div>
+
+
+                <?php
+                    $optionsForTypes = [
+                        1 => TRANS('ALL_TYPES'),
+                        2 => TRANS('ONLY_ASSETS'),
+                        3 => TRANS('ONLY_RESOURCES')
+                    ];
+                ?>
+
+                <!-- Recursos ou ativos -->
+                <label for="asset_or_resource" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CONSIDERS'); ?></label>
+                <div class="form-group col-md-4">
+                    <div class="input-group" name="terceiro-parent">
+                        <div class="input-group-prepend">
+                            <div class="input-group-text" >
+                                <i class="fas fa-star-of-life"></i>&nbsp;
+                            </div>
+                        </div>
+                        <select class="form-control sel2" id="asset_or_resource" name="asset_or_resource">
+                            <?php
+                            foreach ($optionsForTypes as $key => $type) {
+                                ?>
+                                    <option value="<?= $key; ?>"
+                                    <?= ($key == 1 ? ' selected' : ''); ?>
+                                    ><?= $type; ?></option>
+                                <?php
+                            }
+                            ?>
+                        </select>
+                    </div>
+                </div>
+
+
 
 
                 <!-- Fabricante -->
@@ -797,6 +909,7 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
     <script src="../../includes/javascript/funcoes-3.0.js"></script>
     <script src="../../includes/components/jquery/jquery.js"></script>
     <script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables.js"></script>
+    <script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables-checkboxes-master/js/dataTables.checkboxes.min.js"></script>
     <script src="../../includes/components/jquery/jquery.initialize.min.js"></script>
 	<script src="../../includes/components/jquery/datetimepicker/build/jquery.datetimepicker.full.min.js"></script>
     <script src="../../includes/components/bootstrap/js/bootstrap.bundle.min.js"></script>
@@ -807,6 +920,13 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
 
     <script>
         $(function() {
+
+            let userLevel = '<?= $_SESSION['s_nivel']; ?>';
+
+            let enableSelectObject = (userLevel == 1 ? {'style': 'multi+shift'} : false);
+            let enableCheckboxesObject = (userLevel == 1 ? {'selectRow': true} : false);
+            let enableSortFirstColumn = (userLevel == 1 ? false : true);
+            let exportOptions = (userLevel == 1 ? ':visible:not(:eq(0))' : ':visible');
 
             let hiddenColunsCookie = getCookie('oc_assets_sf_hidden_columns');
             let hiddenColunsCookieArray = hiddenColunsCookie.split(',');
@@ -861,6 +981,11 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                 lazyInit: true
             });
 
+
+            $('#modal').on('hidden.bs.modal', function (e) {
+                $('#assets_ids').val('');
+                $('#divResultModal').empty();
+            });
 
 
             $('.add_button_new_pieces').on('click', function() {
@@ -1411,6 +1536,7 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
 
             $('#idSearch').on('click', function(e) {
                 e.preventDefault();
+                setLogoSrc();
                 submitSearch();
             });
 
@@ -1491,8 +1617,20 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
 
                 var criterios = $('#divCriterios').text();
 
+                function setTitles() {
+                    var buttons = $( 'a.buttons-columnVisibility' );
+
+                    buttons.each(function( index ) {
+                        // console.log( index + ": " + $( this ).text() );
+                        var tooltip =  $( this ).text() ;
+                        $( this ).attr( 'title', tooltip );
+                    });
+                }
+
                 var table = $('#table_tickets_queue').DataTable({
 
+                    // 'processing': true,
+                    // 'serverSide': true,
                     paging: true,
                     pageLength: 25,
                     deferRender: true,
@@ -1512,12 +1650,26 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                             targets: reportNotSearchable,
                             searchable: false,
                         },
+                        {
+                            targets: 0,
+                            checkboxes: enableCheckboxesObject,
+                            orderable: enableSortFirstColumn
+                        }
                     ],
+
+                    select : enableSelectObject,
+
+                    'order': [
+                        [1, 'asc']
+                    ],
+                    
+                    rowId: 0,
 
                     colReorder: {
                         iFixedColumns: 1,
                         order : defaultColumnsOrder
                     },
+
 
                     "language": {
                         "url": "../../includes/components/datatables/datatables.pt-br.json"
@@ -1545,21 +1697,23 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                                 $(win.document.body).find('h1').css('text-align', 'center');
                             },
                             exportOptions: {
-                                columns: ':visible'
+                                // columns: ':visible'
+                                // columns: ':visible:not(:eq(0))' // ignora coluna de checkbox
+                                columns: exportOptions
                             },
                         },
                         {
                             extend: 'copyHtml5',
                             text: '<?= TRANS('SMART_BUTTON_COPY', '', 1) ?>',
                             exportOptions: {
-                                columns: ':visible'
+                                columns: exportOptions
                             }
                         },
                         {
                             extend: 'excel',
                             text: "Excel",
                             exportOptions: {
-                                columns: ':visible'
+                                columns: exportOptions
                             },
                             filename: '<?= TRANS('SMART_CUSTOM_REPORT_FILE_NAME', '', 1); ?>-<?= date('d-m-Y-H:i:s'); ?>',
                         },
@@ -1567,7 +1721,7 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                             extend: 'csvHtml5',
                             text: "CVS",
                             exportOptions: {
-                                columns: ':visible'
+                                columns: exportOptions
                             },
 
                             filename: '<?= TRANS('SMART_CUSTOM_REPORT_FILE_NAME', '', 1); ?>-<?= date('d-m-Y-H:i:s'); ?>',
@@ -1577,12 +1731,12 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                             text: "PDF",
 
                             exportOptions: {
-                                columns: ':visible',
+                                columns: exportOptions
                             },
                             title: '<?= TRANS('SMART_CUSTOM_REPORT_TITLE', '', 1); ?>',
                             filename: '<?= TRANS('SMART_CUSTOM_REPORT_FILE_NAME', '', 1); ?>-<?= date('d-m-Y-H:i:s'); ?>',
                             orientation: 'landscape',
-                            pageSize: 'A4',
+                            pageSize: 'A3',
 
                             customize: function(doc) {
                                 var criterios = $('#divCriterios').text()
@@ -1600,7 +1754,8 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                                         columns: [
                                             {
                                                 margin: [20, 10, 0, 0],
-                                                image: '<?= $imgSrc; ?>'
+                                                image: getLogoSrc(),
+                                                width: getLogoWidth()
                                             } ,
                                             {
                                                 table: {
@@ -1679,7 +1834,7 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                             extend: 'colvis',
                             text: '<?= TRANS('SMART_BUTTON_MANAGE_COLLUMNS', '', 1) ?>',
                             // className: 'btn btn-primary',
-                            // columns: ':gt(0)', 
+                            columns: ':gt(0)', 
                             collectionLayout: 'four-column',
                             attr: {
                                 id: 'colvisID'
@@ -1691,6 +1846,29 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                                 title: '<?= TRANS('REMEMBER_VISIBLE_COLUMNS', '', 1) ?>',
                                 id: 'customButton'
                             },
+                        },
+                        {
+                            extend: 'collection',
+                            text: '<?= TRANS('ACTIONS', '', 1) ?>',
+                            attr: {
+                                title: '<?= TRANS('ACTIONS', '', 1) ?>',
+                                id: 'actionsButton'
+                            },
+                            buttons: [
+                                {
+                                    text: '<i class="fas fa-trash"></i> <?= TRANS('REMOVE', '', 1) ?>',
+                                    attr: {
+                                        title: '<?= TRANS('REMOVE', '', 1) ?>',
+                                        id: 'actionRemove'
+                                    },
+                                    action: function ( e, dt, node, config ) {
+                                        var selectedRows = table.rows({ selected: true }).ids().toArray();
+
+                                        $('#modal').modal();
+                                        $('#assets_ids').val(selectedRows);
+                                    }
+                                }
+                            ]
                         }
                     ]
                 });
@@ -1698,6 +1876,47 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                 table.buttons().container()
                     .appendTo($('.display-buttons:eq(0)', table.table().container()));
 
+                table.on( 'buttons-action', function ( e, buttonApi, dataTable, node, config ) {
+                    setTitles();
+                });
+
+
+                // Identificador da coluna específica para não selecionar a linha
+                var specificColumnIndex = 1;
+                table.on('click', 'td', function(e) {
+                    var columnIndex = $(this).index();
+                    if (columnIndex === specificColumnIndex) {
+                        e.stopPropagation();
+                    }
+                });
+
+
+                $('#actionsButton').attr('disabled', true);
+                // Evento para quando uma linha é selecionada
+                table.on('select', function(e, dt, type, indexes) {
+                    var selectedRows = table.rows({ selected: true }).count();
+                    // console.log('Linhas selecionadas:', selectedRows);
+
+                    $('#assets_count').html(selectedRows);
+
+                    $('#actionsButton').attr('disabled', true);
+                    
+                    if (selectedRows > 0) {
+                        $('#actionsButton').attr('disabled', false);
+                    }
+                });
+                // Evento para quando uma linha é deselecionada
+                table.on('deselect', function(e, dt, type, indexes) {
+                    var selectedRows = table.rows({ selected: true }).count();
+                    // console.log('Linhas selecionadas:', selectedRows);
+
+                    $('#assets_count').html(selectedRows);
+
+                    $('#actionsButton').attr('disabled', false);
+                    if (selectedRows < 1) {
+                        $('#actionsButton').attr('disabled', true);
+                    }
+                })
 
             }, {
                 target: document.getElementById('divResult')
@@ -1711,18 +1930,63 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                 var table2 = $('#table_tickets_queue').DataTable();
 
                 $('#customButton').on('click', function(){
+                    
                     defaultHiddenColumns = getHiddenColumns(table2, allColumns);
-
                     defaultColumnsOrder = getColumnsOrder(table2);
-
                 });
+
+
+                
+                // $('#trafficTermButton').on('click', function(){
+                //     // console.log($('#result_ids').val());
+                //     generateTransitForm();
+                // });
 
             }, {
                 target: document.getElementById('divResult')
             }); /* o target limita o scopo do mutate observer */
 
 
-        });
+
+
+            $('#confirmAction').on('click', function(e) {
+                e.preventDefault();
+
+                var loading = $(".loading");
+                $(document).ajaxStart(function() {
+                    loading.show();
+                });
+                $(document).ajaxStop(function() {
+                    loading.hide();
+                });
+
+                $.ajax({
+                    url: './batch_assets_actions_process.php',
+                    method: 'POST',
+                    dataType: 'json',
+                    data: {
+                        'action': $('#batch_action').val(),
+                        'assets_ids': $('#assets_ids').val(),
+                    },
+                }).done(function(response) {
+                    if (!response.success) {
+                        if (response.field_id != "") {
+                            $('#' + response.field_id).focus().addClass('is-invalid');
+                        }
+                        $('#divResultModal').html(response.message);
+                    } else {
+                        $('#modal').modal('hide');
+                        submitSearch();
+                        getFlashMessage();
+                    }
+                });
+                return false;
+            });
+        
+        
+        
+        
+        }); 
 
 
         function submitSearch () {
@@ -1744,6 +2008,30 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
             });
             return false;
         }
+
+        // function generateTransitForm () {
+        //     var loading = $(".loading");
+        //     $(document).ajaxStart(function() {
+        //         loading.show();
+        //     });
+
+        //     $(document).ajaxStop(function() {
+        //         loading.hide();
+        //     });
+
+        //     $.ajax({
+        //         url: 'test_post_data.php',
+        //         method: 'POST',
+        //         // data: $('#form').serialize(),
+        //         data: {
+        //             assets_ids: $('#result_ids').val(),
+        //         }
+        //     }).done(function(response) {
+        //         // $('#divResult').html(response);
+        //         console.log(response);
+        //     });
+        //     return false;
+        // }
 
 
 
@@ -2061,7 +2349,7 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
                     app: 'smartSearch'
                 },
                 success: function(data) {
-                    console.log(data);
+                    // console.log(data);
                 }
             });
 
@@ -2093,6 +2381,59 @@ $imgSrc = 'data:image/' . $logoType . ';base64,'.$imgData;
         function openAssetInfo(asset_id) {
             let location = 'asset_show.php?asset_id=' + asset_id;
             popup_alerta_wide(location);
+        }
+
+
+        function getLogoSrc() {
+            return $('#logo-base64').val() ?? '';
+        }
+
+        function setLogoSrc() {
+
+            let logoName = $('#report-mainlogo').css('background-image');
+
+            if (logoName == 'none') {
+                return;
+            }
+            logoName = logoName.replace(/.*\s?url\([\'\"]?/, '').replace(/[\'\"]?\).*/, '')
+            logoName = logoName.split('/').pop();
+
+            $.ajax({
+                url: '../../ocomon/geral/get_reports_logo.php',
+                method: 'POST',
+                data: {
+                    'logo_name': logoName
+                },
+                dataType: 'json',
+            }).done(function(data) {
+
+                if (!data.success) {
+                    return;
+                }
+                $('#logo-base64').val(data.logo);
+            });
+        }
+
+        function getLogoWidth() {
+            let logoWidth = $('#report-mainlogo').width() ?? 150;
+            return logoWidth;
+        }
+
+        function loadInIframe(pageBase, params) {
+            let url = pageBase + '.php?' + params;
+            $("#iframe-content").attr('src',url)
+            $('#modalIframe').modal();
+        }
+
+        function getFlashMessage() {
+            $.ajax({
+                url: './get_flash_message.php',
+                method: 'POST',
+            }).done(function(response) {
+                if (response.length > 0) {
+                    $('#div_flash').html(response);
+                }
+            })
         }
 
     </script>

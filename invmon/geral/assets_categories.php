@@ -54,8 +54,9 @@ $prefix = "_" . $_SERVER['PHP_SELF'];
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 	
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -131,8 +132,8 @@ $prefix = "_" . $_SERVER['PHP_SELF'];
 						<tr class="header">
 							<td class="line issue_type"><?= TRANS('CATEGORY'); ?></td>
 							<td class="line issue_type"><?= TRANS('DESCRIPTION'); ?></td>
-							<td class="line category_digital"><?= TRANS('CATEGORY_DIGITAL'); ?></td>
-							<td class="line category_product"><?= TRANS('CATEGORY_PRODUCT'); ?></td>
+							<!-- <td class="line category_digital"><?= TRANS('CATEGORY_DIGITAL'); ?></td> -->
+							<!-- <td class="line category_product"><?= TRANS('CATEGORY_PRODUCT'); ?></td> -->
 							<td class="line bgcolor"><?= TRANS('COL_BG_COLOR'); ?></td>
 							<td class="line textcolor"><?= TRANS('FONT_COLOR'); ?></td>
 							<td class="line issue_type"><?= TRANS('FIELD_PROFILE'); ?></td>
@@ -156,8 +157,8 @@ $prefix = "_" . $_SERVER['PHP_SELF'];
 							<tr>
 								<td class="line"><?= $row['cat_name']; ?></td>
 								<td class="line"><?= $row['cat_description']; ?></td>
-								<td class="line"><?= $is_digital; ?></td>
-								<td class="line"><?= $is_product; ?></td>
+								<!-- <td class="line"><?= $is_digital; ?></td> -->
+								<!-- <td class="line"><?= $is_product; ?></td> -->
 								<td class="line"><span class="badge" style="border: 1px solid gray; background: <?= $row['cat_bgcolor']; ?>">&nbsp;&nbsp;&nbsp;</span></td>
 								<td class="line"><span class="badge" style="border: 1px solid gray; background: <?= $row['cat_textcolor']; ?>">&nbsp;&nbsp;&nbsp;</span></td>
 								<td class="line"><?= $profile['profile_name'] ?? ''; ?></td>
@@ -182,7 +183,7 @@ $prefix = "_" . $_SERVER['PHP_SELF'];
 				<div class="form-group row my-4">
 					
 					<!-- Digital -->
-					<label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_CATEGORY_DIGITAL'); ?>"><?= firstLetterUp(TRANS('CATEGORY_DIGITAL')); ?></label>
+					<!-- <label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_CATEGORY_DIGITAL'); ?>"><?= firstLetterUp(TRANS('CATEGORY_DIGITAL')); ?></label>
 					<div class="form-group col-md-2 ">
 						<div class="switch-field">
 							<?php
@@ -194,10 +195,10 @@ $prefix = "_" . $_SERVER['PHP_SELF'];
 							<input type="radio" id="is_digital_no" name="is_digital" value="no" <?= $noChecked; ?> />
 							<label for="is_digital_no"><?= TRANS('NOT'); ?></label>
 						</div>
-					</div>
+					</div> -->
 
 					<!-- Produto -->
-					<label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_CATEGORY_PRODUCT'); ?>"><?= firstLetterUp(TRANS('CATEGORY_PRODUCT')); ?></label>
+					<!-- <label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_CATEGORY_PRODUCT'); ?>"><?= firstLetterUp(TRANS('CATEGORY_PRODUCT')); ?></label>
 					<div class="form-group col-md-2 ">
 						<div class="switch-field">
 							<?php
@@ -209,7 +210,7 @@ $prefix = "_" . $_SERVER['PHP_SELF'];
 							<input type="radio" id="is_product_no" name="is_product" value="no" <?= $noChecked; ?> />
 							<label for="is_product_no"><?= TRANS('NOT'); ?></label>
 						</div>
-					</div>
+					</div> -->
 
 					<div class="w-100"></div>
 					<!-- Nome da categoria -->
@@ -286,7 +287,7 @@ $prefix = "_" . $_SERVER['PHP_SELF'];
 				<div class="form-group row my-4">
 
 					<!-- Digital -->
-					<label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_CATEGORY_DIGITAL'); ?>"><?= firstLetterUp(TRANS('CATEGORY_DIGITAL')); ?></label>
+					<!-- <label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_CATEGORY_DIGITAL'); ?>"><?= firstLetterUp(TRANS('CATEGORY_DIGITAL')); ?></label>
 					<div class="form-group col-md-2 ">
 						<div class="switch-field">
 							<?php
@@ -298,10 +299,10 @@ $prefix = "_" . $_SERVER['PHP_SELF'];
 							<input type="radio" id="is_digital_no" name="is_digital" value="no" <?= $noChecked; ?> />
 							<label for="is_digital_no"><?= TRANS('NOT'); ?></label>
 						</div>
-					</div>
+					</div> -->
 
 					<!-- Produto -->
-					<label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_CATEGORY_PRODUCT'); ?>"><?= firstLetterUp(TRANS('CATEGORY_PRODUCT')); ?></label>
+					<!-- <label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_CATEGORY_PRODUCT'); ?>"><?= firstLetterUp(TRANS('CATEGORY_PRODUCT')); ?></label>
 					<div class="form-group col-md-2 ">
 						<div class="switch-field">
 							<?php
@@ -313,7 +314,7 @@ $prefix = "_" . $_SERVER['PHP_SELF'];
 							<input type="radio" id="is_product_no" name="is_product" value="no" <?= $noChecked; ?> />
 							<label for="is_product_no"><?= TRANS('NOT'); ?></label>
 						</div>
-					</div>
+					</div> -->
 
 					<div class="w-100"></div>
 

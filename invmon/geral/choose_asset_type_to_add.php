@@ -34,6 +34,10 @@ $conn = ConnectPDO::getInstance();
 $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 3, 1);
 $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 
+$maxAmountEachTime = getConfigValue($conn, 'MAX_AMOUNT_BATCH_ASSETS_RECORD') ?? 1;
+
+$disableAmountSelect = ($maxAmountEachTime > 1 ? '' : ' disabled');
+
 
 ?>
 <!DOCTYPE html>
@@ -48,8 +52,9 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
 	<style>
 		li.list_specs {
@@ -89,11 +94,29 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
                 
 					<div class="row mx-2 mt-4">
 								
+						
+						<!-- Definição se o cadastro é para produtos/recursos -->
+						<div class="form-group col-md-12 ">
+							<div class="switch-field mb-0">
+								<?php
+								$yesChecked = "";
+								$noChecked = "checked";
+								?>
+								<input type="radio" id="is_product" name="is_product" value="yes" <?= $yesChecked; ?> />
+								<label for="is_product"><?= TRANS('YES'); ?></label>
+								<input type="radio" id="is_product_no" name="is_product" value="no" <?= $noChecked; ?> />
+								<label for="is_product_no"><?= TRANS('NOT'); ?></label>
+							</div>
+							<small class="form-text text-muted mt-0"><?= TRANS('IS_RECORD_TO_A_PRODUCT'); ?></small>
+						</div>
+
+					
+					
 						<div class="form-group col-sm-12 col-md-12">
 							<div class="input-group">
 								<select class="form-control bs-select" name="asset_type" id="asset_type">
 									<?php
-										$assetsTypes = getAssetsTypes($conn);
+										$assetsTypes = getAssetsTypes($conn, null, null, null, null, null, 0);
 										foreach ($assetsTypes as $type) {
 											?>
 											<option value="<?= $type['tipo_cod']; ?>"><?= $type['tipo_nome']; ?></option>
@@ -145,7 +168,10 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 							<small class="form-text text-muted"><?= TRANS('SEL_ASSET_MODEL'); ?></small>
 						</div>
 
-
+						<div class="form-group col-sm-12 col-md-12">
+							<input type="number" name="asset_amount" id="asset_amount" <?= $disableAmountSelect; ?> class="form-control" min="1" value="1" />
+							<small class="form-text text-muted"><?= TRANS('COL_AMOUNT'); ?></small>
+						</div>
 
 						
 					</div>
@@ -158,6 +184,8 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 					<div class="modal-footer d-flex justify-content-end bg-light">
 						<input type="hidden" name="tipo_selected" value="" id="tipo_selected" />
 						<input type="hidden" name="manufacturer_selected" value="" id="manufacturer_selected" />
+						<input type="hidden" name="product_value" id="product_value" value="0"/>
+						<input type="hidden" name="max_asset_amount" id="max_asset_amount" value="<?= $maxAmountEachTime; ?>"/>
 
 
 						<button class="btn btn-primary nowrap" id="continue" name="continue"><?= TRANS('CONTINUE'); ?></button>
@@ -198,6 +226,28 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 				style: "",
 				styleBase: "form-control ",
 			});
+
+
+			$('[name="is_product"]').on('change', function() {
+				if ($(this).val() == "no") {
+					
+					if ($('#max_asset_amount').val() > 1) {
+						$('#asset_amount').prop('disabled', false);
+					}
+					
+					$('#product_value').val(0);
+					// loadAssetsTypes('');
+				} else {
+					$('#asset_amount').prop('disabled', true).val('1');
+					$('#product_value').val(1);
+					// loadAssetsTypes('');
+				}
+				loadAssetsTypes('');
+			});
+
+			
+
+
 
 			$('#modalChooseAssetType').modal();
 			
@@ -254,6 +304,8 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 						asset_type: $('#asset_type').val(),
 						asset_manufacturer: $('#asset_manufacturer').val(),
 						asset_model: $('#asset_model').val(),
+						is_product: $('#product_value').val(),
+						asset_amount: $('#asset_amount').val(),
 						load_saved_config: ($('#load_saved_config').length > 0 && $('#load_saved_config').is(':checked') ? 1 : 0),
 					},
 					dataType: 'json',
@@ -278,7 +330,12 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 							newParams += '&load_saved_config=1';
 						}
 						
-						let params = 'asset_type=' + response.asset_type + '&asset_manufacturer=' + response.asset_manufacturer + '&asset_model=' + response.asset_model + '&profile_id=' + response.profile_id;
+						let params = 'asset_type=' + response.asset_type + 
+										'&asset_manufacturer=' + response.asset_manufacturer + 
+										'&asset_model=' + response.asset_model + 
+										'&asset_amount=' + response.asset_amount + 
+										'&profile_id=' + response.profile_id + 
+										'&is_product=' + response.is_product;
 						let url = "./asset_add.php?" + params + newParams;
 						
 						$(location).prop('href', url);
@@ -294,11 +351,16 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 
 
 		function loadAssetsTypes(selected_id = '') {
+			
+			
+			
 			$.ajax({
 				url: './get_assets_types.php',
 				method: 'POST',
 				data: {
-					cat_type: 1
+					cat_type: 1,
+					// is_product: is_product
+					is_product: $('#product_value').val()
 				},
 				dataType: 'json',
 			}).done(function(response) {
@@ -415,7 +477,7 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 		}
 
 
-		function reloadAssetModels(asset_type, field_to_update) {
+		function reloadAssetModels(asset_type, field_to_update, manufacturer = '') {
             var loading = $(".loading");
             $(document).ajaxStart(function() {
                 loading.show();
@@ -428,7 +490,8 @@ $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
                 url: './get_asset_type_models_with_specs.php',
                 method: 'POST',
                 data: {
-                    asset_type: asset_type
+                    asset_type: asset_type,
+					manufacturer: manufacturer
                 },
                 dataType: 'json',
             }).done(function(data) {

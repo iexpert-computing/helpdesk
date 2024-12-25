@@ -5,8 +5,10 @@ namespace OcomonApi\Controllers;
 use DateTime;
 use Exception;
 use OcomonApi\Models\Area;
+use OcomonApi\Models\File;
 use OcomonApi\Models\Unit;
 use OcomonApi\Models\User;
+use OcomonApi\Models\Entry;
 use OcomonApi\Models\Issue;
 use OcomonApi\Models\Client;
 use OcomonApi\Models\Config;
@@ -19,12 +21,16 @@ use OcomonApi\Models\Holiday;
 use OcomonApi\Models\Priority;
 use OcomonApi\Models\MsgConfig;
 use OcomonApi\Support\Worktime;
+use OcomonApi\Controllers\Files;
 use OcomonApi\Models\Department;
 use OcomonApi\Models\TicketStage;
 use OcomonApi\Models\AppsRegister;
 use CoffeeCode\Paginator\Paginator;
 use OcomonApi\Controllers\Holidays;
 use OcomonApi\Controllers\InputTags;
+use OcomonApi\Models\TicketsEmailReference;
+use OcomonApi\Models\UsersTicketNotice;
+use stdClass;
 
 class Tickets extends OcomonApi
 {
@@ -180,6 +186,7 @@ class Tickets extends OcomonApi
             $response['asset_tag'] = $ticket->equipamento;
             $response['asset_unit'] = $ticket->unit()->inst_nome ?? "";
             $response['open_by'] = $ticket->openedBy()->nome;
+            $response['registration_operator'] = $ticket->registrationOperator()->nome ?? "";
             $response['phone'] = $ticket->telefone;
             $response['contact_name'] = $ticket->contato;
             $response['contact_email'] = $ticket->contato_email;
@@ -219,18 +226,17 @@ class Tickets extends OcomonApi
             // $response['body_to_email'] = $this->bodyToEmail($ticket->numero, 'abertura-para-usuario');
 
 
-            // if ($ticket->files()) {
-            //     /** @var File $file */
-            //     foreach ($ticket->files() as $file) {
-            //         $responseFile['name'] = $file->data()->img_nome;
-            //         $responseFile['type'] = $file->data()->img_tipo;
-            //         $responseFile['size'] = $file->data()->img_size;
-            //         // $responseFile['bin'] = bin2hex($file->data()->img_bin);
-            //         $response['files'][] = $responseFile;
-            //     }
-            // }
+            if ($ticket->files()) {
+                /** @var File $file */
+                foreach ($ticket->files() as $file) {
+                    $responseFile['name'] = $file->data()->img_nome;
+                    $responseFile['type'] = $file->data()->img_tipo;
+                    $responseFile['size'] = $file->data()->img_size;
+                    // $responseFile['bin'] = bin2hex($file->data()->img_bin);
 
-
+                    $response['files'][] = $responseFile;
+                }
+            }
 
             $this->back($response);
             return;
@@ -668,6 +674,19 @@ class Tickets extends OcomonApi
     */
     public function create(array $data): Tickets
     {
+        
+        // return $this->call(
+        //     200,
+        //     "Testing",
+        //     "Testing"
+        // )->back([
+        //     // "data" => $data,
+        //     // "headers" => $this->headers,
+        //     "data" => $data,
+        //     "files" => $_FILES
+        // ]);
+
+        
         /** Checagem para saber se o método pode ser acessado para o app informado na conexao */
         $app = (new AppsRegister())->methodAllowedByApp($this->headers["app"], get_class($this), __FUNCTION__);
         if (!$app) {
@@ -700,8 +719,12 @@ class Tickets extends OcomonApi
         /** Descrição do chamado */
         $ticket->descricao = $data['description'];
 
+
+        /** Autor do registro */
+        $ticket->registration_operator = $this->user->data()->user_id;
+
         /** Aberto por */
-        $ticket->aberto_por = $this->user->data()->user_id;
+        $ticket->aberto_por = $data['requester'] ?? $this->user->data()->user_id;
 
 
         /** Tratamento para o cliente */
@@ -1010,15 +1033,32 @@ class Tickets extends OcomonApi
             /* Log de abertura */
             (new TicketLogs())->createFirst($ticket->data()->numero);
 
+
+            /* Arquivos anexos - índice `files[]`*/
+            if (!empty($_FILES)) {
+                $_FILES = array_filter($_FILES);
+                $countFiles = count($_FILES['files']['name']);
+
+                for ($i = 0; $i < $countFiles; $i++) {
+                    $file_data = [];
+                    $file_data['ticket'] = $ticket->data()->numero;
+                    $file_data['name'] = $_FILES['files']['name'][$i];
+                    $file_data['type'] = $_FILES['files']['type'][$i];
+                    $file_data['tmp_name'] = $_FILES['files']['tmp_name'][$i];
+                    $file_data['size'] = $_FILES['files']['size'][$i];
+                    $files = (new Files())->save($file_data);
+                }
+            }
+
             
         } else {
-            return $this->call(
+            $this->call(
                 400,
                 "invalid_data",
                 // $ticket->message()->getText()
                 "Houve algum problema durante a tentativa de registrar o chamado"
             )->back();
-            // return $this;
+            return $this;
             // return;
         }
 
@@ -1033,7 +1073,8 @@ class Tickets extends OcomonApi
             );
 
             if (!$mail->queue()) {
-                var_dump($mail->message()->getText());
+                // var_dump($mail->message()->getText());
+                $response['user_mail_error'] = $mail->message()->getText();
             }
         }
 
@@ -1048,12 +1089,123 @@ class Tickets extends OcomonApi
             );
 
             if (!$mail->queue()) {
-                var_dump($mail->message()->getText());
+                // var_dump($mail->message()->getText());
+                $response['area_mail_error'] = $mail->message()->getText();
             }
         }
-        
+
+
+        $response['ticket'] = $ticket->data();
+
+        if ($ticket->files()) {
+            /** @var File $file */
+            foreach ($ticket->files() as $file) {
+                $responseFile['name'] = $file->data()->img_nome;
+                $responseFile['type'] = $file->data()->img_tipo;
+                $responseFile['size'] = $file->data()->img_size;
+                // $responseFile['bin'] = bin2hex($file->data()->img_bin);
+
+                $response['files'][] = $responseFile;
+            }
+        }
+
         /** Retorno para a API */
-        return $this->back(["ticket" => $ticket->data()]);
+        // return $this->back(["ticket" => $ticket->data()]);
+        return $this->back($response);
         // return $this;
     }
+
+
+
+    public function comment(array $data): void
+    {
+        $data = filter_var_array($data, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+        $ticket = (new Ticket())->findById($data['ticket']);
+        if (!$ticket) {
+            $this->call(
+                400,
+                "invalid_data",
+                "Nenhum chamado encontrado"
+            )->back();
+            return;
+        }
+
+        if ($ticket->data()->status == 4) {
+            $this->call(
+                428,
+                "invalid_data",
+                "Este chamado não está aberto para receber comentários"
+            )->back(["code" => 428]);
+            return;
+        }
+
+        if (empty($data['comment'])) {
+            $this->call(
+                400,
+                "invalid_data",
+                "Nenhum comentário foi informado"
+            )->back();
+            return;
+        }
+
+        $entryAppendText = (array_key_exists('author', $data) && !empty($data['author']) ? "&nbsp;\n(<strong>Via {$this->user->data()->nome}</strong>)" : "");
+
+        $entry = (new Entry());
+
+        $entry->ocorrencia = $data['ticket'];
+        $entry->assentamento = htmlspecialchars($data['comment'], ENT_QUOTES) . $entryAppendText;
+        $entry->responsavel = $data['author'] ?? $this->user->data()->user_id;
+        $entry->tipo_assentamento = (!empty([$data['comment_type']]) ? $data['comment_type'] : 33);
+
+        if ($data['asset_privated'] == 1) {
+            $entry->asset_privated = 1;
+        }
+
+        if (!$entry->save()) {
+            $this->call(
+                400,
+                "invalid_data",
+                "Erro ao inserir o registro"
+            )->back();
+            return;
+        }
+        
+        $response['id'] = $entry->data()->numero;
+        $response['ticket'] = $entry->data()->ocorrencia;
+        $response['comment'] = $entry->data()->assentamento;
+        $response['comment_type'] = $entry->data()->tipo_assentamento;
+        $response['author'] = $entry->data()->responsavel;
+        $response['asset_privated'] = $entry->data()->asset_privated;
+
+        /* Gravação da notificação */
+        $ticketNotice = new UsersTicketNotice();
+        $ticketNotice->source_table = "assentamentos";
+        $ticketNotice->notice_id = $entry->data()->numero;
+        $ticketNotice->save();
+        /* Fim da Gravação da notificação */
+
+
+        /* Arquivos anexos - índice `files[]`*/
+        if (!empty($_FILES)) {
+            $_FILES = array_filter($_FILES);
+            $countFiles = count($_FILES['files']['name']);
+
+            for ($i = 0; $i < $countFiles; $i++) {
+                $file_data = [];
+                $file_data['ticket'] = $data['ticket'];
+                $file_data['name'] = $_FILES['files']['name'][$i];
+                $file_data['type'] = $_FILES['files']['type'][$i];
+                $file_data['tmp_name'] = $_FILES['files']['tmp_name'][$i];
+                $file_data['size'] = $_FILES['files']['size'][$i];
+                $files = (new Files())->save($file_data);
+            }
+        }
+
+
+
+        $this->back($response);
+        return;
+    }
+
 }

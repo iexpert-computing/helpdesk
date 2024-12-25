@@ -83,12 +83,20 @@ $columns = array(
 );
 
 // getting total number records without any search
-$sql = $QRY["ocorrencias_full_ini_count"] . " where stat_ignored <> 1 AND o.sistema IN ({$csvAreas}) AND s.stat_painel in(3) AND o.data_abertura > date_sub(CURRENT_DATE, INTERVAL {$months} month) ";
+$sql = $QRY["tickets_in_queues_count"] . " AND 
+            stat_ignored <> 1 AND 
+            o.sistema IN ({$csvAreas}) AND 
+            s.stat_painel in(3) AND 
+            o.data_abertura > date_sub(CURRENT_DATE, INTERVAL {$months} month) ";
 $sqlResult = $conn->query($sql);
 $totalData = $sqlResult->fetch()['total'];
-$totalFiltered = $totalData;  // when there is no search parameter then total number rows = total number filtered rows.
+$totalFiltered = $totalData;
 
-$sql = $QRY["ocorrencias_full_ini"] . " where stat_ignored <> 1 AND o.sistema IN ({$csvAreas}) AND s.stat_painel in(3) AND o.data_abertura > date_sub(CURRENT_DATE, INTERVAL {$months} month)";
+$sql = $QRY["tickets_in_queues"] . " AND 
+            stat_ignored <> 1 AND 
+            o.sistema IN ({$csvAreas}) AND 
+            s.stat_painel in(3) AND 
+            o.data_abertura > date_sub(CURRENT_DATE, INTERVAL {$months} month) ";
 
 if( !empty($requestData['search']['value']) ) {   // if there is a search parameter, $requestData['search']['value'] contains search parameter
 
@@ -166,6 +174,8 @@ foreach ($sqlResult->fetchAll() as $row){
     if (isset($row['cor_fonte']) && !empty($row['cor_fonte'])) {
         $cor_font = $row['cor_fonte'];
     }
+
+    $renderTicketStatus = "<span class='btn btn-sm text-wrap' style='color: " . $row['textcolor'] . "; background-color: " . ($row['bgcolor'] ?? '#FFFFFF') . "'>" . $row['chamado_status'] . "</span>";
 
     $referenceDate = (!empty($row['oco_real_open_date']) ? $row['oco_real_open_date'] : $row['data_abertura']);
     $dataAtendimento = $row['data_atendimento']; //data da primeira resposta ao chamado
@@ -247,9 +257,9 @@ foreach ($sqlResult->fetchAll() as $row){
 	$nestedData[] = $linkImg."&nbsp;".$row['problema'] . $tags;
     $nestedData[] = $clientName . $row['contato'] . $requesterArea;
     $nestedData[] = $departmentName . $texto;
-    $nestedData[] = "<b>" . $row['chamado_status'] . "</b>";
+    $nestedData[] = $renderTicketStatus;
     $nestedData[] = $colTVNew;
-    // $nestedData[] = "<span class='badge p-2' style='color: " . $cor_font . "; background-color: " . $COR . "'>" . $row['pr_descricao'] . "</span>";
+    // $nestedData[] = "<span class='btn btn-sm ' style='color: " . $cor_font . "; background-color: " . $COR . "'>" . $row['pr_descricao'] . "</span>";
     $nestedData[] = $renderedRate;
 
     $nestedData[] = "<img height='20' src='" . $imgsPath . "" . $ledSlaResposta . "' title='" . TRANS('HNT_RESPONSE_LED') . "'>&nbsp;<img height='20' src='" . $imgsPath . "" . $ledSlaSolucao . "' title='" . TRANS('HNT_SOLUTION_LED') . "'>";

@@ -76,6 +76,7 @@ $json3 = 0;
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
     <style>
         .chart-container {
@@ -88,7 +89,7 @@ $json3 = 0;
         }
     </style>
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -348,7 +349,7 @@ $json3 = 0;
                                 <thead>
                                     <tr class="header table-borderless">
                                         <td class="line"><?= mb_strtoupper(TRANS('COL_UNIT')); ?></td>
-                                        <td class="line"><?= mb_strtoupper(TRANS('ASSET_TAG')); ?></td>
+                                        <td class="line"><?= mb_strtoupper(TRANS('ASSET_TAG_TAG')); ?></td>
                                         <td class="line"><?= mb_strtoupper(TRANS('FIELD_LOCALIZATION')); ?></td>
                                         <td class="line"><?= mb_strtoupper(TRANS('COL_AMOUNT')); ?></td>
                                         <td class="line"><?= mb_strtoupper(TRANS('AREA')); ?></td>

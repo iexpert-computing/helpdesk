@@ -49,8 +49,9 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -60,6 +61,8 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 	</div>
 
 	<div id="divResult"></div>
+	<input type="hidden" name="label_close" id="label_close" value="<?= TRANS('BT_CLOSE'); ?>">
+	<input type="hidden" name="label_return" id="label_return" value="<?= TRANS('TXT_RETURN'); ?>">
 
 
 	<div class="container-fluid">
@@ -171,7 +174,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						<button type="submit" id="idSubmit" name="submit" class="btn btn-primary btn-block"><?= TRANS('BT_OK'); ?></button>
 					</div>
 					<div class="form-group col-12 col-md-2">
-						<button type="reset" class="btn btn-secondary btn-block close-or-return" ><?= TRANS('BT_CANCEL'); ?></button>
+						<button type="reset" id="close_details" class="btn btn-secondary btn-block" ><?= TRANS('BT_CANCEL'); ?></button>
 					</div>
 
 
@@ -208,7 +211,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						<button type="submit" id="idSubmit" name="submit" value="edit" class="btn btn-primary btn-block"><?= TRANS('BT_OK'); ?></button>
 					</div>
 					<div class="form-group col-12 col-md-2">
-						<button type="reset" class="btn btn-secondary btn-block close-or-return" ><?= TRANS('BT_CANCEL'); ?></button>
+						<button type="reset" id="close_details" class="btn btn-secondary btn-block" ><?= TRANS('BT_CANCEL'); ?></button>
 					</div>
 				</div>
 			</form>
@@ -237,7 +240,22 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 				}
 			});
 
-			closeOrReturn();
+			/* Identificar se a janela está sendo carregada em uma popup (iframe dentro de uma modal) */
+			if (isInIframe()) {
+				if (!isMainIframe()) {
+					$('#close_details').text($('#label_close').val()).on("click", function() {
+						window.parent.closeIframe();
+					});
+				} else {
+					$('#close_details').text($('#label_return').val()).on("click", function() {
+						window.history.back();
+					});
+				}
+			} else {
+				$('#close_details').text($('#label_return').val()).on("click", function() {
+					window.history.back();
+				});
+			}
 
             $('input, select, textarea').on('change', function() {
 				$(this).removeClass('is-invalid');
@@ -272,11 +290,19 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						$('input, select, textarea').removeClass('is-invalid');
 						$("#idSubmit").prop("disabled", false);
 						
-						if (isPopup()) {
+						if ((isInIframe() && !isMainIframe()) || isPopup()) {
 							if ($('#status_name').length > 0 && $('#status_name').val() != '') {
-								window.opener.loadClientsStatus();
+								if (!isMainIframe()) {
+									window.parent.loadClientsStatus();
+									window.parent.closeIframe();
+								} else {
+									window.opener.loadClientsStatus();
+									window.opener.closeIframe();
+								}
 							}
 						}
+
+
 						
 						var url = '<?= $_SERVER['PHP_SELF'] ?>';
 						$(location).prop('href', url);
@@ -330,21 +356,13 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 			return false;
 		}
 
-		function closeOrReturn (jumps = 1) {
-			buttonValue ();
-			$('.close-or-return').on('click', function(){
-				if (isPopup()) {
-					window.close();
-				} else {
-					window.history.back(jumps);
-				}
-			});
+		function isInIframe() {
+			return (window.location !== window.parent.location) ? true : false;
 		}
 
-		function buttonValue () {
-			if (isPopup()) {
-				$('.close-or-return').text('<?= TRANS('BT_CLOSE'); ?>');
-			}
+		function isMainIframe() {
+			var iframeParent = window.parent.document.getElementById('iframeMain');
+			return (iframeParent) ? true : false;
 		}
 	</script>
 </body>

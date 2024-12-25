@@ -330,7 +330,4 @@ try {
     $data['sql'] = $sql;
 }
 
-
-
-
 echo json_encode($data);

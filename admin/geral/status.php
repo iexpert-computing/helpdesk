@@ -48,9 +48,16 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
+
+	<style>
+		span.rotulo {
+			border: 1px solid gray;
+		}
+	</style>
 </head>
 
 <body>
@@ -86,21 +93,9 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 		];
 		// array_multisort($panels, SORT_LOCALE_STRING);
 
+		$status = (isset($_GET['cod']) ? getStatusById($conn, (int)$_GET['cod']) : getStatus($conn, 1));
 
-		$query = "SELECT S.*, STC.*  FROM `status`  as S left join status_categ as STC on S.stat_cat = STC.stc_cod ";
-		if (isset($_GET['cod'])) {
-			$query .= " WHERE S.stat_id = " . (int)$_GET['cod'] . " ";
-		}
-		$query .= " ORDER  BY S.status";
-		try {
-			$resultado = $conn->query($query);
-			
-		} catch (Exception $e) {
-			echo message('danger', 'Ooops!', $e->getMessage(), '');
-			return false;
-		}
-
-		$registros = $resultado->rowCount();
+		$registros = count($status);
 
 		if ((!isset($_GET['action'])) && !isset($_POST['submit'])) {
 
@@ -142,6 +137,9 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 							<td class="line painel"><?= TRANS("COL_PANEL"); ?></td>
 							<td class="line freeze"><?= TRANS("COL_TIME_FREEZE"); ?></td>
 							<td class="line freeze"><?= TRANS("COL_IGNORED"); ?></td>
+							<td class="line color"><?= TRANS('COL_BG_COLOR'); ?></td>
+							<td class="line color"><?= TRANS('FONT_COLOR'); ?></td>
+							<td class="line example"><?= TRANS('APPEARANCE'); ?></td>
 							<td class="line editar"><?= TRANS("BT_ALTER"); ?></td>
 							<td class="line remover"><?= TRANS("BT_REMOVE"); ?></td>
 						</tr>
@@ -149,7 +147,8 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 					<tbody>
 						<?php
 						
-						foreach ($resultado->fetchall() as $row) {
+						// foreach ($resultado->fetchall() as $row) {
+						foreach ($status as $row) {
 
 							$time_freeze = ($row['stat_time_freeze'] ? '<span class="text-success"><i class="fas fa-check"></i></span>' : '');
 							$ignored = ($row['stat_ignored'] ? '<span class="text-success"><i class="fas fa-check"></i></span>' : '');
@@ -161,6 +160,9 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 								<td class="line"><?= $panels[$row['stat_painel']]; ?></td>
 								<td class="line"><?= $time_freeze; ?></td>
 								<td class="line"><?= $ignored; ?></td>
+								<td class="line"><span class="badge" style="border: 1px solid gray; background: <?= $row['bgcolor']; ?>">&nbsp;&nbsp;&nbsp;</span></td>
+								<td class="line"><span class="badge" style="border: 1px solid gray; background: <?= $row['textcolor']; ?>">&nbsp;&nbsp;&nbsp;</span></td>
+								<td class="line"><span class="btn btn-sm cursor-no-event" style="background: <?= $row['bgcolor']; ?>; color: <?= $row['textcolor']; ?>"><?= $row['status']; ?></span></td>
 								<td class="line"><button type="button" class="btn btn-secondary btn-sm" onclick="redirect('<?= $_SERVER['PHP_SELF']; ?>?action=edit&cod=<?= $row['stat_id']; ?>')"><?= TRANS('BT_EDIT'); ?></button></td>
 								<td class="line"><button type="button" class="btn btn-danger btn-sm" onclick="confirmDeleteModal('<?= $row['stat_id']; ?>')"><?= TRANS('REMOVE'); ?></button></td>
 							</tr>
@@ -220,6 +222,20 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 							</div>
 						</div>
 
+						<label for="bgcolor" class="col-md-2 col-form-label text-md-right"><?= TRANS('COL_BG_COLOR'); ?></label>
+						<div class="form-group col-md-10">
+							<input type="color" class="form-control " id="bgcolor" name="bgcolor" value="#FFFFFF" />
+						</div>
+
+						<label for="textcolor" class="col-md-2 col-form-label text-md-right"><?= TRANS('FONT_COLOR'); ?></label>
+						<div class="form-group col-md-10">
+							<input type="color" class="form-control " id="textcolor" name="textcolor" value="#212529" />
+						</div>
+
+						<label for="sample" class="col-md-2 col-form-label text-md-right"><?= TRANS('APPEARANCE'); ?></label>
+						<div class="form-group col-md-10">
+							<span class="btn btn-sm cursor-no-event" style="color: #212529; background-color:#ffffff; ?>" id="appearance"><?= TRANS('SAMPLE'); ?></span>
+						</div>
 						
 
 						<label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('COL_TIME_FREEZE'); ?>"><?= TRANS('COL_TIME_FREEZE'); ?></label>
@@ -272,7 +288,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 
 		if ((isset($_GET['action']) && $_GET['action'] == "edit") && empty($_POST['submit'])) {
 
-			$row = $resultado->fetch();
+			$row = $status;
 			//These are hard status, it should not have its codes changed
 			if ($row['stat_id'] == 1 || $row['stat_id'] == 2 || $row['stat_id'] == 4) { 
 				$editable = "disabled";
@@ -330,6 +346,21 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 							?>
 						</select>
 					</div>
+
+					<label for="bgcolor" class="col-md-2 col-form-label text-md-right"><?= TRANS('COL_BG_COLOR'); ?></label>
+					<div class="form-group col-md-10">
+						<input type="color" class="form-control " id="bgcolor" name="bgcolor" value="<?= $row['bgcolor'] ?? '#ffffff'; ?>" required />
+                    </div>
+
+                    <label for="textcolor" class="col-md-2 col-form-label text-md-right"><?= TRANS('FONT_COLOR'); ?></label>
+					<div class="form-group col-md-10">
+						<input type="color" class="form-control " id="textcolor" name="textcolor" value="<?= $row['textcolor']; ?>" required />
+                    </div>
+
+					<label for="sample" class="col-md-2 col-form-label text-md-right"><?= TRANS('APPEARANCE'); ?></label>
+					<div class="form-group col-md-10">
+						<span class="btn btn-sm cursor-no-event" style="color: <?= $row['textcolor']; ?>; background-color: <?= $row['bgcolor'] ?? '#ffffff'; ?>" id="appearance"><?= TRANS('SAMPLE'); ?></span>
+                    </div>
 
 					<label class="col-md-2 col-form-label text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('COL_TIME_FREEZE'); ?>"><?= firstLetterUp(TRANS('COL_TIME_FREEZE')); ?></label>
 					<div class="form-group col-md-4 ">
@@ -401,6 +432,23 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 					"url": "../../includes/components/datatables/datatables.pt-br.json"
 				}
 			});
+
+			
+			if ($("#status").val() != '') {
+				$("#appearance").text($("#status").val());
+			}
+
+			$('#status').on('change', function() {
+				$("#appearance").text($(this).val());
+			});
+			
+			$("#bgcolor, #textcolor").on('change', function() {
+				$("#appearance").css({
+					"background-color": $("#bgcolor").val(),
+					"color": $("#textcolor").val()
+				}).text($("#status").val());
+			});
+
 
 			$(function() {
 				$('[data-toggle="popover"]').popover({

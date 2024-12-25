@@ -143,11 +143,17 @@ foreach ($tickets as $ticket) {
 
                     /* Assentamento - Comentário */
                     $sqlEntry = "INSERT INTO assentamentos 
-                                    (ocorrencia, assentamento, `data`, responsavel, tipo_assentamento) 
+                                    (ocorrencia, assentamento, created_at, responsavel, tipo_assentamento) 
                                     VALUES 
                                     (" . $row['numero'] . ", '{$entry}', NOW(), 0 , 13 )"; //tratar usuario 0 (zero) para ser do sistema
                     try {
                         $resultAssent = $conn->exec($sqlEntry);
+
+                        $notice_id = $conn->lastInsertId();
+                        // $ticketData = getTicketData($conn, $row['numero'], ['aberto_por']);
+                        // if ($_SESSION['s_uid'] != $ticketData['aberto_por']) {
+                        setUserTicketNotice($conn, 'assentamentos', $notice_id);
+                        // }
 
 
                         /* Arrays para a função recordLog */
@@ -162,8 +168,8 @@ foreach ($tickets as $ticket) {
                         /* A primeira entrada serve apenas para gravar a conclusão do status anterior ao encerramento */
                         $stopTimeStage = insert_ticket_stage($conn, $row['numero'], 'stop', 4);
 
-                        $startTimeStage = insert_ticket_stage($conn, $row['numero'], 'start', 4, date('Y-m-d H:i:s'));
-                        $stopTimeStage = insert_ticket_stage($conn, $row['numero'], 'stop', 4, date('Y-m-d H:i:s'));
+                        $startTimeStage = insert_ticket_stage($conn, $row['numero'], 'start', 4, null, date('Y-m-d H:i:s'));
+                        $stopTimeStage = insert_ticket_stage($conn, $row['numero'], 'stop', 4, null, date('Y-m-d H:i:s'));
                     }
                     catch (Exception $e) {
                         $exception .= "<hr>" . $e->getMessage();

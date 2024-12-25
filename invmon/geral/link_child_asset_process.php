@@ -56,7 +56,19 @@ $parent_info = getEquipmentInfo($conn, null, null, $data['parent_id']);
 
 $child_info = getEquipmentInfo($conn, $parent_info['comp_inst'], $data['child_tag']);
 
-/* Primeiro chego se o ativo filho existe para a mesma unidade do ativo pai */
+
+/* Primeiro checo se o ativo filho não é um recurso - Recursos não podem ser vinculados a outros ativos */
+if (!empty($child_info) && $child_info['is_product'] == 1) {
+    $data['success'] = false;
+    $data['message'] = message('warning', '', TRANS('MSG_CANT_ASSIGN_RESOURCE'), '', '');
+    $data['field_id'] = 'child_tag';
+    echo json_encode($data);
+    return false;
+}
+
+
+
+/* Checo se o ativo filho existe para a mesma unidade do ativo pai */
 if (empty($child_info)) {
     $data['success'] = false;
     $data['message'] = message('warning', '', TRANS('MSG_ASSET_NOT_FOUND_IN_PARENT_UNIT'), '', '');
@@ -85,6 +97,27 @@ if ($hasParent) {
 }
 
 
+/* Checo se o ativo da etiqueta fornecida não está alocado a um usuário - Se estiver, não poderá ser vinculado a um ativo pai */
+$sql = "SELECT * FROM users_x_assets WHERE asset_id = {$child_info['comp_cod']} AND is_current = 1";
+try {
+    $res = $conn->prepare($sql);
+    $res->execute();
+    if ($res->rowCount()) {
+        $data['success'] = false;
+        $data['message'] = message('warning', '', TRANS('MSG_THIS_ASSET_ASSIGNED_TO_USER'), '', '');
+        $data['field_id'] = 'child_tag';
+        echo json_encode($data);
+        return false;
+    }
+} catch (\PDOException $e) {
+    $data['success'] = false;
+    $data['message'] = message('warning', '', $e->getMessage(), '');
+    $data['field_id'] = 'child_tag';
+    echo json_encode($data);
+    return false;
+}
+
+
 /* Não existindo nenhum restrição, realizo a vinculação */
 $sql = "UPDATE assets_x_specs 
         SET
@@ -92,7 +125,18 @@ $sql = "UPDATE assets_x_specs
         WHERE 
             asset_id = :parent_id AND 
             asset_spec_id = :child_model AND
-            asset_spec_tagged_id IS NULL
+            asset_spec_tagged_id IS NULL AND
+            -- necessario pois há casos de mais de uma especificacao igual e com tag nula
+            id = (
+                SELECT 
+                    MIN(id) 
+                FROM 
+                    assets_x_specs 
+                WHERE 
+                    asset_id = :parent_id AND 
+                    asset_spec_id = :child_model AND 
+                    asset_spec_tagged_id IS NULL
+            )
             ";
 try {
     $stmt = $conn->prepare($sql);

@@ -19,6 +19,14 @@
   */
         session_start();
 
+        require_once __DIR__ . "/" . "../functions/dbFunctions.php";
+        require_once __DIR__ . "/" . "../config.inc.php";
+        require_once __DIR__ . "/" . "../classes/ConnectPDO.php";
+        use includes\classes\ConnectPDO;
+        $conn = ConnectPDO::getInstance();
+
+        $configs = getConfigValues($conn);
+
         unset($_SESSION);
         if (ini_get("session.use_cookies")) {
             $params = session_get_cookie_params();
@@ -26,6 +34,12 @@
         }
 
         session_destroy();
+
+
+        if ($configs['AUTH_TYPE'] == "OIDC") {
+            header("Location: {$configs['OIDC_LOGOUT_URL']}");
+            exit;
+        }
 
         echo "<script>top.window.location = '../../login.php'</script>";
         header("Location: ../../login.php");

@@ -16,7 +16,7 @@ class Solutions extends OcomonApi
     public function read(array $data): void
     {
 
-        var_dump($data);
+        // var_dump($data);
         
         if (empty($data['numero'])) {
             $this->call(

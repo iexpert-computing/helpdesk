@@ -44,7 +44,7 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 1);
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 	<style>
 		hr.thick {
 			border: 1px solid;
@@ -83,13 +83,16 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 1);
 		//Quantidade de palavras digitadas
 		$termos = explode("%", $probA);
 		$termos = array_unique($termos);
-		reIndexArray($termos);
+		// reIndexArray($termos);
+		$termos = array_values($termos);
 
 		$destacaProb = $probA . "%" . $probB; //TODOS OS TERMOS COM OU SEM FORMATAÇÃO HTML
 		$palavrasA = explode("%", $destacaProb);
 		$palavrasA = array_unique($palavrasA); //RETIRA OS ELEMENTOS REPETIDOS (DISTINGUE AS FORMAÇÕES HTML)
 
-		reIndexArray($palavrasA);
+		// reIndexArray($palavrasA);
+
+		$palavrasA = array_values($palavrasA);
 
 		// if (isset($post['anyword']) || (count($termos) == 1)) {
 		if (isset($post['anyword'])) {
@@ -268,7 +271,8 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 1);
 						}
 					}
 				}
-				reIndexArray($achou);
+				// reIndexArray($achou);
+				$achou = array_values($achou);
 				if (count($achou) < count($termos)) { //Não achou o termo
 					$totalE++;
 				}
@@ -330,7 +334,8 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 1);
 					$achou = array_unique($achou);
 				}
 			}
-			reIndexArray($achou);
+			// reIndexArray($achou);
+			$achou = array_values($achou);
 
 			if ((isset($post['anyword'])) || (!isset($post['anyword']) && (count($achou) >= count($termos) && count($termos) == 1)) || (!isset($post['anyword']) && (count($achou) == count($termos) && count($termos) > 1))) {
 

@@ -47,8 +47,9 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 2);
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -116,7 +117,7 @@ if (!$hasChanges) {
     <h6><?= TRANS('CLIENT'); ?>: <?= getUnits($conn, null, $row['cod_inst'])['nickname']; ?></h6>
     <h6><?= TRANS('COL_UNIT'); ?>: <?= $row['instituicao']; ?></h6>
     <h6><?= TRANS('DEPARTMENT'); ?>: <?= $row['local']; ?></h6>
-    <h6><?= TRANS('ASSET_TAG'); ?>: <?= $row['etiqueta']; ?></h6><br/>
+    <h6><?= TRANS('ASSET_TAG_TAG'); ?>: <?= $row['etiqueta']; ?></h6><br/>
 
     <table id="table_lists" class="stripe hover order-column row-border" border="0" cellspacing="0" width="100%">
 
@@ -141,7 +142,7 @@ if (!$hasChanges) {
         ?>
         <tr>
             <td class="line"><?= $i; ?></td>
-            <td class="line"><?= $change['local'] . " " . $currentLocation ?></td>
+            <td class="line"><?= $change['local'] . " (".$change['unidade'].") " . $currentLocation ?></td>
             <td class="line" data-sort="<?= $change['hist_data']; ?>"><?= dateScreen($change['hist_data']); ?></td>
             <td class="line"><?= $change['nome']; ?></td>
         </tr>

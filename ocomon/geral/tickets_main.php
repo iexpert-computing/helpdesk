@@ -33,8 +33,7 @@ $conn = ConnectPDO::getInstance();
 $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 1);
 
 $_SESSION['s_page_ocomon'] = $_SERVER['PHP_SELF'];
-// $_SESSION['s_app'] = "tickets_main";
-
+$_SESSION['s_page_home'] = $_SERVER['PHP_SELF'];
 
 $imgsPath = "../../includes/imgs/";
 
@@ -53,7 +52,9 @@ $imgsPath = "../../includes/imgs/";
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/Responsive-2.2.5/css/responsive.dataTables-custom.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/util.css" />
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
+
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <style>
         .table_lines {
@@ -88,7 +89,7 @@ $imgsPath = "../../includes/imgs/";
             </div>
         </div>
 
-        <div id="divCards" class="mt-2">
+        <div id="divCards" class="top-cards mt-2">
 
             <div class="row no-gutters">
                 <div class="col-md-2">
@@ -156,7 +157,6 @@ $imgsPath = "../../includes/imgs/";
             <div class="accordion" id="accordionAgendados">
                 <div class="card">
                     <div class="card-header bg-oc-teal" id="showAgendados">
-                        <!-- style="background-color: teal;" -->
                         <button id="idBtnAgendados" class="btn btn-block text-center text-white" type="button" data-toggle="collapse" data-target="#listagemAgendados" aria-expanded="true" aria-controls="listagemAgendados" onclick="this.blur();">
                             <h4><i class="fas fa-calendar-alt"></i>&nbsp;<?= TRANS('QUEUE_SCHEDULED'); ?>&nbsp;<span id="idTotalAgendados" class="badge badge-light"></span></h4>
                         </button>
@@ -458,6 +458,8 @@ $imgsPath = "../../includes/imgs/";
 
             /* CARREGA A FILA GERAL DE CHAMADOS */
             if ($('#table_my_queued').length > 0) {
+
+                $('#idLoad').show();
                 var dataTableMyQueued = $('#table_my_queued').DataTable({
                     "responsive": {
                         details: {
@@ -502,7 +504,7 @@ $imgsPath = "../../includes/imgs/";
                         {
                             /* Quebra de linha da coluna de tipo de solicitacao */
                             className: 'text-wrap line-height pointer',
-                            targets: 'problema'
+                            targets: ['problema', 'contato']
                         },
                         {
                             // targets: [6, 7, 8],
@@ -557,6 +559,7 @@ $imgsPath = "../../includes/imgs/";
                         type: "post",
 
                         "dataSrc": function(json) { //aqui consigo trabalhar no response
+                            $('#idLoad').hide();
                             if (json.recordsTotal == 0) {
                                 $("#listagemFilaGeral").collapse('hide');
                                 $("#idBtnFilaGeral").attr('data-toggle', '');

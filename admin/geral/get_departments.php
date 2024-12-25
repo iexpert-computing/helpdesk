@@ -38,18 +38,23 @@ if (isset($_SESSION['s_area_admin']) && $_SESSION['s_area_admin'] == '1' && $_SE
     $areaAdmin = 1;
 }
 
-$departments = [];
 
-$terms = "";
-if (isset($post['client'])) {
-    $departments = getDepartments($conn, null, null, null, $post['client']);
-} 
-
-if (!isset($post['client']) || $post['level'] == "") {
-    $data['']['department'] = TRANS('SEL_LEVEL_FIRST');
+if ((!isset($post['client']) || $post['client'] == '') && isset($post['origin']) && !empty($post['origin'])) {
+    $data['']['department'] = TRANS('SEL_CLIENT_FIRST');
     echo json_encode($data);
     return false;
 }
+
+
+$departments = [];
+
+$terms = "";
+if (isset($post['client']) && !empty($post['client'])) {
+    $departments = getDepartments($conn, null, null, null, $post['client']);
+} else {
+    $departments = getDepartments($conn, null, null, null, null);
+} 
+
 
 
 $data = $departments;

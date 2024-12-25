@@ -33,9 +33,7 @@ $conn = ConnectPDO::getInstance();
 $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 2);
 
 $post = $_POST;
-
-// var_dump($post); exit;
-
+$now = date('Y-m-d H:i:s');
 
 $config = getConfig($conn);
 
@@ -52,6 +50,7 @@ catch (Exception $e) {
 
 $exception = "";
 $screenNotification = "";
+$need_serial = false;
 $data = [];
 $data['success'] = true;
 $data['message'] = "";
@@ -61,15 +60,245 @@ $data['field_id'] = "";
 $data['profile_id'] = (isset($post['profile_id']) ? noHtml($post['profile_id']) : "");
 
 
+$data['client'] = (isset($post['client']) ? noHtml($post['client']) : "");
+$data['asset_unit'] = (isset($post['asset_unit']) ? noHtml($post['asset_unit']) : "");
+if ($data['action'] != 'delete' && empty($data['asset_unit'])) {
+    $data = [];
+    $data['success'] = false; 
+    $data['field_id'] = 'asset_unit';
+    $data['message'] = message('warning', 'Ooops!', TRANS('MSG_EMPTY_DATA'),'');
+    echo json_encode($data);
+    return false;
+}
+
+/* Quantidade máxima de registros por vez no cadastro em lote. Criar uma opção de configuração no painel de administração */
+$maxAmountEachTime = getConfigValue($conn, 'MAX_AMOUNT_BATCH_ASSETS_RECORD');
+if (!isset($maxAmountEachTime)) {
+    setConfigValue($conn, 'MAX_AMOUNT_BATCH_ASSETS_RECORD', 1);
+    $maxAmountEachTime = 1;
+}
+
+
+
+/* Validar se o asset_amount é um número */
+if ($data['action'] == 'new' && (!isset($post['asset_amount']) || empty($post['asset_amount']) || !filter_var($post['asset_amount'], FILTER_VALIDATE_INT) || $post['asset_amount'] <= 0)) {
+    $data['success'] = false; 
+    $data['field_id'] = 'asset_amount';
+    $data['message'] = message('warning', 'Ooops!', TRANS('MSG_ERROR_WRONG_VALUE'),'');
+    echo json_encode($data);
+    return false;
+}
+
+
+$data['asset_amount'] = 1;
+$data['asset_tags'] = [];
+$data['serial_numbers'] = [];
+$data['asset_tags_and_serials'] = [];
+if ($data['action'] == 'new') {
+    $data['asset_amount'] = ($post['asset_amount'] > $maxAmountEachTime ? $maxAmountEachTime : (int)$post['asset_amount']);
+    $data['asset_tags'] = (isset($post['asset_tags']) && !empty($post['asset_tags']) ? noHtml($post['asset_tags']) : []);
+    $data['serial_numbers'] = (isset($post['serial_numbers']) && !empty($post['serial_numbers']) ? noHtml($post['serial_numbers']) : []);
+}
+
+$data['asset_tag'] = (isset($post['asset_tag']) && !empty($post['asset_tag']) ? noHtml($post['asset_tag']) : "");
+$data['serial_number'] = (isset($post['serial_number']) && !empty($post['serial_number']) ? noHtml($post['serial_number']) : "");
+$data['model'] = (isset($post['model']) && !empty($post['model']) ? (int)$post['model'] : "");
+$data['is_product'] = (isset($post['is_product']) && !empty($post['is_product']) ? (int)$post['is_product'] : 0);
+
+
+
+if ($data['asset_amount'] > 1) {
+    
+    $data['is_product'] = 0;
+    /* Checagem das etiquetas fornecidas */
+    if (empty($data['asset_tags'])) {
+        $data['success'] = false; 
+        $data['message'] = message('warning', 'Ooops!', TRANS('NUMBER_OF_TAGS_DOESNT_MATCH'),'');
+        echo json_encode($data);
+        return false;
+    }
+    
+    $tags = explode(",", $data['asset_tags']);
+    $tags = array_map("trim", $tags);
+    $tags = array_map("noHtml", $tags);
+    $tags = array_unique($tags);
+    
+    if (count($tags) != $data['asset_amount']) {
+        $data = [];
+        $data['success'] = false; 
+        $data['message'] = message('warning', 'Ooops!', TRANS('NUMBER_OF_TAGS_DOESNT_MATCH'),'');
+        echo json_encode($data);
+        return false;
+    } 
+    
+    /* Verificar se alguma das tags informadas já existe no sistema */
+    $txtTags = implode("','", $tags);
+    $sql = "SELECT 
+                comp_inv
+            FROM
+                equipamentos
+            WHERE
+                comp_inv IN ('{$txtTags}') AND
+                comp_inst = {$data['asset_unit']}
+                ";
+    try {
+        $result = $conn->query($sql);
+        if ($result->rowCount() > 0) {
+
+            $row = $result->fetchAll();
+            $repeatedTags = [];
+
+            foreach ($row as $key => $value) {
+                $repeatedTags[] = $value['comp_inv'];
+            }
+
+            $repeatedTagsText = implode(",", $repeatedTags);
+            $repeatedTagsText = str_replace(",", ", ", $repeatedTagsText);
+
+            $data = [];
+            $data['success'] = false; 
+            $data['message'] = message('warning', 'Ooops!', TRANS('AT_LEAST_ONE_TAG_ALREADY_EXISTS') . '<hr />' . $repeatedTagsText,'');
+            echo json_encode($data);
+            return false;
+        }
+    }
+    catch (Exception $e) {
+        $data = [];
+        $data['success'] = false; 
+        $data['message'] = message('warning', 'Ooops!', $e->getMessage(),'');
+        echo json_encode($data);
+        return false;
+    }
+
+
+    /* Conferir também na tabela de estoque (bases antigas) */
+    $sql = "SELECT 
+                estoq_tag_inv 
+            FROM 
+                estoque 
+            WHERE 
+                estoq_tag_inv IN ('{$txtTags}') AND 
+                estoq_tag_inst = {$data['asset_unit']} 
+            ";
+    try {
+        $result = $conn->query($sql);
+        if ($result->rowCount() > 0) {
+
+            $row = $result->fetchAll();
+            $repeatedTags = [];
+
+            foreach ($row as $key => $value) {
+                $repeatedTags[] = $value['comp_inv'];
+            }
+
+            $repeatedTagsText = implode(",", $repeatedTags);
+            $repeatedTagsText = str_replace(",", ", ", $repeatedTagsText);
+
+
+            $data = [];
+            $data['success'] = false; 
+            $data['message'] = message('warning', 'Ooops!', TRANS('AT_LEAST_ONE_TAG_ALREADY_EXISTS') . '<hr />' . $repeatedTagsText,'');
+            echo json_encode($data);
+            return false;
+        }
+    }
+    catch (Exception $e) {
+        $data = [];
+        $data['success'] = false; 
+        $data['message'] = message('warning', 'Ooops!', $e->getMessage(),'');
+        echo json_encode($data);
+        return false;
+    }
+
+    $data['asset_tags'] = $tags;
+
+
+
+
+
+
+    /* Checagem dos números de série fornecidos */
+    // if (empty($data['serial_numbers'])) {
+    //     $data['success'] = false; 
+    //     $data['message'] = message('warning', 'Ooops!', TRANS('NUMBER_OF_SERIALS_DOESNT_MATCH'),'');
+    //     echo json_encode($data);
+    //     return false;
+    // }
+    
+    if (!empty($data['serial_numbers'])) {
+        $serials = explode(",", $data['serial_numbers']);
+        $serials = array_map("trim", $serials);
+        $serials = array_map("noHtml", $serials);
+        $serials = array_unique($serials);
+        
+        if (count($serials) != $data['asset_amount']) {
+            $data = [];
+            $data['success'] = false; 
+            $data['message'] = message('warning', 'Ooops!', TRANS('NUMBER_OF_SERIALS_DOESNT_MATCH'),'');
+            echo json_encode($data);
+            return false;
+        } 
+        
+        /* Verificar se algum dos seriais informados já existe para o mesmo modelo de ativo no sistema */
+        $txtSerials = implode("','", $serials);
+    
+        $sql = "SELECT comp_cod FROM equipamentos WHERE comp_marca = '" . $data['model'] . "' 
+                    AND comp_sn IN ('{$txtSerials}') ";
+        try {
+            $result = $conn->query($sql);
+            if ($result->rowCount() > 0) {
+    
+                $row = $result->fetchAll();
+                $repeatedSerials = [];
+    
+                foreach ($row as $key => $value) {
+                    $repeatedSerials[] = $value['comp_inv'];
+                }
+    
+                $repeatedSerialsText = implode(",", $repeatedSerials);
+                $repeatedSerialsText = str_replace(",", ", ", $repeatedSerialsText);
+    
+                $data = [];
+                $data['success'] = false; 
+                $data['message'] = message('warning', 'Ooops!', TRANS('AT_LEAST_ONE_SERIAL_ALREADY_EXISTS') . '<hr />' . $repeatedSerialsText,'');
+                echo json_encode($data);
+                return false;
+            }
+        }
+        catch (Exception $e) {
+            $data = [];
+            $data['success'] = false; 
+            $data['message'] = message('warning', 'Ooops!', $e->getMessage(),'');
+            echo json_encode($data);
+            return false;
+        }
+    
+        $data['serial_numbers'] = $serials;
+
+        $data['asset_tags_and_serials'] = array_combine($data['asset_tags'], $data['serial_numbers']);
+
+    } else {
+        foreach ($data['asset_tags'] as $key => $value) {
+            $data['asset_tags_and_serials'][$value] = "";
+        }
+    }
+
+
+} else {
+    $data['asset_tags'][] = $data['asset_tag'];
+    $data['serial_numbers'][] = $data['serial_number'];
+    $data['asset_tags_and_serials'] = array_combine($data['asset_tags'], $data['serial_numbers']);
+}
+
+
+
 /* Campos comuns a todos os tipos de ativos */
 $data['asset_type'] = (isset($post['asset_type']) ? noHtml($post['asset_type']) : "");    
 $data['manufacturer'] = (isset($post['manufacturer']) ? noHtml($post['manufacturer']) : "");
-$data['model'] = (isset($post['model']) ? noHtml($post['model']) : "");
-$data['client'] = (isset($post['client']) ? noHtml($post['client']) : "");
-$data['asset_unit'] = (isset($post['asset_unit']) ? noHtml($post['asset_unit']) : "");
-$data['asset_tag'] = (isset($post['asset_tag']) ? noHtml($post['asset_tag']) : "");
+// $data['model'] = (isset($post['model']) ? noHtml($post['model']) : "");
+
 $data['department'] = (isset($post['department']) ? noHtml($post['department']) : "");
-$data['serial_number'] = (isset($post['serial_number']) ? noHtml($post['serial_number']) : "");
+// $data['serial_number'] = (isset($post['serial_number']) ? noHtml($post['serial_number']) : "");
 $data['part_number'] = (isset($post['part_number']) ? noHtml($post['part_number']) : "");
 $data['net_name'] = (isset($post['net_name']) && !empty($post['net_name']) ? str_slug($post['net_name']) : "");
 $data['invoice_number'] = (isset($post['invoice_number']) ? noHtml($post['invoice_number']) : "");
@@ -157,6 +386,17 @@ if ($data['action'] == "new" || $data['action'] == "edit") {
         $required_fields = setBasicRequired();
     }
 
+
+    /* Cadastro em lote */
+    if ($data['asset_amount'] > 1 && $data['action'] == "new") {
+        unset($required_fields['asset_tag']);
+
+        if (isset($required_fields['serial_number']) && $required_fields['serial_number'] == 1) {
+            $need_serial = true;
+        }
+        unset($required_fields['serial_number']);
+    }
+
     /* Validação dos campos obrigatórios */
     $fields_names = [];
     $fields_names['asset_unit'] = TRANS('COL_UNIT');
@@ -174,13 +414,20 @@ if ($data['action'] == "new" || $data['action'] == "edit") {
         }
     }
 
+    if ($need_serial && empty($data['serial_numbers'])) {
+        $data['success'] = false;
+        $data['message'] = message('warning', '', TRANS('MSG_EMPTY_DATA') . '<hr />' . TRANS('SERIAL_NUMBERS'), '');
+        $data['field_id'] = "serial_numbers";
+    }
+
+
     if ($data['success'] == false) {
         echo json_encode($data);
         return false;
     }
 
 
-    if (strpos($data['asset_tag'], " ")) {
+    if (!empty($data['asset_tag']) && strpos($data['asset_tag'], " ")) {
         $data['success'] = false; 
         $data['field_id'] = "asset_tag";
 
@@ -207,6 +454,11 @@ if ($data['action'] == "new" || $data['action'] == "edit") {
         }
     }
 
+
+
+
+    /* Neste caso, não é cadastro em lote */
+    if (!empty($data['asset_tag'])) {
     /* Checagem da etiqueta e unidade para equipamentos existentes - VER PARA CONSIDERAR O CLIENTE */
     $terms = ($data['action'] == "edit" ? " AND comp_cod <> '" . $data['cod'] . "' " : "");
     $sql = "SELECT comp_cod FROM equipamentos WHERE 
@@ -234,7 +486,9 @@ if ($data['action'] == "new" || $data['action'] == "edit") {
         return false;
     }
 
+    }
 
+    
     if ($data['price'] != "" && $data['price'] != 0 && !filter_var($data['price'], FILTER_VALIDATE_FLOAT)) {
         $data['success'] = false; 
         $data['field_id'] = "price";
@@ -263,7 +517,7 @@ $fields_ids = [];
 /* No caso de cadastro, restringe aos campos extras existentes no perfil de cadastro */
 if ($profile_fields['field_custom_ids'] || $data['action'] != 'new') {
     
-    $fields_ids = ($profile_fields['field_custom_ids'] ? explode(',', $profile_fields['field_custom_ids']) : []);
+    $fields_ids = ($profile_fields['field_custom_ids'] ? explode(',', (string)$profile_fields['field_custom_ids']) : []);
     
     $cfields = getCustomFields($conn, null, 'equipamentos');
     
@@ -290,7 +544,7 @@ if ($profile_fields['field_custom_ids'] || $data['action'] != 'new') {
             /* Controle de acordo com a opção global conf_cfield_only_opened */
             if (($data['action'] == 'new' || !empty($field_value['field_id'])) && $data['action'] != 'delete') {
 
-                if (empty($post[$cfield['field_name']]) && $cfield['field_required']) {
+                if (empty($post[$cfield['field_name']]) && $cfield['field_required'] && $data['asset_amount'] == 1) {
                     $data['success'] = false;
                     $data['field_id'] = $cfield['field_name'];
                     $data['message'] = message('warning', '', TRANS('MSG_EMPTY_DATA'), '');
@@ -340,7 +594,11 @@ if ($profile_fields['field_custom_ids'] || $data['action'] != 'new') {
 
 
 /* Checagens para upload de arquivos - vale para todos os actions */
+if ($data['asset_amount'] > 1 && $data['action'] == "new") {
+    $totalFiles = 0;
+} else
 $totalFiles = ($_FILES ? count($_FILES['anexo']['name']) : 0);
+
 $filesClean = [];
 if ($totalFiles > $config['conf_qtd_max_anexos']) {
 
@@ -403,7 +661,13 @@ if ($data['action'] == "new") {
         return false;
     }
 
+    /* Date with microseconds */
+    $now_microtime = DateTime::createFromFormat('U.u', microtime(true));
+    $batch_id = (count($data['asset_tags']) > 1 ? $now_microtime->format("YmdHis.u") : null);
+    $has_virtual_tag = 0;
 
+    foreach ($data['asset_tags'] as $asset_tag) {
+    
     $beforeValues = [];
 
 	$sql = "INSERT INTO equipamentos 
@@ -417,20 +681,29 @@ if ($data['action'] == "new") {
             comp_ccusto, comp_situac, 
             comp_tipo_garant, comp_garant_meses, 
             comp_assist, comp_coment, 
-            comp_data
+            comp_data,
+            is_product,
+            batch_id,
+            has_virtual_tag
         )
 		VALUES 
         (
             {$data['asset_type']}, {$data['manufacturer']}, {$data['model']}, 
-            {$data['asset_unit']}, {$data['department']}, '{$data['asset_tag']}', 
+                {$data['asset_unit']}, {$data['department']}, 
+                -- '{$data['asset_tag']}',
+                '{$asset_tag}',
             " . dbField($data['net_name'], 'text') . ", 
-            " . dbField($data['serial_number'], 'text') . ", " . dbField($data['part_number'], 'text') . ", 
+            " . dbField($data['asset_tags_and_serials'][$asset_tag], 'text') . ", 
+            " . dbField($data['part_number'], 'text') . ", 
             " . dbField($data['invoice_number'], 'text') . ", " . dbField($data['supplier']) . ", 
             " . dbField($data['price'], 'float') . ", " . dbField($data['buy_date'], 'date') . ", 
             " . dbField($data['cost_center']) . ", " . dbField($data['situation']) . ",  
             " . dbField($data['warranty_type']) . ", " . dbField($data['warranty_time']) . ",   
             " . dbField($data['assistance_type']) . ", " . dbField($data['extra_info'], 'text') . ", 
-            NOW()
+            '{$now}',
+            " . dbField($data['is_product']) . ", 
+            " . dbField($batch_id, 'text') . ", 
+            {$has_virtual_tag}
         )";
 		
     try {
@@ -438,14 +711,11 @@ if ($data['action'] == "new") {
         $data['success'] = true; 
         $data['cod'] = $conn->lastInsertId();
 
-
-
-
         /* Inserção dos campos de especificação - Gravar em assets_x_specs */
         $spec_fields_ids = [];
         
         if ($profile_fields['field_specs_ids']) {
-            $spec_fields_ids = ($profile_fields['field_specs_ids'] ? explode(',', $profile_fields['field_specs_ids']) : []);
+            $spec_fields_ids = ($profile_fields['field_specs_ids'] ? explode(',', (string)$profile_fields['field_specs_ids']) : []);
         }
 
         if ($spec_fields_ids) {
@@ -459,6 +729,7 @@ if ($data['action'] == "new") {
                     foreach ($post[$spec_field_name] as $field) {
                         
                         if (!empty($field)) {
+                            
                             $sql = "INSERT INTO assets_x_specs 
                             (
                                 asset_id, asset_spec_id
@@ -470,14 +741,18 @@ if ($data['action'] == "new") {
                         
                             try {
                                 $conn->exec($sql);
+
+
                             } catch (Exception $e) {
-                                $exception .= '<hr />' . $e->getMessage();
+                                        $exception .= '<hr />' . $e->getMessage() . '<hr />' . $sql;
                             }
                         }
                     }
                 }
             }
         }
+
+
 
 
 
@@ -503,7 +778,7 @@ if ($data['action'] == "new") {
 
 
                     } catch (Exception $e) {
-                        $exception .= '<hr />' . $e->getMessage();
+                            $exception .= '<hr />' . $e->getMessage() . '<hr />' . $sql;
                     }
                 }
             }
@@ -587,7 +862,7 @@ if ($data['action'] == "new") {
 
                 }
                 catch (Exception $e) {
-                    $exception .= "<hr>" . $e->getMessage();
+                        $exception .= "<hr>" . $e->getMessage() . '<hr />' . $sql;
                 }
             }
         }
@@ -597,16 +872,21 @@ if ($data['action'] == "new") {
             $exception = '<hr />' .TRANS('MSG_ERROR_IN_LOGGING_NEW_DEPARTMENT');
         }
 
+
         $data['message'] = TRANS('MSG_SUCCESS_INSERT') . $exception;
+            if (count($data['asset_tags']) > 1) {
+                $data['message'] = TRANS('BATCH_RECORD_SUCCESSFULLY_ADDED') . $exception;
+            }
         
     } catch (Exception $e) {
-        $exception .= $e->getMessage();
+            $exception .= $e->getMessage() . '<hr />' . $sql;
         
         $data['success'] = false; 
         $data['message'] = TRANS('MSG_ERR_SAVE_RECORD') . $exception;
         $_SESSION['flash'] = message('danger', '', $data['message'], '');
         echo json_encode($data);
         return false;
+    }
     }
 
 } elseif ($data['action'] == 'edit') {
@@ -625,8 +905,15 @@ if ($data['action'] == "new") {
     $res = $conn->query($sql);
     $oldData = $res->fetch();
 
-    /* Se o ativo for filho - não posso deixar alterar a unidade e o departmento */
-    if (assetHasParent($conn, $data['cod'])) {
+
+    /* Informações sobre alocação do ativo para algum usuário */
+    $locatorInfo = getUserFromAssetId ($conn, $data['cod']);
+    $isAlocated = (!empty($locatorInfo) ? true : false);
+
+
+    /* Se o ativo for filho ou alocado para algum usuário - não posso deixar alterar a etiqueta, unidade e o departmento */
+    if (assetHasParent($conn, $data['cod']) || $isAlocated) {
+        $data['asset_tag'] = $oldData['comp_inv'];
         $data['asset_unit'] = $oldData['comp_inst'];
         $data['department'] = $oldData['comp_local'];
     }
@@ -685,7 +972,7 @@ if ($data['action'] == "new") {
             $conn->exec($sqlDel);
         }
         catch (Exception $e) {
-            $exception .= "<hr>" . $e->getMessage();
+            $exception .= "<hr>" . $e->getMessage() . '<hr />' . $sql;
         }
 
         /* Novas Especificações */
@@ -704,7 +991,7 @@ if ($data['action'] == "new") {
 
                             }
                             catch (Exception $e) {
-                                $exception .= "<hr>" . $e->getMessage();
+                                $exception .= "<hr>" . $e->getMessage() . '<hr />' . $sql;
                             }
                         }
                     }
@@ -733,7 +1020,7 @@ if ($data['action'] == "new") {
                         $conn->exec($sql);
 
                     } catch (Exception $e) {
-                        $exception .= '<hr />' . $e->getMessage();
+                        $exception .= '<hr />' . $e->getMessage() . '<hr />' . $sql;
                     }
                 }
             }
@@ -1164,6 +1451,18 @@ if ($data['action'] == "new") {
     $unit = $equipmentInfo['comp_inst'];
 
 
+    /* Checa se está vinculado a algum usuário */
+    $sql = "SELECT id FROM users_x_assets WHERE asset_id = '{$data['cod']}' AND is_current = 1 ";
+    $res = $conn->query($sql);
+    if ($res->rowCount()) {
+        $data['success'] = false; 
+        $data['message'] = message('danger', '', TRANS('CANT_DELETE_DUE_ALLOCATION') . $exception, '');
+        echo json_encode($data);
+        return false;
+    }
+
+
+
     /* Checa se há componentes avulsos associados */
     $sql = "SELECT * FROM {$table} WHERE eqp_equip_inv = '{$tag}' AND eqp_equip_inst = '{$unit}' ";
     $res = $conn->query($sql);
@@ -1202,6 +1501,25 @@ if ($data['action'] == "new") {
         echo json_encode($data);
         return false;
     }
+
+
+    /* Guardar o log com sobre o ativo excluído e o usuário responsável */
+    $author = $_SESSION['s_uid'];
+    $ipAddress = getClientIP();
+    $actionType = "DELETE_ASSET";
+    $actionDetails = "";
+    
+    $unit_name = getUnits($conn, null, (int)$unit)['inst_nome'];
+        
+    $textAssetInfo = implode(", ", $equipmentInfo);
+    $actionDetails .= "{$tag} - {$unit_name} - ID: {$data['cod']} - Record: {$textAssetInfo}";
+
+    $logged = recordUserLog($conn, $author, $actionType, $actionDetails, $ipAddress);
+    if (!$logged) {
+        $exception .= "<hr>" . $conn->errorInfo()[2];
+    }
+
+
 
 
     /* Sem restrições para excluir o registro */

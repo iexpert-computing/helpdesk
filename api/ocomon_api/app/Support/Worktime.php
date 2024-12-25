@@ -56,6 +56,18 @@ class WorkTime
 
     private $error;
 
+    private $weekDays;
+
+    private $workTimeSingleWeekDay;
+
+    private $saturdays;
+    
+    private $workTimeSingleSatDay;
+    
+    private $sundays;
+    
+    private $workTimeSigleSunDay;
+
 
     /**
      * __construct

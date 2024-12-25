@@ -40,10 +40,11 @@ if (ini_get("session.use_cookies")) {
 }
 session_destroy();
 
-if (isset($_SESSION['s_logado']) && $_SESSION['s_logado'] == 1) {
-    echo "<script>top.window.location = '../../login.php'</script>";
-    exit();
-}
+// if (isset($_SESSION['s_logado']) && $_SESSION['s_logado'] == 1) {
+//     echo "<script>top.window.location = '../../login.php'</script>";
+//     exit();
+// }
+
 
 if (!isset($_GET['numero']) || !isset($_GET['id'])) {
     echo "<script>top.window.location = '../../login.php'</script>";
@@ -51,10 +52,21 @@ if (!isset($_GET['numero']) || !isset($_GET['id'])) {
 }
 
 $numero = (int)$_GET['numero'];
-$id = noHtml($_GET['id']);
-
+$id = $_GET['id'];
 $id = str_replace(" ", "+", $id);
-if ($id == getGlobalTicketId($conn, $numero)) {
+$id = noHtml($id);
+
+// var_dump([
+//     'id' => $id,
+//     'getGlobalTicketId' => getGlobalTicketId($conn, $numero),
+//     'asEquals()' => asEquals($id, getGlobalTicketId($conn, $numero)),
+//     '$_GET[rating_id]' => $_GET['rating_id'],
+
+// ]); exit;
+
+
+
+if (asEquals($id, getGlobalTicketId($conn, $numero))) {
     $GLOBALACCESS = true;
 } else {
     echo "<script>top.window.location = '../../login.php'</script>";
@@ -66,12 +78,12 @@ if ($id == getGlobalTicketId($conn, $numero)) {
 */
 $rating_id = "";
 if (isset($_GET['rating_id']) && !empty($_GET['rating_id'])) {
-    $rating_id = str_replace(" ", "+", noHtml($_GET['rating_id']));
+    $rating_id = noHtml(str_replace(" ", "+", $_GET['rating_id']));
 }
 
-$sysConfig = getConfig($conn);
+$config = getConfig($conn);
 
-$onlyBusinessDays = ($sysConfig['conf_only_weekdays_to_count_after_done'] ? true : false);
+$onlyBusinessDays = ($config['conf_only_weekdays_to_count_after_done'] ? true : false);
 
 
 /* Para manter a compatibilidade com versões antigas */
@@ -88,13 +100,16 @@ if (!isset($_POST['submit']) || empty($_POST)) {
         <title><?= TRANS('TICKET_OPENING'); ?></title>
 
         <link rel="stylesheet" type="text/css" href="../../includes/css/estilos.css" />
-        <link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
         <link rel="stylesheet" type="text/css" href="../../includes/css/switch_radio.css" />
 
         <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
+        <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
+        <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
         <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
         <link rel="stylesheet" type="text/css" href="../../includes/css/util.css" />
-        <link rel="shortcut icon" href="../../includes/icons/favicon.ico">
+    	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
+
+        <link rel="shortcut icon" href="../../includes/icons/favicon.webp">
 
         <style>
             .container-mt {
@@ -136,7 +151,8 @@ if (!isset($_POST['submit']) || empty($_POST)) {
 
         <div class="topo topo-color fixed-top p-2">
             <div id="header_logo">
-                <span class="logo"><img src="../../MAIN_LOGO.svg" width="240"></span>
+                <!-- <span class="logo"><img src="../../MAIN_LOGO.svg" width="240"></span> -->
+                <span class="logo header-mainlogo"></span>
             </div>
             <div id="header_elements" class="fs-13">
                 <span class="font-weight-bold d-none d-sm-block"> <?= TRANS('USER_NOT_LOGGED') . "&nbsp;&nbsp;|&nbsp;&nbsp;"; ?>
@@ -173,14 +189,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
     $rowPai = $execpai->fetch();
     if ($rowPai && $rowPai['dep_pai'] != "") {
     
-        $msgPai = "
-            <div class='d-flex justify-content-center'>
-                <div class='alert alert-info fade show w-100' role='alert' id='divMsgSubCall' style=' z-index:1030 !important;'>
-                    <i class='fas fa-info-circle'></i>&nbsp;" . TRANS('FIELD_OCCO_SUB_CALL') . "<strong onClick=\"location.href = '" . $_SERVER['PHP_SELF'] . "?numero=" . $rowPai['dep_pai'] . "'\" style='cursor: pointer'>" . $rowPai['dep_pai'] . "</strong>
-                    
-                </div>
-            </div>
-        ";
+        $msgPai = TRANS('FIELD_OCCO_SUB_CALL') . "<strong onClick=\"location.href = '" . $_SERVER['PHP_SELF'] . "?numero=" . $rowPai['dep_pai'] . "'\" style='cursor: pointer'>" . $rowPai['dep_pai'] . "</strong>";
     } else
         $msgPai = "";
 
@@ -222,7 +231,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
     $isScheduled = ($row['oco_scheduled'] == 1 ? true : false);
     $ratedInfo = getRatedInfo($conn, $numero);
 
-    $isDoneStatus = ($row['status_cod'] == $sysConfig['conf_status_done']);
+    $isDoneStatus = ($row['status_cod'] == $config['conf_status_done']);
     // $isRejected = (!empty($ratedInfo) && empty($ratedInfo['rate']) && !$isDoneStatus);
     $isRejected = isRejected($conn, $row['numero']);
     $isRequester = false;
@@ -235,14 +244,14 @@ if (!isset($_POST['submit']) || empty($_POST)) {
     $canBeRated = false;
     $isRated = isRated($conn, $numero);
 
-    if (!empty($rating_id) && $rating_id == getGlobalTicketRatingId($conn, $numero)) {
+    if (!empty($rating_id) && asEquals($rating_id, getGlobalTicketRatingId($conn, $numero))) {
         /* Se foi passado o rating_id corretamente, significa que o usuário possui o link para avaliação, pontanto, solicitante */
         $isRequester = true;
         /* Checar o limite de tempo para a validacao do atendimento */
         if (!empty($row['data_fechamento'])) {
-            $deadlineToApprove = addDaysToDate($row['data_fechamento'], $sysConfig['conf_time_to_close_after_done'], $onlyBusinessDays);
+            $deadlineToApprove = addDaysToDate($row['data_fechamento'], $config['conf_time_to_close_after_done'], $onlyBusinessDays);
             
-            /* if (daysFromDate($row['data_fechamento']) <= $sysConfig['conf_time_to_close_after_done']) {
+            /* if (daysFromDate($row['data_fechamento']) <= $config['conf_time_to_close_after_done']) {
                 $showApprovalOption = ($isRequester && !$isResponsible && !$isRated ? true : false);
                 $canBeRated = (!$isRated ? true : false);
             } */
@@ -261,18 +270,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
     //     $itemClosure = " onClick=\"approvingTicket({$numero})\""; 
     // }
 
-
-
-
-    $qryCatProb = "SELECT * FROM problemas as p " .
-        "LEFT JOIN sla_solucao as sl on sl.slas_cod = p.prob_sla " .
-        "LEFT JOIN prob_tipo_1 as pt1 on pt1.probt1_cod = p.prob_tipo_1 " .
-        "LEFT JOIN prob_tipo_2 as pt2 on pt2.probt2_cod = p.prob_tipo_2 " .
-        "LEFT JOIN prob_tipo_3 as pt3 on pt3.probt3_cod = p.prob_tipo_3 " .
-        " WHERE p.prob_id = " . $row['prob_cod'] . " ";
-
-    $execCatprob = $conn->query($qryCatProb);
-    $rowCatProb = $execCatprob->fetch();
+    $issueDetails = (!empty($row['prob_cod'] && $row['prob_cod'] != '-1') ? getIssueDetailed($conn, $row['prob_cod'])[0] : []);
 
     $descricao = "";
     if (isset($_GET['destaca'])) {
@@ -586,13 +584,10 @@ if (!isset($_POST['submit']) || empty($_POST)) {
         <?php
         /* MENSAGEM SE FOR SUBCHAMADO */
         if (!empty($msgPai)) {
-        ?>
-            <div class="row my-2 mb-0">
-                <div class="<?= $colsDefault . " col-sm-12"; ?>">
-                    <?= $msgPai; ?>
-                </div>
-            </div>
-        <?php
+            ?>
+            <div class="w-100 mb-4"></div>
+            <?php
+            echo message('info', '', $msgPai, '', '', true);
         }
         $client = getClientByTicket($conn, $row['numero']);
         $ticket_rate = getRatedInfo($conn, $row['numero']);
@@ -651,9 +646,27 @@ if (!isset($_POST['submit']) || empty($_POST)) {
             <div class="<?= $colContent; ?>"><?= $row['problema'] . "&nbsp;" . $ShowlinkScript; ?></div>
             <div class="<?= $colLabel; ?>"><?= TRANS('COL_CAT_PROB'); ?></div>
             <?php
-            if ($rowCatProb) {
+            if ($issueDetails) {
+                $categories = "";
+                $catKeys = ["probt1_desc", "probt2_desc", "probt3_desc", "probt4_desc", "probt5_desc", "probt6_desc"];
+                $groupNames = [
+                    $config['conf_prob_tipo_1'],
+                    $config['conf_prob_tipo_2'],
+                    $config['conf_prob_tipo_3'],
+                    $config['conf_prob_tipo_4'],
+                    $config['conf_prob_tipo_5'],
+                    $config['conf_prob_tipo_6']
+                ];
+
+                $arrayCategories = [];
+                foreach ($catKeys as $key => $catKey) {
+                    if (!empty($issueDetails[$catKey]) && strlen($issueDetails[$catKey]) > 1) {
+                        $arrayCategories[] = $groupNames[$key] . ": " . $issueDetails[$catKey];
+                    }
+                }
+                $categories = implode(",", $arrayCategories);
             ?>
-                <div class="<?= $colContent; ?>"><?= $rowCatProb['probt1_desc'] . " | " . $rowCatProb['probt2_desc'] . " | " . $rowCatProb['probt3_desc']; ?></div>
+                <div class="<?= $colContent; ?>"><?= strToTags($categories, 0, "secondary", "issue-category"); ?></div>
             <?php
             } else {
             ?>
@@ -680,7 +693,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
         <?php
             $fontColor = (!empty($row['cor_fonte']) ? $row['cor_fonte']: "#FFFFFF");
             $bgColor = (!empty($row['cor']) ? $row['cor']: "#CCCCCC");
-            $priorityBadge = "<span class='badge p-2' style='color: " . $fontColor . "; background-color: " . $bgColor . "'>" . $row['pr_descricao'] . "</span>";
+            $priorityBadge = "<span class='btn btn-sm cursor-no-event p-2' style='color: " . $fontColor . "; background-color: " . $bgColor . "'>" . $row['pr_descricao'] . "</span>";
         ?>
         <div class="row my-2">
             <div class="<?= $colLabel; ?>"><?= TRANS('OCO_PRIORITY'); ?></div>
@@ -745,11 +758,34 @@ if (!isset($_POST['submit']) || empty($_POST)) {
         </div> -->
 
         <div class="row my-2">
+            <?php
+            $statusBadge = "<span class='btn btn-sm cursor-no-event text-wrap p-2' style='color: " . $row['textcolor'] . "; background-color: " . ($row['bgcolor'] ?? '#FFFFFF') . "'>" . $row['chamado_status'] . "</span>";
+            ?>
             <div class="<?= $colLabel; ?>"><?= TRANS('COL_STATUS'); ?></div>
-            <div class="<?= $colContent; ?>"><?= $row['chamado_status']; ?></div>
-            <div class="<?= $colLabel; ?>"><?= TRANS('FIELD_LAST_OPERATOR'); ?></div>
-            <div class="<?= $colContent; ?>"><?= $row['nome']; ?></div>
+            <div class="<?= $colContent; ?>"><?= $statusBadge; ?></div>
+            
+            <?php
+                if (!empty($row['registration_operator_cod'])) {
+                    $registratorInfo = getUserInfo($conn, $row['registration_operator_cod']);
+                    ?>
+                        <div class="<?= $colLabel; ?>"><?= TRANS('REGISTRATION_AUTHOR'); ?></div>
+                        <div class="<?= $colContent; ?>"><?= $registratorInfo['nome']; ?></div>
+                    <?php
+                }
+            ?>
         </div>
+
+        <?php
+            $ticketTreaterInfo = getTicketTreater($conn, $row['numero']);
+            if (!empty($ticketTreaterInfo)) {
+                ?>
+                <div class="row my-2">
+                    <div class="<?= $colLabel; ?>"><?= TRANS('OCO_RESP'); ?></div>
+                    <div class="<?= $colContent; ?>"><?= $ticketTreaterInfo['nome']; ?></div>
+                </div>
+                <?php
+            }
+        ?>
 
         <div class="row my-2">
             <div class="<?= $colLabel; ?>"><?= TRANS('GLOBAL_LINK'); ?></div>
@@ -898,7 +934,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
                                         }
                                         /* Badge da primeira resposta */
                                         $badgeFirstResponse = "";
-                                        if (!empty($row['data_atendimento']) && $row['data_atendimento'] == $rowAsset['data']) {
+                                        if (!empty($row['data_atendimento']) && $row['data_atendimento'] == $rowAsset['created_at']) {
                                             $badgeFirstResponse = '&nbsp;<span class="badge badge-info p-2">' . TRANS('FIRST_RESPONSE') . '</span>';
                                         }
                                         $author = $rowAsset['nome'] ?? TRANS('AUTOMATIC_PROCESS');
@@ -907,7 +943,7 @@ if (!isset($_POST['submit']) || empty($_POST)) {
                                             <th scope="row"><?= $i; ?></th>
                                             <td><?= $transAssetText; ?></td>
                                             <td><?= $author; ?></td>
-                                            <td><?= formatDate($rowAsset['data']) . $badgeFirstResponse; ?></td>
+                                            <td data-sort="<?= $rowAsset['created_at']; ?>"><?= formatDate($rowAsset['created_at']) . $badgeFirstResponse; ?></td>
                                             <td><?= getEntryType($rowAsset['tipo_assentamento']); ?></td>
                                             <td><?= nl2br($rowAsset['assentamento']); ?></td>
                                         </tr>
@@ -1173,11 +1209,14 @@ if (!isset($_POST['submit']) || empty($_POST)) {
             <div class=" fixed-bottom ">
                 <div class="  bg-light border-top text-center p-2 " style="z-index:4; ">
                     <div class="footer-text">
-                        <a href="https://ocomonphp.sourceforge.io/" target="_blank">
-                            OcoMon
-                        </a>&nbsp;-&nbsp;
-                        <?= TRANS('OCOMON_ABSTRACT'); ?><br />
-                        <?= TRANS('COL_VERSION') . ": " . VERSAO . " - " . TRANS('MNS_MSG_LIC') . " GPL"; ?>
+                        <span>
+                            <a href="<?= APP_URL; ?>" target="_blank">
+                                <strong><?= APP_NAME; ?></strong>
+                            </a>
+                            &nbsp;-&nbsp;
+                            <?= TRANS('OCOMON_ABSTRACT'); ?><br />
+                            <?= TRANS('COL_VERSION') . ": <strong>" . VERSAO . "</strong> - " . TRANS('MNS_MSG_LIC') . " GPL"; ?>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -1191,6 +1230,8 @@ if (!isset($_POST['submit']) || empty($_POST)) {
     <script src="../../includes/javascript/funcoes-3.0.js"></script>
     <script src="../../includes/components/jquery/jquery.js"></script>
     <script src="../../includes/components/bootstrap/js/bootstrap.bundle.js"></script>
+	<script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables.js"></script>
+
 
     <script>
         $(function() {
@@ -1198,6 +1239,16 @@ if (!isset($_POST['submit']) || empty($_POST)) {
             $(function() {
                 $('[data-toggle="popover"]').popover()
             });
+
+
+            $('.table').DataTable({
+				language: {
+					url: "../../includes/components/datatables/datatables.pt-br.json",
+				},
+				paging: true,
+				deferRender: true,
+				order: [3, 'DESC'],
+			});
 
             $('.popover-dismiss').popover({
                 trigger: 'focus'

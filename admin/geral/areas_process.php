@@ -54,7 +54,39 @@ $data['mod_tickets'] = (isset($post['mod_tickets']) ? ($post['mod_tickets'] == "
 $data['mod_inventory'] = (isset($post['mod_inventory']) ? ($post['mod_inventory'] == "yes" ? 1 : 0) : 0);
 $data['area_admins'] = (isset($post['area_admins']) ? noHtml($post['area_admins']) : "");
 
+
+$data['pre_filters_own_config'] = (isset($post['pre_filters_own_config']) ? ($post['pre_filters_own_config'] == "yes" ? 1 : 0) : 0);
+
+
+$data['pre_filters'] = "";
+if ($data['pre_filters_own_config']) {
+    /** Tratamento para os pré filtros de categorias para tipos de solicitações */
+    $textPreFilters = "";
+    $data['pre_filters'] = (isset($post['pre_filters_hidden']) ? noHtml($post['pre_filters_hidden']) : "");
+    if (!empty($data['pre_filters'])) {
+        $array_pre_filters = explode(',', $data['pre_filters']);
+        // percorrer o array e verificar se cada elemento é um inteiro entre 1 e 6 (número de categorias existentes)
+        foreach ($array_pre_filters as $pre_filter) {
+            $pre_filter = intval($pre_filter);
+            if ($pre_filter > 0 && $pre_filter <= 6) {
+                if (strlen($textPreFilters) > 0)
+                    $textPreFilters .= ",";
+                $textPreFilters .= $pre_filter;
+            }
+        }
+        $data['pre_filters'] = $textPreFilters;
+    }
+}
+
+
 $data['dynamic_mode'] = (isset($post['dynamic_mode']) ? ($post['dynamic_mode'] == "yes" ? 2 : 1) : 1);
+
+/* Os pré-filtros só serão gravados se a abertura dinâmica estiver habilitada */
+if ($data['dynamic_mode'] == 1) {
+    $data['pre_filters_own_config'] = 0;
+    $data['pre_filters'] = "";
+}
+
 $data['areaToOwnArea'] = (isset($post['areaToOwnArea']) ? ($post['areaToOwnArea'] == "yes" ? 1 : 0) : 0);
 $data['default_areaOwnArea'] = (isset($post['default_areaOwnArea']) ? ($post['default_areaOwnArea'] == "on" ? 1 : 0) : 0);
 $data['default_area'] = (isset($post['default_area']) ? $post['default_area'] : []);
@@ -62,8 +94,6 @@ $data['default_area'] = (isset($post['default_area']) ? $post['default_area'] : 
 /* Unidades específicas que poderão ser acessadas pela área na parte de inventário */
 $data['asset_client'] = (isset($post['asset_client']) && !empty(array_filter($post['asset_client'], function($v) { return !empty($v); })) ? array_map('noHtml', $post['asset_client']) : []);
 $data['asset_unit'] = (isset($post['asset_unit']) && !empty(array_filter($post['asset_unit'], function($v) { return !empty($v); })) ? array_map('noHtml', $post['asset_unit']) : []);
-// $data['asset_client_update'] = (isset($post['asset_client_update']) && !empty(array_filter($post['asset_client_update'], function($v) { return !empty($v); })) ? array_map('noHtml', $post['asset_client_update']) : []);
-// $data['asset_unit_update'] = (isset($post['asset_unit_update']) && !empty(array_filter($post['asset_unit_update'], function($v) { return !empty($v); })) ? array_map('noHtml', $post['asset_unit_update']) : []);
 $data['deleteClientLimitation'] = (isset($post['deleteClientLimitation']) ? $post['deleteClientLimitation'] : []);
 
 
@@ -142,7 +172,10 @@ if ($data['action'] == 'new') {
                     sis_screen, 
                     sis_wt_profile, 
                     sis_months_done,
-                    sis_opening_mode
+                    sis_opening_mode,
+                    sis_cat_chain_at_opening,
+                    use_own_config_cat_chain
+
                 ) 
                 VALUES 
                 (
@@ -153,7 +186,10 @@ if ($data['action'] == 'new') {
                     " . dbField($data['screen_profile']) . ", 
                     '" . $data['wt_profile'] . "',
                     '" . $data['months'] . "',
-                    '" . $data['dynamic_mode'] . "'
+                    '" . $data['dynamic_mode'] . "',
+                    " . dbField($data['pre_filters'], "text") . ",
+                    " . dbField($data['pre_filters_own_config'], "int") . "
+
                 )";
 
 
@@ -358,7 +394,10 @@ if ($data['action'] == 'new') {
                 sis_atende = '" . $data['process_tickets'] . "', 
                 sis_wt_profile = '" . $data['wt_profile'] . "', 
                 sis_months_done = '" . $data['months'] . "', 
-                sis_opening_mode = '" . $data['dynamic_mode'] . "' 
+                sis_opening_mode = '" . $data['dynamic_mode'] . "',
+                sis_cat_chain_at_opening = " . dbField($data['pre_filters'], "text") . ",
+                use_own_config_cat_chain = " . dbField($data['pre_filters_own_config'], "int") . " 
+
             WHERE sis_id = '" . $data['cod'] . "'";
 
 

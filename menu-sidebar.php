@@ -1,21 +1,21 @@
 <?php
 /*                        Copyright 2023 Flávio Ribeiro
 
-         This file is part of OCOMON.
+		This file is part of OCOMON.
 
-         OCOMON is free software; you can redistribute it and/or modify
-         it under the terms of the GNU General Public License as published by
-         the Free Software Foundation; either version 3 of the License, or
-         (at your option) any later version.
+		OCOMON is free software; you can redistribute it and/or modify
+		it under the terms of the GNU General Public License as published by
+		the Free Software Foundation; either version 3 of the License, or
+		(at your option) any later version.
 
-         OCOMON is distributed in the hope that it will be useful,
-         but WITHOUT ANY WARRANTY; without even the implied warranty of
-         MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-         GNU General Public License for more details.
+		OCOMON is distributed in the hope that it will be useful,
+		but WITHOUT ANY WARRANTY; without even the implied warranty of
+		MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+		GNU General Public License for more details.
 
-         You should have received a copy of the GNU General Public License
-         along with Foobar; if not, write to the Free Software
-         Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+		You should have received a copy of the GNU General Public License
+		along with Foobar; if not, write to the Free Software
+		Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */ session_start();
 
 include("PATHS.php");
@@ -24,7 +24,13 @@ include("./includes/languages/" . LANGUAGE . "");
 require_once("./includes/functions/functions.php");
 require_once("./includes/functions/dbFunctions.php");
 
+require_once "./includes/classes/ConnectPDO.php";
 
+use includes\classes\ConnectPDO;
+$conn = ConnectPDO::getInstance();
+
+
+$config = getConfig($conn);
 $rootPath = "./";
 $ocomonPath = "./ocomon/geral/";
 $invmonPath = "./invmon/geral/";
@@ -39,11 +45,14 @@ if (isset($_SESSION['s_area_admin']) && $_SESSION['s_area_admin'] == '1' && $_SE
 $isWorker = ($_SESSION['s_can_get_routed'] == '1' ? true : false);
 
 
+$showDeprecated = getConfigValue($conn, 'SHOW_DEPRECATED') ?? 1;
+
+
 /* Páginas que serão carregadas por padrão em cada aba */
 $simplesHome = (isset($_SESSION['s_page_simples']) ? $_SESSION['s_page_simples'] : $ocomonPath . "tickets_main_user.php");
 $homeHome = (isset($_SESSION['s_page_home']) ? $_SESSION['s_page_home'] : $ocomonPath . "tickets_main_user.php");
 $ocoHome = (isset($_SESSION['s_page_ocomon']) ? $_SESSION['s_page_ocomon'] : $ocomonPath . "tickets_main.php");
-$invHome = (isset($_SESSION['s_page_invmon']) ? $_SESSION['s_page_invmon'] : $invmonPath . "inventory_main.php");
+$invHome = (isset($_SESSION['s_page_invmon']) ? $_SESSION['s_page_invmon'] : $invmonPath . "assets_tree.php");
 $admHome = (isset($_SESSION['s_page_admin']) ? $_SESSION['s_page_admin'] : $adminPath . "users.php");
 // $admAreaHome = (isset($_SESSION['s_page_admin']) ? $_SESSION['s_page_admin'] : $adminPath . "users.php");
 $admAreaHome = $adminPath . "users.php";
@@ -114,7 +123,7 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 					?>
 						<li class='li-link'>
 							<a href="#" data-app="tickets_main_area_admin" data-params="" data-path="<?= $ocomonPath ?>">
-								<i class="fa fa-align-justify"></i>
+								<i class="fa fa-list-ul"></i>
 								<span class="menu-text"><?= TRANS('TICKETS_FROM_MY_MANAGED_AREAS'); ?></span>
 							</a>
 						</li>
@@ -146,10 +155,14 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 			</li>
 			<li class='li-link'>
 				<a href="#" data-app="tickets_main_user" data-params="" data-path="<?= $ocomonPath ?>">
-					<!-- action=listall -->
-					<!-- <i class="fa fa-book"></i> -->
 					<i class="fas fa-user-check"></i>
 					<span class="menu-text"><?= TRANS('MNL_MEUS'); ?></span>
+				</a>
+			</li>
+			<li class='li-link'>
+				<a href="#" data-app="tickets_main" data-params="" data-path="<?= $ocomonPath ?>">
+					<i class="fa fa-align-justify"></i>
+					<span class="menu-text"><?= TRANS('QUEUE_OF_TICKETS'); ?></span>
 				</a>
 			</li>
 			<?php
@@ -160,7 +173,7 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 					?>
 						<li class='li-link'>
 							<a href="#" data-app="tickets_main_area_admin" data-params="" data-path="<?= $ocomonPath ?>">
-								<i class="fa fa-align-justify"></i>
+								<i class="fa fa-list-ul"></i>
 								<span class="menu-text"><?= TRANS($textMyArea); ?></span>
 							</a>
 						</li>
@@ -176,7 +189,7 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 
 			<li class='li-link'>
 				<a href="#" data-app="notices_board" data-params="" data-path="<?= $ocomonPath ?>">
-					<i class="fas fa-bell"></i>
+					<i class="fas fa-thumbtack"></i>
 					<span class="menu-text"><?= TRANS('TLT_BOARD_NOTICE'); ?></span>
 				</a>
 			</li>
@@ -209,6 +222,20 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 					<span class="menu-text"><?= TRANS('DASHBOARD'); ?></span>
 				</a>
 			</li>
+			<?php
+				/* Só exibirá a opção do painel de custos caso exista a configuração para campo de custo */
+				if ($config['tickets_cost_field']) {
+					?>
+						<li class='li-link'>
+							<a href="#" data-app="dashboard_master" data-params="" data-path="<?= $ocomonPath ?>">
+								<i class="fas fa-chart-line"></i>
+								<span class="menu-text"><?= TRANS('COST_DASHBOARD'); ?></span>
+							</a>
+						</li>
+					<?php
+				}
+			?>
+			
 			<li class='li-link'>
 				<a href="#" data-app="tickets_main" data-params="" data-path="<?= $ocomonPath ?>">
 					<i class="fa fa-align-justify"></i>
@@ -296,6 +323,12 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 					<span class="menu-text"><?= TRANS('MNL_INICIO'); ?></span>
 				</a>
 			</li>
+			<li class='li-link'>
+				<a href="#" data-app="assets_calendar" data-params="" data-path="<?= $invmonPath ?>">
+					<i class="fa fa-calendar"></i>
+					<span class="menu-text"><?= TRANS('WARRANTIES_CALENDAR'); ?></span>
+				</a>
+			</li>
 
 			<!-- Consultas -->
 			<li class="sidebar-dropdown">
@@ -313,14 +346,27 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 						<li>
 							<a href="#" data-app="smart_search_inventory_to_report" data-params="" data-path="<?= $invmonPath ?>"><?= TRANS('TTL_SMART_SEARCH_INVENTORY_TO_REPORT'); ?></a>
 						</li>
+						<?php
+							if ($showDeprecated) {
+								?>
 						<li>
 							<a href="#" data-app="smart_search_peripheral_to_report" data-params="" data-path="<?= $invmonPath ?>"><?= TRANS('TTL_SMART_SEARCH_PERIPHERAL_TO_REPORT'); ?>&nbsp;<span class="badge badge-warning text-small"><?= TRANS('DEPRECATED'); ?></span></a>
 						</li>
+								<?php
+							}
+						?>
+						
 						<li>
 							<a href="#" data-app="search_hist_by_tag_and_unit" data-params="" data-path="<?= $invmonPath ?>"><?= TRANS('MNL_CON_HIST_TAG'); ?></a>
 						</li>
 						<li>
 							<a href="#" data-app="search_by_previous_location" data-params="" data-path="<?= $invmonPath ?>"><?= TRANS('MNL_CON_HIST_LOCAL'); ?></a>
+						</li>
+						<li>
+							<a href="#" data-app="search_hist_users_by_asset_tag" data-params="" data-path="<?= $invmonPath ?>"><?= TRANS('ASSET_ALLOCATION_HISTORY'); ?></a>
+						</li>
+						<li>
+							<a href="#" data-app="search_hist_assets_by_user" data-params="" data-path="<?= $invmonPath ?>"><?= TRANS('USER_ALLOCATION_HISTORY'); ?></a>
 						</li>
 					</ul>
 				</div>
@@ -342,16 +388,26 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 						<li>
 							<a href="#" data-app="choose_asset_type_to_add" data-params="" data-path="<?= $invmonPath ?>"><?= TRANS('ASSET_REGISTER'); ?></a>
 						</li>
-						
+						<?php
+							if ($showDeprecated) {
+								?>
 						<li>
 							<a href="#" data-app="peripherals_tagged" data-params="" data-path="<?= $invmonPath ?>"><?= TRANS('DETACHED_COMPONENTS'); ?>&nbsp;<span class="badge badge-warning text-small"><?= TRANS('DEPRECATED'); ?></span></a>
 						</li>
+								<?php
+							}
+						?>
+						
 						<li>
 							<a href="#" data-app="type_of_equipments" data-params="" data-path="<?= $invmonPath ?>"><?= TRANS('ADM_EQUIP_TYPE'); ?></a>
 						</li>
 						<li>
 							<a href="#" data-app="equipments_models" data-params="" data-path="<?= $invmonPath ?>"><?= TRANS('EQUIPMENTS_MODELS'); ?></a>
 						</li>
+						
+						<?php
+							if ($showDeprecated) {
+								?>
 						<li>
 							<a href="#" data-app="configuration_models" data-params="" data-path="<?= $invmonPath ?>"><?= TRANS('CONFIGURATION_EQUIPMENTS_MODELS'); ?>&nbsp;<span class="badge badge-warning text-small"><?= TRANS('DEPRECATED'); ?></span></a>
 						</li>
@@ -362,6 +418,11 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 						<li>
 							<a href="#" data-app="peripherals" data-params="" data-path="<?= $invmonPath ?>"><?= TRANS('MNL_COMPONENTES_MODEL'); ?>&nbsp;<span class="badge badge-warning text-small"><?= TRANS('DEPRECATED'); ?></span></a>
 						</li>
+								<?php
+							}
+						?>
+						
+						
 						
 						
 						
@@ -502,24 +563,7 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 				</div>
 			</li>
 
-			<li class="sidebar-dropdown">
-				<a href="#">
-					<i class="fas fa-link"></i>
-					<span class="menu-text"><?= TRANS('API'); ?></span>
-					<!-- <span class="badge badge-pill badge-danger">3</span> -->
-				</a>
-				<div class="sidebar-submenu">
-					<ul>
-						<li>
-							<a href="#" data-app="appsRegistered" data-params="" data-path="<?= $adminPath ?>"><?= TRANS('APPS_THROUGH_API'); ?></a>
-						</li>
-						<li>
-							<a href="#" data-app="tokens" data-params="" data-path="<?= $adminPath ?>"><?= TRANS('ACCESS_TOKENS'); ?></a>
-						</li>
-
-					</ul>
-				</div>
-			</li>
+			
 
 			<li class="sidebar-dropdown">
 				<a href="#">
@@ -539,6 +583,9 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 
 						<li>
 							<a href="#" data-app="types_of_issues" data-params="" data-path="<?= $adminPath ?>"><?= TRANS('PROBLEM_TYPES'); ?></a>
+						</li>
+						<li>
+							<a href="#" data-app="issues_tree" data-params="" data-path="<?= $adminPath ?>"><?= TRANS('ISSUES_TYPES_TREE'); ?></a>
 						</li>
 						<li>
 							<a href="#" data-app="status" data-params="" data-path="<?= $adminPath ?>"><?= TRANS('ADM_STATUS'); ?></a>
@@ -587,11 +634,11 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 							<a href="#" data-app="assets_fields_profiles" data-params="" data-path="<?= $adminPath ?>"><?= TRANS('ASSETS_FIELDS_PROFILES'); ?></a>
 						</li>
 					</ul>
-					<ul>
+					<!-- <ul>
 						<li>
 							<a href="#" data-app="responsibility_statements" data-params="" data-path="<?= $adminPath ?>"><?= TRANS('RESPONSIBILITY_STATEMENTS'); ?></a>
 						</li>
-					</ul>
+					</ul> -->
 				</div>
 			</li>
 
@@ -628,6 +675,9 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 						<li>
 							<a href="#" data-app="cost_centers" data-params="" data-path="<?= $adminPath ?>"><?= TRANS('COST_CENTERS'); ?></a>
 						</li>
+						<li>
+							<a href="#" data-app="commitment_models" data-params="" data-path="<?= $adminPath ?>"><?= TRANS('RESPONSIBILITY_STATEMENTS'); ?></a>
+						</li>
 						
 					</ul>
 				</div>
@@ -647,6 +697,24 @@ if (isset($_GET['menu']) && !empty($_GET['menu'])) {
 					<i class="fa fa-user-friends"></i>
 					<span class="menu-text"><?= TRANS('MNL_USUARIOS'); ?></span>
 				</a>
+			</li>
+
+			<li class="sidebar-dropdown">
+				<a href="#">
+					<i class="fas fa-link"></i>
+					<span class="menu-text"><?= TRANS('API'); ?></span>
+				</a>
+				<div class="sidebar-submenu">
+					<ul>
+						<li>
+							<a href="#" data-app="appsRegistered" data-params="" data-path="<?= $adminPath ?>"><?= TRANS('APPS_THROUGH_API'); ?></a>
+						</li>
+						<li>
+							<a href="#" data-app="tokens" data-params="" data-path="<?= $adminPath ?>"><?= TRANS('ACCESS_TOKENS'); ?></a>
+						</li>
+
+					</ul>
+				</div>
 			</li>
 
 		</ul>

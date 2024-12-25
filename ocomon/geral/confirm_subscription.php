@@ -36,12 +36,13 @@ $conn = ConnectPDO::getInstance();
 	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
 	<style>
 
 	</style>
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>

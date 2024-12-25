@@ -45,8 +45,9 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 2);
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -76,7 +77,7 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 2);
         }
 
 
-        $asset_id = (isset($_GET['asset_id']) ? noHtml($_GET['asset_id']) : '');
+        $asset_id = (isset($_GET['asset_id']) ? (int)$_GET['asset_id'] : '');
         if (empty($asset_id)) {
             echo message('danger', 'Ooops!', TRANS('MSG_ERR_NOT_EXECUTE'), '', '', 1);
             return;

@@ -35,6 +35,7 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 1);
 
 $clients = getClients($conn);
 
+
 $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 
 ?>
@@ -52,8 +53,9 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -63,6 +65,9 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 	</div>
 
 	<div id="divResult"></div>
+
+	<input type="hidden" name="label_close" id="label_close" value="<?= TRANS('BT_CLOSE'); ?>">
+	<input type="hidden" name="label_return" id="label_return" value="<?= TRANS('TXT_RETURN'); ?>">
 
 
 	<div class="container-fluid">
@@ -122,31 +127,42 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 
 					<thead>
 						<tr class="header">
-                            <td class="line issue_type"><?= TRANS('COL_UNIT'); ?></td>
-                            <td class="line status"><?= TRANS('ACTIVE_O'); ?></td>
                             <td class="line client"><?= TRANS('CLIENT'); ?></td>
+                            <td class="line issue_type"><?= TRANS('COL_UNIT'); ?></td>
+                            <td class="line issue_type"><?= TRANS('ADDRESS'); ?></td>
+                            <td class="line issue_type"><?= TRANS('CITY'); ?></td>
+                            <td class="line issue_type"><?= TRANS('ADDRESS_UF'); ?></td>
+                            <td class="line status"><?= TRANS('ACTIVE_O'); ?></td>
 							<td class="line editar" width="10%"><?= TRANS('BT_EDIT'); ?></td>
 							<td class="line remover" width="10%"><?= TRANS('BT_REMOVE'); ?></td>
 						</tr>
 					</thead>
 					<tbody>
 						<?php
-
+						$addressKeys = ['addr_street', 'addr_number', 'addr_complement', 'addr_neighborhood'];
 						foreach ($units as $row) {
-                            // $lstatus = TRANS('ACTIVE_O');
-                            // if ($row['inst_status'] == 0) $lstatus = TRANS('INACTIVE_O');
+							$location = "";
+							$locationArray = [];
+							foreach ($addressKeys as $key) {
+								$locationArray[] = $row[$key];
+							}
+							
+							$location = implode(" - ", array_filter($locationArray));
+
 							$lstatus = ($row['inst_status'] == 1 ? '<span class="text-success"><i class="fas fa-check"></i></span>' : '');
 
-						    ?>
+							?>
 							<tr>
-                                <td class="line"><?= $row['inst_nome']; ?></td>
-                                <td class="line"><?= $lstatus; ?></td>
                                 <td class="line"><?= $row['nickname']; ?></td>
+                                <td class="line"><?= $row['inst_nome']; ?></td>
+                                <td class="line"><?= $location; ?></td>
+                                <td class="line"><?= $row['addr_city']; ?></td>
+                                <td class="line"><?= $row['addr_uf']; ?></td>
+                                <td class="line"><?= $lstatus; ?></td>
 								<td class="line"><button type="button" class="btn btn-secondary btn-sm" onclick="redirect('<?= $_SERVER['PHP_SELF']; ?>?action=edit&cod=<?= $row['inst_cod']; ?>')"><?= TRANS('BT_EDIT'); ?></button></td>
 								<td class="line"><button type="button" class="btn btn-danger btn-sm" onclick="confirmDeleteModal('<?= $row['inst_cod']; ?>')"><?= TRANS('REMOVE'); ?></button></td>
 							</tr>
-
-						    <?php
+						<?php
 						}
 						?>
 					</tbody>
@@ -159,13 +175,9 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 			?>
 			<h6><?= TRANS('NEW_RECORD'); ?></h6>
 			<form method="post" action="<?= $_SERVER['PHP_SELF']; ?>" id="form">
-				<?= csrf_input(); ?>
+				<?= csrf_input('units'); ?>
 				<div class="form-group row my-4">
-					<label for="unit_name" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('COL_UNIT'); ?></label>
-					<div class="form-group col-md-10">
-						<input type="text" class="form-control " id="unit_name" name="unit_name" required />
-                    </div>
-                    
+					
 					<label for="unit_client" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CLIENT'); ?></label>
 					<div class="form-group col-md-10">
 						<select class="form-control bs-select" id="unit_client" name="unit_client">
@@ -179,6 +191,69 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 							?>
 						</select>
                     </div>
+				
+					<label for="unit_name" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('COL_UNIT'); ?></label>
+					<div class="form-group col-md-10">
+						<input type="text" class="form-control " id="unit_name" name="unit_name" required />
+                    </div>
+					
+
+					<div class="form-group col-md-2">
+					</div>
+					<div class="form-group col-md-10">
+						<hr />
+                    </div>
+								
+
+					<label for="unit_cep" class="col-md-2 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('CEP'); ?></label>
+					<div class="form-group col-md-3">
+						<div class="input-group">
+							<input type="text" class="form-control " id="unit_cep" name="unit_cep"  />
+							<div class="input-group-append">
+								<div class="input-group-text load-address" title="<?= TRANS('GET_ADDRESS_INFO_BY_CEP'); ?>" data-placeholder="<?= TRANS('GET_ADDRESS_INFO_BY_CEP'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+									<i class="fas fa-search-location"></i>&nbsp;
+								</div>
+                        	</div>
+						</div>
+                    </div>
+					<label for="unit_street" class="col-md-1 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('STREET'); ?></label>
+					<div class="form-group col-md-6">
+						<input type="text" class="form-control " id="unit_street" name="unit_street"  />
+                    </div>
+					<label for="unit_neighborhood" class="col-md-2 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('NEIGHBORHOOD'); ?></label>
+					<div class="form-group col-md-3">
+						<input type="text" class="form-control " id="unit_neighborhood" name="unit_neighborhood"  />
+                    </div>
+					<label for="unit_city" class="col-md-1 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('CITY'); ?></label>
+					<div class="form-group col-md-4">
+						<input type="text" class="form-control " id="unit_city" name="unit_city"  />
+                    </div>
+					<label for="unit_state" class="col-md-1 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('ADDRESS_STATE'); ?></label>
+					<div class="form-group col-md-1">
+						<input type="text" class="form-control " id="unit_state" name="unit_state"  />
+                    </div>
+
+					<label for="unit_address_number" class="col-md-2 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('ADDRESS_NUMBER'); ?></label>
+					<div class="form-group col-md-3">
+						<input type="text" class="form-control " id="unit_address_number" name="unit_address_number"  />
+                    </div>
+					<label for="unit_address_complement" class="col-md-1 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('ADDRESS_COMPLEMENT'); ?></label>
+					<div class="form-group col-md-6">
+						<input type="text" class="form-control " id="unit_address_complement" name="unit_address_complement"  />
+                    </div>
+
+					<div class="form-group col-md-2">
+					</div>
+					<div class="form-group col-md-10">
+						<hr />
+                    </div>
+
+					<label for="unit_obs" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('TXT_INFO_COMPLEM'); ?>"><?= firstLetterUp(TRANS('TXT_INFO_COMPLEM')); ?></label>
+					<div class="form-group col-md-10 ">
+						<textarea class="form-control" name="unit_obs" id="unit_obs"></textarea>
+					</div>
+                    
+					
 
 					<div class="row w-100"></div>
 					<div class="form-group col-md-8 d-none d-md-block">
@@ -189,7 +264,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						<button type="submit" id="idSubmit" name="submit" class="btn btn-primary btn-block"><?= TRANS('BT_OK'); ?></button>
 					</div>
 					<div class="form-group col-12 col-md-2">
-						<button type="reset" class="btn btn-secondary btn-block" onClick="parent.history.back();"><?= TRANS('BT_CANCEL'); ?></button>
+						<button type="reset" id="close_details" class="btn btn-secondary btn-block"><?= TRANS('BT_CANCEL'); ?></button>
 					</div>
 
 
@@ -204,12 +279,9 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 		    ?>
 			<h6><?= TRANS('BT_EDIT'); ?></h6>
 			<form method="post" action="<?= $_SERVER['PHP_SELF']; ?>" id="form">
-				<?= csrf_input(); ?>
+				<?= csrf_input('units'); ?>
 				<div class="form-group row my-4">
-					<label for="unit_name" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('COL_UNIT'); ?></label>
-					<div class="form-group col-md-10">
-						<input type="text" class="form-control " id="unit_name" name="unit_name" value="<?= $row['inst_nome']; ?>" required />
-                    </div>
+
 
 					<label for="unit_client" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('CLIENT'); ?></label>
 					<div class="form-group col-md-10">
@@ -227,6 +299,12 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						</select>
                     </div>
 
+					<label for="unit_name" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= TRANS('COL_UNIT'); ?></label>
+					<div class="form-group col-md-10">
+						<input type="text" class="form-control " id="unit_name" name="unit_name" value="<?= $row['inst_nome']; ?>" required />
+                    </div>
+
+
                     <label class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('ACTIVE_O'); ?>"><?= firstLetterUp(TRANS('ACTIVE_O')); ?></label>
 					<div class="form-group col-md-10 ">
 						<div class="switch-field">
@@ -240,6 +318,54 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 							<label for="unit_status_no"><?= TRANS('NOT'); ?></label>
 						</div>
 					</div>
+
+					<label for="unit_cep" class="col-md-2 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('CEP'); ?></label>
+					<div class="form-group col-md-3">
+						<div class="input-group">
+							<input type="text" class="form-control " id="unit_cep" name="unit_cep" value="<?= $row['addr_cep']; ?>" />
+							<div class="input-group-append">
+								<div class="input-group-text load-address" title="<?= TRANS('GET_ADDRESS_INFO_BY_CEP'); ?>" data-placeholder="<?= TRANS('GET_ADDRESS_INFO_BY_CEP'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+									<i class="fas fa-search-location"></i>&nbsp;
+								</div>
+                        	</div>
+						</div>
+                    </div>
+					<label for="unit_street" class="col-md-1 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('STREET'); ?></label>
+					<div class="form-group col-md-6">
+						<input type="text" class="form-control " id="unit_street" name="unit_street"  value = "<?= $row['addr_street']; ?>"/>
+                    </div>
+					<label for="unit_neighborhood" class="col-md-2 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('NEIGHBORHOOD'); ?></label>
+					<div class="form-group col-md-3">
+						<input type="text" class="form-control " id="unit_neighborhood" name="unit_neighborhood"    value = "<?= $row['addr_neighborhood']; ?>"/>
+                    </div>
+					<label for="unit_city" class="col-md-1 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('CITY'); ?></label>
+					<div class="form-group col-md-4">
+						<input type="text" class="form-control " id="unit_city" name="unit_city" value = "<?= $row['addr_city']; ?>" />
+                    </div>
+					<label for="unit_state" class="col-md-1 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('ADDRESS_STATE'); ?></label>
+					<div class="form-group col-md-1">
+						<input type="text" class="form-control " id="unit_state" name="unit_state"  value = "<?= $row['addr_uf']; ?>" />
+                    </div>
+
+					<label for="unit_address_number" class="col-md-2 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('ADDRESS_NUMBER'); ?></label>
+					<div class="form-group col-md-3">
+						<input type="text" class="form-control " id="unit_address_number" name="unit_address_number"  value = "<?= $row['addr_number']; ?>"  />
+                    </div>
+					<label for="unit_address_complement" class="col-md-1 col-form-label col-form-label-sm text-md-right address-info"><?= TRANS('ADDRESS_COMPLEMENT'); ?></label>
+					<div class="form-group col-md-6">
+						<input type="text" class="form-control " id="unit_address_complement" name="unit_address_complement"  value = "<?= $row['addr_complement']; ?>"  />
+                    </div>
+
+					<div class="form-group col-md-2">
+					</div>
+					<div class="form-group col-md-10">
+						<hr />
+                    </div>
+
+					<label for="unit_obs" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('TXT_INFO_COMPLEM'); ?>"><?= firstLetterUp(TRANS('TXT_INFO_COMPLEM')); ?></label>
+					<div class="form-group col-md-10 ">
+						<textarea class="form-control" name="unit_obs" id="unit_obs"><?= $row['observation']; ?></textarea>
+					</div>
                     
 
 					<div class="row w-100"></div>
@@ -251,7 +377,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						<button type="submit" id="idSubmit" name="submit" value="edit" class="btn btn-primary btn-block"><?= TRANS('BT_OK'); ?></button>
 					</div>
 					<div class="form-group col-12 col-md-2">
-						<button type="reset" class="btn btn-secondary btn-block" onClick="parent.history.back();"><?= TRANS('BT_CANCEL'); ?></button>
+						<button type="reset" id="close_details" class="btn btn-secondary btn-block"><?= TRANS('BT_CANCEL'); ?></button>
 					</div>
 
 				</div>
@@ -263,10 +389,11 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 
 	<script src="../../includes/javascript/funcoes-3.0.js"></script>
 	<script src="../../includes/components/jquery/jquery.js"></script>
-	<!-- <script type="text/javascript" src="../../includes/components/jquery/jquery-ui-1.12.1/jquery-ui.js"></script> -->
 	<script src="../../includes/components/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../../includes/components/bootstrap-select/dist/js/bootstrap-select.min.js"></script>
 	<script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables.js"></script>
+    <script src="../../includes/components/Inputmask-5.x/dist/jquery.inputmask.min.js"></script>
+
 	<script type="text/javascript">
 		$(function() {
 
@@ -302,6 +429,36 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 			});
 
 
+			/* Identificar se a janela está sendo carregada em uma popup (iframe dentro de uma modal) */
+			if (isInIframe()) {
+				if (!isMainIframe()) {
+					$('#close_details').text($('#label_close').val()).on("click", function() {
+						window.parent.closeIframe();
+					});
+				} else {
+					$('#close_details').text($('#label_return').val()).on("click", function() {
+						window.history.back();
+					});
+				}
+			} else {
+				$('#close_details').text($('#label_return').val()).on("click", function() {
+					window.history.back();
+				});
+			}
+
+
+
+			$('#unit_cep').inputmask({ mask: '99999-999' }).on('change', function(e){
+				e.preventDefault();
+				loadAddressData();
+			});
+
+			$('.load-address').css('cursor', 'pointer').on('click', function(e) {
+				e.preventDefault();
+				loadAddressData();
+			});
+
+
             $('input, select, textarea').on('change', function() {
 				$(this).removeClass('is-invalid');
 			});
@@ -331,11 +488,17 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						}
 						$("#idSubmit").prop("disabled", false);
 					} else {
-						$('#divResult').html('');
-						$('input, select, textarea').removeClass('is-invalid');
-						$("#idSubmit").prop("disabled", false);
-						var url = '<?= $_SERVER['PHP_SELF'] ?>';
-						$(location).prop('href', url);
+
+						if (isInIframe() && !isMainIframe()) {
+							window.parent.loadPossibleUnits();
+							window.parent.closeIframe();
+						} else {
+							$('#divResult').html('');
+							$('input, select, textarea').removeClass('is-invalid');
+							$("#idSubmit").prop("disabled", false);
+							var url = '<?= $_SERVER['PHP_SELF'] ?>';
+							$(location).prop('href', url);
+						}
 						return false;
 					}
 				});
@@ -353,6 +516,67 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 				$(location).prop('href', url);
 			});
 		});
+
+
+
+
+
+		function loadAddressData() {
+			// e.preventDefault();
+			var loading = $(".loading");
+			$(document).ajaxStart(function() {
+				loading.show();
+			});
+			$(document).ajaxStop(function() {
+				loading.hide();
+			});
+
+			$(".address-info").each(function() {
+				$(this).prop("disabled", true);
+			});
+			$.ajax({
+				url: './get_address_by_cep.php',
+				method: 'POST',
+				data: {
+					cep: $('#unit_cep').val(),
+				},
+				dataType: 'json',
+			}).done(function(response) {
+
+				if (!response.success) {
+					$('#divResult').html(response.message);
+					$('input, select, textarea').removeClass('is-invalid');
+					if (response.field_id != "") {
+						$('#' + response.field_id).focus().addClass('is-invalid');
+					}
+					$(".address-info").each(function() {
+						$(this).prop("disabled", false);
+					});
+				} else {
+
+					$('#divResult').html('');
+					$(".address-info").each(function() {
+						$(this).prop("disabled", false);
+					});
+					$('input, select, textarea').removeClass('is-invalid');
+					
+					$('#unit_street').val(response[0].street);
+					$('#unit_neighborhood').val(response[0].neighborhood);
+					$('#unit_city').val(response[0].city);
+					$('#unit_state').val(response[0].state);
+
+					return false;
+				}
+			});
+			return false;
+		};
+
+
+
+
+
+
+
 
 
 		function confirmDeleteModal(id) {
@@ -385,6 +609,15 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 			});
 			return false;
 			// $('#deleteModal').modal('hide'); // now close modal
+		}
+
+		function isInIframe() {
+			return (window.location !== window.parent.location) ? true : false;
+		}
+
+		function isMainIframe() {
+			var iframeParent = window.parent.document.getElementById('iframeMain');
+			return (iframeParent) ? true : false;
 		}
 	</script>
 </body>

@@ -6,6 +6,10 @@
     use includes\classes\ConnectPDO;
     $conn = ConnectPDO::getInstance();
 
+    $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 1);
+
+    $_SESSION['s_page_ocomon'] = $_SERVER['PHP_SELF'];
+
     $isWorker = $_SESSION['s_can_get_routed'] == 1;
     $isAdmin = $_SESSION['s_nivel'] == 1;
     // $user_id = (!$isAdmin ? $_SESSION['s_uid'] : '');

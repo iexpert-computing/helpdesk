@@ -31,7 +31,7 @@ use includes\classes\ConnectPDO;
 $conn = ConnectPDO::getInstance();
 
 $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 3, 1);
-$_SESSION['s_page_ocomon'] = $_SERVER['PHP_SELF'];
+$_SESSION['s_page_home'] = $_SERVER['PHP_SELF'];
 
 $exception = "";
 $imgsPath = "../../includes/imgs/";
@@ -54,18 +54,20 @@ $uareas = $_SESSION['s_uareas'];
     <link rel="stylesheet" type="text/css" href="../../includes/css/util.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <style>
 
         .line {
             line-height: 1.4em;
         }
+
+        
         .icon-expand:before {
             font-family: "Font Awesome\ 5 Free";
-            /* content: "\f0fe"; */
             content: "\f105";
             font-weight: 900;
             font-size: 16px;
@@ -73,7 +75,6 @@ $uareas = $_SESSION['s_uareas'];
 
         .icon-collapse:before {
             font-family: "Font Awesome\ 5 Free";
-            /* content: "\f146"; */
             content: "\f107";
             font-weight: 900;
             font-size: 16px;
@@ -112,7 +113,6 @@ $uareas = $_SESSION['s_uareas'];
         }
 
         .list-group.list-group-root>.list-group>.list-group-item {
-            /* padding-left: 35px; */
             padding-left: 35px;
         }
 
@@ -141,6 +141,7 @@ $uareas = $_SESSION['s_uareas'];
 <body>
     <div class="container">
         <div id="idLoad" class="loading" style="display:none"></div>
+        <div id="idLoadTree" class="loading" style="display:none"></div>
     </div>
 
     <?php
@@ -160,7 +161,8 @@ $uareas = $_SESSION['s_uareas'];
         TRANS('ISSUE_TYPE'),
         TRANS('DEPARTMENT'),
         TRANS('COL_UNIT'),
-        TRANS('OPENED_BY')
+        TRANS('OPENED_BY'),
+        TRANS('AUTHORIZATION_STATUS')
     ];
     sort($options, SORT_LOCALE_STRING);
 
@@ -174,7 +176,8 @@ $uareas = $_SESSION['s_uareas'];
         TRANS('ISSUE_TYPE') => 'issue_type',
         TRANS('DEPARTMENT') => 'department',
         TRANS('COL_UNIT') => 'unit',
-        TRANS('OPENED_BY') => 'opened_by'
+        TRANS('OPENED_BY') => 'opened_by',
+        TRANS('AUTHORIZATION_STATUS') => 'authorization_status'
     ];
 
     ?>
@@ -185,7 +188,7 @@ $uareas = $_SESSION['s_uareas'];
             <div class="modal-dialog modal-xl">
                 <div class="modal-content">
                     <div id="divDetails" style="position:relative">
-                        <iframe id="ticketInfo"  frameborder="0" style="position:absolute;top:0px;width:95%;height:100vh;"></iframe>
+                        <iframe id="ticketInfo" frameborder="0" style="position:absolute;top:0px;width:100%;height:100vh;"></iframe>
                     </div>
                 </div>
             </div>
@@ -277,7 +280,7 @@ $uareas = $_SESSION['s_uareas'];
                 <div class="col-md-4">
                     <div class="form-group row my-4">
                         <div class="form-group col-md-4 align-baseline">
-                            <button type="submit" id="idSubmit" name="submit" class="btn btn-primary btn-sm btn-block"><?= TRANS('BT_AGROUP'); ?></button>
+                            <button type="submit" id="idSubmit" name="submit" class="btn btn-primary btn-sm btn-block"><i class="fas fa-sync-alt text-white"></i>&nbsp;<?= TRANS('BT_AGROUP'); ?></button>
                         </div>
                     </div>
                 </div>
@@ -492,13 +495,7 @@ $uareas = $_SESSION['s_uareas'];
 
 
             function agroup() {
-                var loading = $(".loading");
-                $(document).ajaxStart(function() {
-                    loading.show();
-                });
-                $(document).ajaxStop(function() {
-                    loading.hide();
-                });
+                $('#idLoadTree').show();
 
                 $("#idSubmit").prop("disabled", true);
                 
@@ -507,6 +504,7 @@ $uareas = $_SESSION['s_uareas'];
                     method: 'POST',
                     data: $('#form').serialize(),
                 }).done(function(response) {
+                    $('#idLoadTree').hide();
                     $('#divResult').html('');
                     $('#divResult').html(response);
 

@@ -50,6 +50,21 @@ $asset_categories = (isset($post['asset_category']) && !empty(array_filter($post
 
 $asset_types = (isset($post['asset_type']) && !empty(array_filter($post['asset_type'], function($v) { return !empty($v); })) ? array_map('noHtml', $post['asset_type']) : []);
 
+$asset_or_resource = (isset($post['asset_or_resource']) ? (int)$post['asset_or_resource'] : 1);
+
+
+$queryForTypes = [
+    1 => "",
+    2 => " AND cat.cat_is_product = 0 ",
+    3 => " AND cat.cat_is_product = 1 "
+];
+
+$titleForTypes = [
+    1 => TRANS('ALL_TYPES'),
+    2 => TRANS('ONLY_ASSETS'),
+    3 => TRANS('ONLY_RESOURCES')
+];
+
 
 $termsTotal = "";
 $terms = "";
@@ -109,9 +124,9 @@ if (!empty($_SESSION['s_allowed_units'])) {
 
 
 if (!empty($units_filter)) {
-    $termsTotal .= (!empty($termsTotal) ? " AND " : " WHERE ");
+    // $termsTotal .= (!empty($termsTotal) ? " AND " : " WHERE ");
     $units_filter = implode(",", array_column($units_filter, 'inst_cod'));
-    $termsTotal .= " e.comp_inst IN ({$units_filter})";
+    $termsTotal .= " AND e.comp_inst IN ({$units_filter})";
     $terms .= " AND e.comp_inst IN ({$units_filter})";
 }
 
@@ -148,11 +163,22 @@ if (!empty($asset_categories)) {
 
 
 if (!empty($types_filter)) {
-    $termsTotal .= (!empty($termsTotal) ? " AND " : " WHERE ");
+    // $termsTotal .= (!empty($termsTotal) ? " AND " : " WHERE ");
     $types_filter = implode(",", array_column($types_filter, 'tipo_cod'));
-    $termsTotal .= " e.comp_tipo_equip IN ({$types_filter})";
+    $termsTotal .= " AND e.comp_tipo_equip IN ({$types_filter})";
     $terms .= " AND e.comp_tipo_equip IN ({$types_filter})";
 }
+
+
+
+if (!empty($asset_or_resource)) {
+    $criteria['asset_or_resource'] = $titleForTypes[$asset_or_resource];
+    $termsTotal .= $queryForTypes[$asset_or_resource];
+    $terms .= $queryForTypes[$asset_or_resource];
+
+    $criteriaAssetOrResource = TRANS('CONSIDERS') . ':&nbsp;' . $criteria['asset_or_resource'];
+}
+
 
 
 
@@ -193,7 +219,7 @@ if (empty($criteria['asset_type'])) {
     $criteriaTypes = TRANS('COL_TYPE') . ':&nbsp;' . $types_names;    
 }
 
-$criteriaText .= $criteriaClient . '<br />' . $criteriaUnits . '<br />' . $criteriaCategory . '<br />' . $criteriaTypes;
+$criteriaText .= $criteriaClient . '<br />' . $criteriaUnits . '<br />' . $criteriaCategory . '<br />' . $criteriaTypes . '<br />' . $criteriaAssetOrResource;
 
 
 if (!empty($_SESSION['s_allowed_units'])) {
@@ -207,8 +233,16 @@ $data['criteria'] = $criteriaText;
 /* Totalização dos registros com base nos critérios */
 $sqlTotal = "SELECT 
                 count(*) as total 
-            FROM equipamentos e 
-            {$termsTotal}";
+            FROM 
+                equipamentos e, 
+                tipo_equip t
+                LEFT JOIN assets_categories cat ON cat.id = t.tipo_categoria 
+
+            WHERE
+                e.comp_tipo_equip = t.tipo_cod
+            
+                {$termsTotal}";
+
 try {
     $res = $conn->prepare($sqlTotal);
     $res->execute();
@@ -236,7 +270,8 @@ $sql = "SELECT
             t.tipo_nome AS asset_type,
             u.inst_nome AS asset_unit
         FROM 
-            equipamentos e, tipo_equip t, instituicao u
+            equipamentos e, instituicao u, tipo_equip t 
+            LEFT JOIN assets_categories cat ON cat.id = t.tipo_categoria
         WHERE
             e.comp_tipo_equip = t.tipo_cod AND
             e.comp_inst = u.inst_cod
@@ -270,7 +305,8 @@ $sql = "SELECT
             ROUND (count(*)*100/" . $data['total'] . ", 2) as percentual,
             t.tipo_nome AS asset_type
         FROM 
-            equipamentos e, tipo_equip t, instituicao u
+            equipamentos e, instituicao u, tipo_equip t 
+            LEFT JOIN assets_categories cat ON cat.id = t.tipo_categoria 
         WHERE
             e.comp_tipo_equip = t.tipo_cod AND
             e.comp_inst = u.inst_cod
@@ -338,8 +374,10 @@ $sql = "SELECT
             ROUND (count(*)*100/" . $data['total'] . ", 2) as percentual,
             COALESCE(c.nickname, 'N/A') AS client
         FROM 
-            equipamentos e, tipo_equip t, instituicao u
-            LEFT JOIN clients c ON c.id = u.inst_client
+            equipamentos e, instituicao u
+                LEFT JOIN clients c ON c.id = u.inst_client,
+            tipo_equip t
+                LEFT JOIN assets_categories cat ON cat.id = t.tipo_categoria
         WHERE
             e.comp_tipo_equip = t.tipo_cod AND
             e.comp_inst = u.inst_cod
@@ -373,7 +411,8 @@ $sql = "SELECT
             -- t.tipo_nome AS asset_type,
             u.inst_nome AS asset_unit
         FROM 
-            equipamentos e, tipo_equip t, instituicao u
+            equipamentos e, instituicao u, tipo_equip t
+                LEFT JOIN assets_categories cat ON cat.id = t.tipo_categoria
         WHERE
             e.comp_tipo_equip = t.tipo_cod AND
             e.comp_inst = u.inst_cod

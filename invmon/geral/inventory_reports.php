@@ -33,6 +33,10 @@ $conn = ConnectPDO::getInstance();
 
 $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 2, 2);
 
+$isAdmin = $_SESSION['s_nivel'] == 1;
+
+$showDeprecated = getConfigValue($conn, 'SHOW_DEPRECATED') ?? 1;
+
 $_SESSION['s_page_invmon'] = $_SERVER['PHP_SELF'];
 
 function ordenaPorColunas($array, $col)
@@ -94,9 +98,7 @@ $itenBadge = array();
 /* Links */
 $listItem[TRANS('TOP_TEN_MODELS_RECORD')] = "show_top_ten_equipments_models.php";
 $listItem[TRANS('TTL_QTD_EQUIP_CAD_FOR_LOCAL')] = "report_assets_by_department.php";
-$listItem[TRANS('TTL_COMP_X_MEMORY')] = "show_equipments_by_memory.php";
-$listItem[TRANS('TTL_COMP_X_PROCESSOR')] = "show_equipments_by_processor.php";
-$listItem[TRANS('TTL_COMP_X_HD')] = "show_equipments_by_hdd.php";
+
 $listItem[TRANS('TTL_EQUIP_X_SITUAC')] = "report_assets_by_state.php";
 $listItem[TRANS('TTL_ESTAT_CAD_EQUIP')] = "report_assets_general.php";
 $listItem[TRANS('TTL_EQUIP_X_RECTORY')] = "report_assets_by_rectory.php";
@@ -109,9 +111,21 @@ $listItem[TRANS('ASSETS_BY_ATTRIBUTE')] = "report_assets_by_attribute.php";
 /* Icons */
 $itemIcon[TRANS('TOP_TEN_MODELS_RECORD')] = "<i class='fas fa-clone text-secondary'></i>";
 $itemIcon[TRANS('TTL_QTD_EQUIP_CAD_FOR_LOCAL')] = "<i class='fas fa-door-closed text-secondary'></i>";
-$itemIcon[TRANS('TTL_COMP_X_MEMORY')] = "<i class='fas fa-memory text-secondary'></i>";
-$itemIcon[TRANS('TTL_COMP_X_PROCESSOR')] = "<i class='fas fa-microchip text-secondary'></i>";
-$itemIcon[TRANS('TTL_COMP_X_HD')] = "<i class='fas fa-hdd text-secondary'></i>";
+
+if ($showDeprecated) {
+    $listItem[TRANS('TTL_COMP_X_MEMORY')] = "show_equipments_by_memory.php";
+    $listItem[TRANS('TTL_COMP_X_PROCESSOR')] = "show_equipments_by_processor.php";
+    $listItem[TRANS('TTL_COMP_X_HD')] = "show_equipments_by_hdd.php";
+    
+    $itemIcon[TRANS('TTL_COMP_X_MEMORY')] = "<i class='fas fa-memory text-secondary'></i>";
+    $itemIcon[TRANS('TTL_COMP_X_PROCESSOR')] = "<i class='fas fa-microchip text-secondary'></i>";
+    $itemIcon[TRANS('TTL_COMP_X_HD')] = "<i class='fas fa-hdd text-secondary'></i>";
+
+    $itemBadge[TRANS('TTL_COMP_X_MEMORY')] = '&nbsp;<span class="badge badge-warning text-small">' . TRANS('DEPRECATED') . '</span>';
+    $itemBadge[TRANS('TTL_COMP_X_PROCESSOR')] = '&nbsp;<span class="badge badge-warning text-small">' . TRANS('DEPRECATED') . '</span>';
+    $itemBadge[TRANS('TTL_COMP_X_HD')] = '&nbsp;<span class="badge badge-warning text-small">' . TRANS('DEPRECATED') . '</span>';
+}
+
 $itemIcon[TRANS('TTL_EQUIP_X_SITUAC')] = "<i class='fas fa-hashtag text-secondary'></i>";
 $itemIcon[TRANS('TTL_ESTAT_CAD_EQUIP')] = "<i class='fas fa-qrcode text-secondary'></i>";
 $itemIcon[TRANS('TTL_EQUIP_X_RECTORY')] = "<i class='fas fa-university text-secondary'></i>";
@@ -123,9 +137,7 @@ $itemIcon[TRANS('ASSETS_BY_AGGREGATE')] = "<i class='fas fa-puzzle-piece text-se
 /* Badges */
 $itemBadge[TRANS('TOP_TEN_MODELS_RECORD')] = '';
 $itemBadge[TRANS('TTL_QTD_EQUIP_CAD_FOR_LOCAL')] = '';
-$itemBadge[TRANS('TTL_COMP_X_MEMORY')] = '&nbsp;<span class="badge badge-warning text-small">' . TRANS('DEPRECATED') . '</span>';
-$itemBadge[TRANS('TTL_COMP_X_PROCESSOR')] = '&nbsp;<span class="badge badge-warning text-small">' . TRANS('DEPRECATED') . '</span>';
-$itemBadge[TRANS('TTL_COMP_X_HD')] = '&nbsp;<span class="badge badge-warning text-small">' . TRANS('DEPRECATED') . '</span>';
+
 $itemBadge[TRANS('TTL_EQUIP_X_SITUAC')] = '';
 $itemBadge[TRANS('TTL_ESTAT_CAD_EQUIP')] = '';
 $itemBadge[TRANS('TTL_EQUIP_X_RECTORY')] = '';
@@ -134,6 +146,12 @@ $itemBadge[TRANS('TTL_EXPIRAT_GUARANTEE')] = '';
 $itemBadge[TRANS('ASSETS_BY_ATTRIBUTE')] = '';
 $itemBadge[TRANS('ASSETS_BY_AGGREGATE')] = '';
 
+
+if ($isAdmin) {
+    $listItem[TRANS('ASSETS_COST_BY_USER')] = "report_assets_cost_by_user.php";
+    $itemIcon[TRANS('ASSETS_COST_BY_USER')] = "<i class='fas fa-hand-holding-usd text-secondary'></i>";
+    $itemBadge[TRANS('ASSETS_COST_BY_USER')] = '';
+}
 
 ?>
 <!DOCTYPE html>
@@ -145,7 +163,9 @@ $itemBadge[TRANS('ASSETS_BY_AGGREGATE')] = '';
     <link rel="stylesheet" type="text/css" href="../../includes/css/estilos.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
+
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
     <style>
         #loadSmartSearch {
             cursor: pointer;

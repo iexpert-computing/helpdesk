@@ -57,8 +57,9 @@ $custom_fields_classes_text = implode(",", $custom_fields_classes);
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
 </head>
 
@@ -191,6 +192,16 @@ $custom_fields_classes_text = implode(",", $custom_fields_classes);
             var obs = $.initialize("#table_tickets_queue", function() {
                 
                 var criterios = $('#divCriterios').text();
+
+                function setTitles() {
+                    var buttons = $( 'a.buttons-columnVisibility' );
+
+                    buttons.each(function( index ) {
+                        // console.log( index + ": " + $( this ).text() );
+                        var tooltip =  $( this ).text() ;
+                        $( this ).attr( 'title', tooltip );
+                    });
+                }
                 
                 var table = $('#table_tickets_queue').DataTable({
 
@@ -378,6 +389,10 @@ $custom_fields_classes_text = implode(",", $custom_fields_classes);
 
                 table.buttons().container()
                     .appendTo($('.display-buttons:eq(0)', table.table().container()));
+
+                table.on( 'buttons-action', function ( e, buttonApi, dataTable, node, config ) {
+                    setTitles();
+                });
 
 
             }, {

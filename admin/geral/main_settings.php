@@ -52,12 +52,53 @@ if (!defined('ALLOWED_LANGUAGES')) {
 array_multisort($langLabels, SORT_LOCALE_STRING);
 
 
+$categoriesLabels = [
+	1 => $config['conf_prob_tipo_1'],
+	2 => $config['conf_prob_tipo_2'],
+	3 => $config['conf_prob_tipo_3'],
+	4 => $config['conf_prob_tipo_4'],
+	5 => $config['conf_prob_tipo_5'],
+	6 => $config['conf_prob_tipo_6']
+];
+
+$categories[] = ["tag" => $config['conf_prob_tipo_1'], "value" => 1];
+$categories[] = ["tag" => $config['conf_prob_tipo_2'], "value" => 2];
+$categories[] = ["tag" => $config['conf_prob_tipo_3'], "value" => 3];
+$categories[] = ["tag" => $config['conf_prob_tipo_4'], "value" => 4];
+$categories[] = ["tag" => $config['conf_prob_tipo_5'], "value" => 5];
+$categories[] = ["tag" => $config['conf_prob_tipo_6'], "value" => 6];
+$categories = json_encode($categories);	
+
+$categories_setted = $config['conf_cat_chain_at_opening'];
+$textCategoriesSetted = TRANS('NO_PRE_FILTERS_DEFINED');
+if (!empty($categories_setted)) {
+	$textCategoriesSetted = "<ol class='categories_setted'>";
+	$array_categories_setted = explode(',', $categories_setted);
+	foreach ($array_categories_setted as $cat) {
+		$textCategoriesSetted .= "<li>" . $categoriesLabels[$cat] . "</li>";
+	}
+	$textCategoriesSetted .= "</ol>";
+}	
+
+
+
 $response_at_routing = [
 	'never' => TRANS('NEVER'),
 	'always' => TRANS('ALWAYS'),
 	'choice' => TRANS('OPERATOR_DECIDES')
 ];
 array_multisort($response_at_routing, SORT_LOCALE_STRING);
+
+/* Possíveis posições do campo descrição dos chamados */
+$descriptionFieldPositions = [
+	'default' => TRANS('COL_DEFAULT'),
+	'top' => TRANS('TOP'),
+	'bottom' => TRANS('BOTTOM'),
+];
+array_multisort($descriptionFieldPositions, SORT_LOCALE_STRING);
+
+$descriptionCurrentPos = getConfigValue($conn, 'TICKET_DESCRIPTION_POS') ?? 'default';
+
 
 
 $panels = [
@@ -87,9 +128,11 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/components/jquery/jquery.amsify.suggestags-master/css/amsify.suggestags.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/css/my_datatables.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap-select/dist/css/bootstrap-select.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/my_bootstrap_select.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
 
 	<style>
@@ -97,11 +140,15 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 			border: 1px solid;
 			color: #CCCCCC !important;
 			/* border-radius: 5px; */
+		}
 
+		li {
+			list-style: none;
+			line-height: 1.5em;
 		}
 	</style>
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -137,10 +184,28 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 		/* Listagem de status possíveis */
 		$status = getStatus($conn, 0, '1,2');
 		$status_done = getStatus($conn, 0, '3', '1', [12]);
+
+
+		/* Status para monitorar quanto a inatividade */
+		$statusToMonitorByInactivity = [];
+		if ($config['stats_to_close_by_inactivity']) {
+			$statusToMonitorByInactivity = explode(",", (string)$config['stats_to_close_by_inactivity']);
+		}
+
+		/* Status após retorno do solicitante */
+		$statusOutInactivity = $config['stat_out_inactivity'];
+
+
+
 		/* Base de referência de perfil de jornada - área origem do chamado ou a área de atendimento */
 		$wt_areas = array();
 		$wt_areas[1] = TRANS('ORIGIN_AREA');
 		$wt_areas[2] = TRANS('SERVICE_AREA');
+
+
+		/* Campos customizados do tipo texto */
+		$textCustomFields = getCustomFields($conn, null, "ocorrencias", ["text"]);
+		$textCustomFields = arraySortByColumn($textCustomFields, 'field_label');
 
 
 		/* Classes para o grid */
@@ -174,6 +239,51 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 					<div class="<?= $colContent; ?>"><?= $config['conf_ocomon_site']; ?></div>
 				</div>
 
+				<h6 class="w-100 mt-5 border-top p-4"><i class="fas fa-bars text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('DEPRECATED_OPTIONS')); ?></h6>
+				<div class="row my-2">
+					<div class="<?= $colLabel2; ?>"><?= firstLetterUp(TRANS('SHOW_DEPRECATED_OPTIONS_IN_MENU')); ?></div>
+					<div class="<?= $colContent2; ?>">
+						<?php
+						$yesChecked = (getConfigValue($conn, 'SHOW_DEPRECATED') ?? 1) == 1 ? " checked" : "" ;
+						$noChecked = (getConfigValue($conn, 'SHOW_DEPRECATED') ?? 1) != 1 ? " checked" : "" ;
+						?>
+						<div class="switch-field">
+							<input type="radio" id="show_deprecated" name="show_deprecated" value="yes" <?= $yesChecked; ?> disabled />
+							<label for="show_deprecated"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="show_deprecated_no" name="show_deprecated" value="no" <?= $noChecked; ?> disabled />
+							<label for="show_deprecated_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+				</div>
+				
+				<!-- Abertura de chamados -->
+				<h6 class="w-100 mt-5 border-top p-4"><i class="fas fa-plus text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('TICKETS_OPENING')); ?></h6>
+				<div class="row my-2">
+					<div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('OPENING_PRE_FILTERS_TO_ISSUES')); ?></div>
+					<div class="<?= $colContentLine; ?>"><?= $textCategoriesSetted; ?></div>
+
+
+					<div class="<?= $colLabel2; ?>"><?= firstLetterUp(TRANS('CONF_ONLY_REQUESTER_CAN_OPEN_AS_OTHERS')); ?></div>
+					<div class="<?= $colContent2; ?>">
+						<?php
+						$basic_users_can_open_as_others = getConfigValue($conn, 'ALLOW_BASIC_USERS_REQUEST_AS_OTHERS') ?? 0;
+
+						$yesChecked = ($basic_users_can_open_as_others == 1 ? "checked" : "");
+						$noChecked = ($basic_users_can_open_as_others == 0 ? "checked" : "");
+						?>
+						<div class="switch-field">
+							<input type="radio" id="basic_users_can_request_as_others" name="basic_users_can_request_as_others" value="yes" <?= $yesChecked; ?> disabled />
+							<label for="basic_users_can_request_as_others"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="basic_users_can_request_as_others_no" name="basic_users_can_request_as_others" value="no" <?= $noChecked; ?> disabled />
+							<label for="basic_users_can_request_as_others_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
+				</div>
+				
+				
+				
+				
 				<!-- TICKET_CLOSING_MODE_BY_REQUESTER -->
 				<h6 class="w-100 mt-5 border-top p-4"><i class="fas fa-check text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('TICKET_CLOSING')); ?></h6>
 				
@@ -198,6 +308,64 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 					<div class="<?= $colContent2; ?>"><?= $config['conf_time_to_close_after_done']; ?>&nbsp;<?= $textAboutWeekTime; ?></div>
 					<div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('DEFAULT_AUTOMATIC_RATE')); ?></div>
 					<div class="<?= $colContent2; ?>"><?= $ratingLabels[$config['conf_rate_after_deadline']]; ?></div>
+				</div>
+				
+
+				<!-- Encerramento automático para chamados inativos -->
+				<h6 class="w-100 mt-5 border-top p-4"><i class="fas fa-check text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('TICKETS_CLOSING_BY_INACTIVITY')); ?></h6>
+				<div class="row my-2">
+					<?php
+						$textAboutWeekTime = ($config['only_weekdays_to_count_inactivity'] ? TRANS('TEXT_BUSINESS_DAYS') : TRANS('TEXT_RUNNING_DAYS'));
+					
+						$textStatusToCloseByInactivity = TRANS('WITHOUT_DEFINITION');
+
+						if (!empty($statusToMonitorByInactivity)) {
+							$textStatusToCloseByInactivity = "";
+							foreach ($statusToMonitorByInactivity as $statInactive) {
+								$textStatusToCloseByInactivity .= '<li>' . getStatusInfo($conn, $statInactive)['status'] . '</li>';
+							}
+						}
+						
+					?>
+					
+					<div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('STATUS_TO_MONITOR_BY_INACTIVITY')); ?></div>
+					<div class="<?= $colContent; ?>"><?= $textStatusToCloseByInactivity; ?></div>
+
+					<div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('STATUS_REQUESTER_IS_ALIVE')); ?></div>
+					<div class="<?= $colContent; ?>"><?= getStatusInfo($conn, $statusOutInactivity)['status']; ?></div>
+
+					<div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('DAYS_TO_CLOSE_BY_INACTIVITY')); ?></div>
+					<div class="<?= $colContent2; ?>"><?= $config['days_to_close_by_inactivity']; ?>&nbsp;<?= $textAboutWeekTime; ?></div>
+					<div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('DEFAULT_AUTOMATIC_RATE')); ?></div>
+					<div class="<?= $colContent2; ?>"><?= $ratingLabels[$config['rate_after_close_by_inactivity']]; ?></div>
+				</div>
+
+				
+				
+
+				<!-- TICKETS COST OPTIONS-->
+				<h6 class="w-100 mt-5 border-top p-4"><i class="fas fa-file-invoice-dollar text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('TTL_TICKETS_COST')); ?></h6>
+				<div class="row my-2">
+
+					<?php
+						$fieldLabel = TRANS('MSG_NOT_DEFINED');
+						if (!empty($config['tickets_cost_field'])) {
+							$fieldLabel = getCustomFields($conn, $config['tickets_cost_field'])['field_label'];
+						}
+					?>
+					<div class="<?= $colLabel2; ?>"><?= firstLetterUp(TRANS('TICKETS_COST_FIELD')); ?></div>
+					<div class="<?= $colContent2; ?>"><?= $fieldLabel; ?></div>
+					
+					<div class="<?= $colLabel2; ?>"><?= firstLetterUp(TRANS('OPT_STATUS_TO_WAITING_COST_AUTHORIZATION')); ?></div>
+					<div class="<?= $colContent2; ?>"><?= getStatusInfo($conn, $config['status_waiting_cost_auth'])['status']; ?></div>
+
+					<div class="<?= $colLabel2; ?>"><?= firstLetterUp(TRANS('OPT_STATUS_COST_AUTHORIZATED')); ?></div>
+					<div class="<?= $colContent2; ?>"><?= getStatusInfo($conn, $config['status_cost_authorized'])['status']; ?></div>
+					<div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('OPT_STATUS_COST_REFUSED')); ?></div>
+					<div class="<?= $colContent2; ?>"><?= getStatusInfo($conn, $config['status_cost_refused'])['status']; ?></div>
+					<div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('OPT_STATUS_COST_UPDATED')); ?></div>
+					<div class="<?= $colContent2; ?>"><?= getStatusInfo($conn, $config['status_cost_updated'])['status']; ?></div>
+
 				</div>
 				
 
@@ -517,6 +685,19 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 							<label for="upld_html_no"><?= TRANS('NOT'); ?></label>
 						</div>
 					</div>
+					<div class="<?= $colLabel2; ?>"><?= firstLetterUp(TRANS('OPT_UPLOAD_TYPE_WAV')); ?></div>
+					<div class="<?= $colContent2; ?>">
+						<?php
+						$yesChecked = (strpos($config['conf_upld_file_types'], '%WAV%')) ? " checked" : "";
+						$noChecked = (!strpos($config['conf_upld_file_types'], '%WAV%')) ? " checked" : "";
+						?>
+						<div class="switch-field">
+							<input type="radio" id="upld_wav" name="upld_wav" value="yes" <?= $yesChecked; ?> disabled />
+							<label for="upld_wav"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="upld_wav_no" name="upld_wav" value="no" <?= $noChecked; ?> disabled />
+							<label for="upld_wav_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
 				</div>
 
 				<!-- section -->
@@ -530,7 +711,7 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 				</div>
 
 
-				<!-- section -->
+				<!-- section Barra de formatação de textos -->
 				<h6 class="w-100 mt-5 border-top p-4"><i class="fas fa-align-right text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('FORMATTING_BAR')); ?></h6>
 				<div class="row my-2">
 					<div class="<?= $colLabel2; ?>"><?= firstLetterUp(TRANS('OPT_MURAL')); ?></div>
@@ -562,6 +743,15 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 				</div>
 
 
+				<!-- Configuração para posicionamento do campo de Descrição dos chamados -->
+				<h6 class="w-100 mt-5 border-top p-4"><i class="fas fa-ellipsis-h text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('MISCELLENEOUS')); ?></h6>
+				<div class="row my-2">
+					<div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('DESCRIPTION_FIELD_POSITION')); ?></div>
+					<div class="<?= $colContent; ?>"><?= $descriptionFieldPositions[$descriptionCurrentPos]; ?></div>
+				</div>
+				<div class="w-100"></div>
+
+
 				<!-- section -->
 				<h6 class="w-100 mt-5 border-top p-4"><i class="fas fa-bell text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('OPT_SEND_MAIL_WRTY')); ?></h6>
 				<div class="row my-2">
@@ -569,6 +759,66 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 					<div class="<?= $colContent2; ?>"><?= $config['conf_days_bf']; ?></div>
 					<div class="<?= $colLabel2; ?>"><?= firstLetterUp(TRANS('OPT_SEL_AREA')); ?></div>
 					<div class="<?= $colContent2; ?>"><?= getAreaInfo($conn, $config['conf_wrty_area'])['area_name']; ?></div>
+				</div>
+
+				<!-- Quantidade máxima de ativos que podem ser cadastradas em um lote -->
+				<h6 class="w-100 mt-5 border-top p-4"><i class="fas fa-boxes text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('ASSETS_BATCH_REGISTER')); ?></h6>
+				<div class="row my-2">
+					<div class="<?= $colLabel; ?>"><?= firstLetterUp(TRANS('MAX_AMOUNT_EACH_ASSET_BATCH')); ?></div>
+					<div class="<?= $colContent; ?>"><?= getConfigValue($conn, 'MAX_AMOUNT_BATCH_ASSETS_RECORD') ?? 1; ?></div>
+				</div>
+
+				<h6 class="w-100 mt-5 border-top p-4"><i class="fas fa-truck-loading text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('ASSETS_ALLOCATION_TO_USERS')); ?></h6>
+				<div class="row my-2">
+					<div class="<?= $colLabel2; ?>"><?= firstLetterUp(TRANS('ALLOW_ALLOCATION_BTW_CLIENTS')); ?></div>
+					<div class="<?= $colContent2; ?>">
+						<?php
+						$yesChecked = (getConfigValue($conn, 'ALLOW_USER_GET_ASSETS_BTW_CLIENTS') ?? 0) == 1 ? " checked" : "" ;
+						$noChecked = (getConfigValue($conn, 'ALLOW_USER_GET_ASSETS_BTW_CLIENTS') ?? 0) != 1 ? " checked" : "" ;
+						?>
+						<div class="switch-field">
+							<input type="radio" id="allow_assets_btw_clients" name="allow_assets_btw_clients" value="yes" <?= $yesChecked; ?> disabled />
+							<label for="allow_assets_btw_clients"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="allow_assets_btw_clients_no" name="allow_assets_btw_clients" value="no" <?= $noChecked; ?> disabled />
+							<label for="allow_assets_btw_clients_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+				
+					<div class="<?= $colLabel2; ?>"><?= firstLetterUp(TRANS('ALLOW_ALLOCATION_BTW_CLIENTS_ONLY_TO_OPS')); ?></div>
+					<div class="<?= $colContent2; ?>">
+						<?php
+						$yesChecked = (getConfigValue($conn, 'ALLOW_ONLY_OPS_GET_ASSETS_BTW_CLIENTS') ?? 0) == 1 ? " checked" : "" ;
+						$noChecked = (getConfigValue($conn, 'ALLOW_ONLY_OPS_GET_ASSETS_BTW_CLIENTS') ?? 0) != 1 ? " checked" : "" ;
+						?>
+						<div class="switch-field">
+							<input type="radio" id="allow_only_ops_assets_btw_clients" name="allow_only_ops_assets_btw_clients" value="yes" <?= $yesChecked; ?> disabled />
+							<label for="allow_only_ops_assets_btw_clients"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="allow_only_ops_assets_btw_clients_no" name="allow_only_ops_assets_btw_clients" value="no" <?= $noChecked; ?> disabled />
+							<label for="allow_only_ops_assets_btw_clients_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
+					<div class="<?= $colLabel2; ?>"><?= firstLetterUp(TRANS('DISABLED_USERS_ASSETS_DEPARTMENT')); ?></div>
+					<?php
+						$department = TRANS('MSG_NOT_DEFINED');
+						$autoDepartmentId = getConfigValue($conn, 'ASSETS_AUTO_DEPARTMENT') ?? 0;
+						if ($autoDepartmentId) {
+							$autoDepartmentInfo = getDepartments($conn, null, $autoDepartmentId);
+
+							$keys = ['local', 'nickname', 'unidade'];
+							
+							$departmentInfoArray = [];
+							foreach ($keys as $key) {
+								$departmentInfoArray[] = $autoDepartmentInfo[$key];
+							}
+							$department = implode(" - ", array_filter($departmentInfoArray));
+						}
+
+
+					?>
+					<div class="<?= $colContent; ?>"><?= $department; ?></div>
+
+
 				</div>
 
 
@@ -619,6 +869,44 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						<input type="text" class="form-control" name="site" id="site" required value="<?= $config['conf_ocomon_site']; ?>" />
 					</div>
 
+					<h6 class="w-100 mt-5 ml-5 border-top p-4"><i class="fas fa-bars text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('DEPRECATED_OPTIONS')); ?></h6>
+					<label for="max_amount_batch_assets_record" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_SHOW_DEPRECATED_OPTIONS_IN_MENU'); ?>"><?= firstLetterUp(TRANS('SHOW_DEPRECATED_OPTIONS_IN_MENU')); ?></label>
+
+					<div class="form-group col-md-10 ">
+						<div class="switch-field">
+							<?php
+							$yesChecked = (getConfigValue($conn, 'SHOW_DEPRECATED') ?? 1) == 1 ? " checked" : "" ;
+							$noChecked = (getConfigValue($conn, 'SHOW_DEPRECATED') ?? 1) != 1 ? " checked" : "" ;
+							?>
+							<input type="radio" id="show_deprecated" name="show_deprecated" value="yes" <?= $yesChecked; ?> />
+							<label for="show_deprecated"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="show_deprecated_no" name="show_deprecated" value="no" <?= $noChecked; ?> />
+							<label for="show_deprecated_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
+					<h6 class="w-100 mt-5 ml-5 border-top p-4"><i class="fas fa-plus text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('TICKETS_OPENING')); ?></h6>
+					<label for="pre_filters" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_OPENING_PRE_FILTERS_TO_ISSUES'); ?>"><?= firstLetterUp(TRANS('OPENING_PRE_FILTERS_TO_ISSUES')); ?></label>
+					<div class="form-group col-md-10">
+						<input type="text" class="form-control" name="pre_filters" id="pre_filters" value="<?= $config['conf_cat_chain_at_opening']; ?>" placeholder="<?= TRANS('ADD_OR_REMOVE'); ?>" />
+					</div>
+
+					<label class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_CONF_ONLY_REQUESTER_CAN_OPEN_AS_OTHERS'); ?>"><?= firstLetterUp(TRANS('CONF_ONLY_REQUESTER_CAN_OPEN_AS_OTHERS')); ?></label>
+					<div class="form-group col-md-4 ">
+						<div class="switch-field">
+							<?php
+
+							$basic_users_can_open_as_others = getConfigValue($conn, 'ALLOW_BASIC_USERS_REQUEST_AS_OTHERS') ?? 0;
+
+							$yesChecked = ($basic_users_can_open_as_others == 1 ? "checked" : "");
+							$noChecked = ($basic_users_can_open_as_others == 0 ? "checked" : "");
+							?>
+							<input type="radio" id="basic_users_can_request_as_others" name="basic_users_can_request_as_others" value="yes" <?= $yesChecked; ?> />
+							<label for="basic_users_can_request_as_others"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="basic_users_can_request_as_others_no" name="basic_users_can_request_as_others" value="no" <?= $noChecked; ?> />
+							<label for="basic_users_can_request_as_others_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
 
 
 					<h6 class="w-100 mt-5 ml-5 border-top p-4"><i class="fas fa-check text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('TICKET_CLOSING')); ?></h6>
@@ -677,6 +965,157 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 							foreach ($ratingLabels as $key => $label) {
 							?>
 								<option value="<?= $key; ?>" <?= ($key == $config['conf_rate_after_deadline']) ? 'selected' : ''; ?>><?= $label; ?></option>
+							<?php
+							}
+							?>
+						</select>
+					</div>
+
+					<!-- Encerramento automático por inatividade -->
+					<h6 class="w-100 mt-5 ml-5 border-top p-4"><i class="fas fa-check text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('TICKETS_CLOSING_BY_INACTIVITY')); ?></h6>
+
+					<label for="status_to_monitor" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_TICKETS_CLOSING_BY_INACTIVITY'); ?>"><?= firstLetterUp(TRANS('STATUS_TO_MONITOR_BY_INACTIVITY')); ?></label>
+					<div class="form-group col-md-10 ">
+						<select class="form-control bs-select" name="status_to_monitor[]" required id="status_to_monitor" multiple="multiple">
+							<?php
+							$subtext = "";
+							foreach ($status as $stat) {
+								$subtext = $panels[$stat['stat_painel']] . "&nbsp;|&nbsp;" . $timeFreeze[$stat['stat_time_freeze']];
+							?>
+								<option data-subtext="<?= $subtext; ?>" value="<?= $stat['stat_id']; ?>" <?= (in_array($stat['stat_id'], $statusToMonitorByInactivity)) ? ' selected' : ''; ?>><?= $stat['status']; ?></option>
+							<?php
+							}
+							?>
+						</select>
+					</div>
+
+					<label for="status_to_monitor" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('STATUS_REQUESTER_IS_ALIVE'); ?>"><?= firstLetterUp(TRANS('STATUS_REQUESTER_IS_ALIVE')); ?></label>
+					<div class="form-group col-md-10 ">
+						<select class="form-control bs-select" name="status_out_inactivity" required id="status_out_inactivity">
+							<?php
+							$subtext = "";
+							foreach ($status as $stat) {
+								$subtext = $panels[$stat['stat_painel']] . "&nbsp;|&nbsp;" . $timeFreeze[$stat['stat_time_freeze']];
+							?>
+								<option data-subtext="<?= $subtext; ?>" value="<?= $stat['stat_id']; ?>" <?= ($stat['stat_id'] == $statusOutInactivity) ? ' selected' : ''; ?>><?= $stat['status']; ?></option>
+							<?php
+							}
+							?>
+						</select>
+					</div>
+
+					<label for="days_to_close_by_inactivity" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_DAYS_TO_CLOSE_BY_INACTIVITY'); ?>"><?= firstLetterUp(TRANS('DAYS_TO_CLOSE_BY_INACTIVITY')); ?></label>
+					<div class="form-group col-md-4">
+					<div class="input-group">	
+						<input type="number" class="form-control" name="days_to_close_by_inactivity" id="days_to_close_by_inactivity" min="1" value="<?= $config['days_to_close_by_inactivity']; ?>" />
+						<div class="input-group-append">
+
+							<?php
+								$checked = ($config['only_weekdays_to_count_inactivity'] ? " checked" : "");
+							?>
+							
+                            <div class="input-group-text" title="<?= TRANS('COUNTS_ONLY_WEEKDAYS'); ?>" data-placeholder="<?= TRANS('COUNTS_ONLY_WEEKDAYS'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover">
+                                <i class="fas fa-business-time"></i>&nbsp;
+                                <input type="checkbox" class="last-check" name="only_weekdays_to_count_inactivity" id="only_weekdays_to_count_inactivity" value="1" <?= $checked; ?>>
+                            </div>
+                        </div>
+					</div>
+					</div>
+
+					<label for="default_inactivity_automatic_rate" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('DEFAULT_AUTOMATIC_RATE'); ?>"><?= firstLetterUp(TRANS('DEFAULT_AUTOMATIC_RATE')); ?></label>
+					<div class="form-group col-md-4 ">
+						<select class="form-control bs-select" name="default_inactivity_automatic_rate" required id="default_inactivity_automatic_rate">
+							<?php
+							foreach ($ratingLabels as $key => $label) {
+							?>
+								<option value="<?= $key; ?>" <?= ($key == $config['rate_after_close_by_inactivity']) ? 'selected' : ''; ?>><?= $label; ?></option>
+							<?php
+							}
+							?>
+						</select>
+					</div>
+					<!-- Final da seção sobre o encerramento automático por inatividade -->
+
+
+
+
+					<h6 class="w-100 mt-5 ml-5 border-top p-4"><i class="fas fa-file-invoice-dollar text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('TTL_TICKETS_COST_AND_AUTHORIZATION_FLOW')); ?></h6>
+					
+					<label for="tickets_cost_field" class="col-md-2 col-form-label col-form-label-sm text-md-right" title="<?= TRANS('TICKETS_COST_FIELD'); ?>" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_TICKETS_COST_FIELD'); ?>"><?= firstLetterUp(TRANS('TICKETS_COST_FIELD')); ?></label>
+					<div class="form-group col-md-4 ">
+						
+						<?php
+							if (empty($textCustomFields)) {
+								echo message('danger', 'Ooops!', TRANS('MSG_NO_CUSTOM_FIELDS_TICKETS_COST'), '', '', 1 );
+							} else {
+								?>
+								<select class="form-control bs-select" name="tickets_cost_field" required id="tickets_cost_field">
+									<option value=""><?= TRANS('SEL_NONE'); ?></option>
+								<?php
+								foreach ($textCustomFields as $customField) {
+								?>
+									<option value="<?= $customField['id']; ?>" <?= ($customField['id'] == $config['tickets_cost_field']) ? 'selected' : ''; ?>><?= $customField['field_label']; ?></option>
+								<?php
+								}
+								?>
+								</select>
+								<?php
+							}
+						?>
+					</div>
+					
+					<label for="status_waiting_cost_auth" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('OPT_STATUS_TO_WAITING_COST_AUTHORIZATION'); ?>"><?= firstLetterUp(TRANS('OPT_STATUS_TO_WAITING_COST_AUTHORIZATION')); ?></label>
+					<div class="form-group col-md-4 ">
+						<select class="form-control bs-select" name="status_waiting_cost_auth" required id="status_waiting_cost_auth">
+							<?php
+							$subtext = "";
+							foreach ($status as $stat) {
+								$subtext = $panels[$stat['stat_painel']] . "&nbsp;|&nbsp;" . $timeFreeze[$stat['stat_time_freeze']];
+							?>
+								<option data-subtext="<?= $subtext; ?>" value="<?= $stat['stat_id']; ?>" <?= ($stat['stat_id'] == $config['status_waiting_cost_auth']) ? 'selected' : ''; ?>><?= $stat['status']; ?></option>
+							<?php
+							}
+							?>
+						</select>
+					</div>
+					<label for="status_cost_authorized" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('OPT_STATUS_COST_AUTHORIZATED'); ?>"><?= firstLetterUp(TRANS('OPT_STATUS_COST_AUTHORIZATED')); ?></label>
+					<div class="form-group col-md-4 ">
+						<select class="form-control bs-select" name="status_cost_authorized" required id="status_cost_authorized">
+							<?php
+							$subtext = "";
+							foreach ($status as $stat) {
+								$subtext = $panels[$stat['stat_painel']] . "&nbsp;|&nbsp;" . $timeFreeze[$stat['stat_time_freeze']];
+							?>
+								<option data-subtext="<?= $subtext; ?>" value="<?= $stat['stat_id']; ?>" <?= ($stat['stat_id'] == $config['status_cost_authorized']) ? 'selected' : ''; ?>><?= $stat['status']; ?></option>
+							<?php
+							}
+							?>
+						</select>
+					</div>
+					<label for="status_cost_refused" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('OPT_STATUS_COST_REFUSED'); ?>"><?= firstLetterUp(TRANS('OPT_STATUS_COST_REFUSED')); ?></label>
+					<div class="form-group col-md-4 ">
+						<select class="form-control bs-select" name="status_cost_refused" required id="status_cost_refused">
+							<?php
+							$subtext = "";
+							foreach ($status as $stat) {
+								$subtext = $panels[$stat['stat_painel']] . "&nbsp;|&nbsp;" . $timeFreeze[$stat['stat_time_freeze']];
+							?>
+								<option data-subtext="<?= $subtext; ?>" value="<?= $stat['stat_id']; ?>" <?= ($stat['stat_id'] == $config['status_cost_refused']) ? 'selected' : ''; ?>><?= $stat['status']; ?></option>
+							<?php
+							}
+							?>
+						</select>
+					</div>
+
+					<label for="status_cost_updated" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_OPT_STATUS_COST_UPDATED'); ?>"><?= firstLetterUp(TRANS('OPT_STATUS_COST_UPDATED')); ?></label>
+					<div class="form-group col-md-4 ">
+						<select class="form-control bs-select" name="status_cost_updated" required id="status_cost_updated">
+							<?php
+							$subtext = "";
+							foreach ($status as $stat) {
+								$subtext = $panels[$stat['stat_painel']] . "&nbsp;|&nbsp;" . $timeFreeze[$stat['stat_time_freeze']];
+							?>
+								<option data-subtext="<?= $subtext; ?>" value="<?= $stat['stat_id']; ?>" <?= ($stat['stat_id'] == $config['status_cost_updated']) ? 'selected' : ''; ?>><?= $stat['status']; ?></option>
 							<?php
 							}
 							?>
@@ -1086,6 +1525,20 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						</div>
 					</div>
 
+					<label class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= firstLetterUp(TRANS('OPT_UPLOAD_TYPE_WAV')); ?></label>
+					<div class="form-group col-md-4 ">
+						<?php
+						$yesChecked = (strpos($config['conf_upld_file_types'], '%WAV%')) ? " checked" : "";
+						$noChecked = (!strpos($config['conf_upld_file_types'], '%WAV%')) ? " checked" : "";
+						?>
+						<div class="switch-field">
+							<input type="radio" id="upld_wav" name="upld_wav" value="yes" <?= $yesChecked; ?> />
+							<label for="upld_wav"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="upld_wav_no" name="upld_wav" value="no" <?= $noChecked; ?> />
+							<label for="upld_wav_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
 					<h6 class="w-100 mt-5 ml-5 border-top p-4"><i class="fas fa-image text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('OPT_UPLOAD_IMG')); ?></h6>
 					
 					<label for="img_max_width" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= firstLetterUp(TRANS('OPT_MAXWIDTH')); ?></label>
@@ -1126,6 +1579,24 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						</div>
 					</div>
 
+
+					<!-- Configuração para posicionamento do campo de Descrição dos chamados -->
+					<h6 class="w-100 mt-5 ml-5 border-top p-4"><i class="fas fa-ellipsis-h text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('MISCELLANEOUS')); ?></h6>
+					<label for="description_position" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_DESCRIPTION_FIELD_POSITION'); ?>"><?= firstLetterUp(TRANS('DESCRIPTION_FIELD_POSITION')); ?></label>
+					<div class="form-group col-md-4 ">
+						<select class="form-control bs-select" name="description_position" required id="description_position">
+							<?php
+							foreach ($descriptionFieldPositions as $key => $value) {
+							?>
+								<option value="<?= $key; ?>" <?= ($key == $descriptionCurrentPos) ? 'selected' : ''; ?>><?= $value; ?></option>
+							<?php
+							}
+							?>
+						</select>
+					</div>
+					
+
+
 					<h6 class="w-100 mt-5 ml-5 border-top p-4"><i class="fas fa-bell text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('OPT_SEND_MAIL_WRTY')); ?></h6>
 					<label for="days_before_expire" class="col-md-2 col-form-label col-form-label-sm text-md-right"><?= firstLetterUp(TRANS('OPT_DAYS_BEFORE')); ?></label>
 					<div class="form-group col-md-4">
@@ -1145,7 +1616,68 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 						</select>
 					</div>
 
+					<h6 class="w-100 mt-5 ml-5 border-top p-4"><i class="fas fa-boxes text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('ASSETS_BATCH_REGISTER')); ?></h6>
+					<label for="max_amount_batch_assets_record" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_MAX_AMOUNT_EACH_ASSET_BATCH'); ?>"><?= firstLetterUp(TRANS('MAX_AMOUNT_EACH_ASSET_BATCH')); ?></label>
+					<div class="form-group col-md-10">
+						<input type="number" class="form-control" name="max_amount_batch_assets_record" id="max_amount_batch_assets_record" min="1" required value="<?= getConfigValue($conn, 'MAX_AMOUNT_BATCH_ASSETS_RECORD') ?? 1; ?>" />
+					</div>
+
+
+
+					<h6 class="w-100 mt-5 ml-5 border-top p-4"><i class="fas fa-truck-loading text-secondary"></i>&nbsp;<?= firstLetterUp(TRANS('ASSETS_ALLOCATION_TO_USERS')); ?></h6>
 					
+					<label for="allow_assets_btw_clients" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_ALLOW_ALLOCATION_BTW_CLIENTS'); ?>"><?= firstLetterUp(TRANS('ALLOW_ALLOCATION_BTW_CLIENTS')); ?></label>
+					<div class="form-group col-md-4 ">
+						<div class="switch-field">
+							<?php
+							$yesChecked = (getConfigValue($conn, 'ALLOW_USER_GET_ASSETS_BTW_CLIENTS') ?? 0) == 1 ? " checked" : "" ;
+							$noChecked = (getConfigValue($conn, 'ALLOW_USER_GET_ASSETS_BTW_CLIENTS') ?? 0) != 1 ? " checked" : "" ;
+							?>
+							<input type="radio" id="allow_assets_btw_clients" name="allow_assets_btw_clients" value="yes" <?= $yesChecked; ?> />
+							<label for="allow_assets_btw_clients"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="allow_assets_btw_clients_no" name="allow_assets_btw_clients" value="no" <?= $noChecked; ?> />
+							<label for="allow_assets_btw_clients_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
+					<label for="allow_only_ops_assets_btw_clients" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_ALLOW_ALLOCATION_BTW_CLIENTS_ONLY_TO_OPS'); ?>"><?= firstLetterUp(TRANS('ALLOW_ALLOCATION_BTW_CLIENTS_ONLY_TO_OPS')); ?></label>
+					<div class="form-group col-md-4 ">
+						<div class="switch-field">
+							<?php
+							$yesChecked = (getConfigValue($conn, 'ALLOW_ONLY_OPS_GET_ASSETS_BTW_CLIENTS') ?? 0) == 1 ? " checked" : "" ;
+							$noChecked = (getConfigValue($conn, 'ALLOW_ONLY_OPS_GET_ASSETS_BTW_CLIENTS') ?? 0) != 1 ? " checked" : "" ;
+							?>
+							<input type="radio" id="allow_only_ops_assets_btw_clients" name="allow_only_ops_assets_btw_clients" value="yes" <?= $yesChecked; ?> />
+							<label for="allow_only_ops_assets_btw_clients"><?= TRANS('YES'); ?></label>
+							<input type="radio" id="allow_only_ops_assets_btw_clients_no" name="allow_only_ops_assets_btw_clients" value="no" <?= $noChecked; ?> />
+							<label for="allow_only_ops_assets_btw_clients_no"><?= TRANS('NOT'); ?></label>
+						</div>
+					</div>
+
+
+					<label for="assets_auto_department" class="col-md-2 col-form-label col-form-label-sm text-md-right" data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= TRANS('HELPER_DISABLED_USERS_ASSETS_DEPARTMENT'); ?>"><?= firstLetterUp(TRANS('DISABLED_USERS_ASSETS_DEPARTMENT')); ?></label>
+					<div class="form-group col-md-10">
+						<select class="form-control bs-select" name="assets_auto_department" id="assets_auto_department">
+							<option value=""><?= TRANS('SEL_SELECT'); ?></option>
+							<?php
+							$departments = getDepartments($conn, 1, null, null, null);
+							$subtextKeys = ['nickname', 'unidade'];
+							foreach ($departments as $department) {
+								$departmentInfoArray = [];
+								foreach ($subtextKeys as $key) {
+									$departmentInfoArray[] = $department[$key];
+								}
+								$subtext = implode(" - ", array_filter($departmentInfoArray));
+								?>
+									<option data-subtext="<?= $subtext; ?>" value="<?= $department['loc_id']; ?>" 
+									<?= ($department['loc_id'] == getConfigValue($conn, 'ASSETS_AUTO_DEPARTMENT')) ? ' selected' : ''; ?>
+									><?= $department['local']; ?></option>
+								<?php
+							}
+							?>
+						</select>
+					</div>
+
 
 					<!-- ---------------------------------------- -->
 					<div class="row w-100"></div>
@@ -1174,11 +1706,15 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 	<script src="../../includes/components/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../../includes/components/bootstrap-select/dist/js/bootstrap-select.min.js"></script>
 	<script type="text/javascript" charset="utf8" src="../../includes/components/datatables/datatables.js"></script>
+	<script src="../../includes/components/jquery/jquery.amsify.suggestags-master/js/jquery.amsify.suggestags.js"></script>
+
 	<script type="text/javascript">
 		$(function() {
 
 			$(function() {
-				$('[data-toggle="popover"]').popover()
+				$('[data-toggle="popover"]').popover({
+					html:true
+				})
 			});
 
 			$('.popover-dismiss').popover({
@@ -1200,8 +1736,22 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 				styleBase: "form-control input-select-multi",
 			});
 
-			deadlineReopenControl();
+			if ($('#pre_filters').length > 0) {
+				$('input[name="pre_filters"]').amsifySuggestags({
+					type : 'bootstrap',
+					defaultTagClass: 'badge bg-secondary text-white p-2 m-1',
+					tagLimit: 6,
+					printValues: false,
+					showPlusAfter: 6,
+					showAllSuggestions: true,
+					keepLastOnHoverTag: false,
+					
+					suggestions: <?= $categories; ?>,
+					whiteList: true
+				});
+			}
 
+			deadlineReopenControl();
 			$('[name="allow_reopen"]').on('change', function(){
 				deadlineReopenControl();
 			});
@@ -1209,6 +1759,11 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 			ratingOptionsControl ();
 			$('#time_to_close_after_done').on('change', function(){
 				ratingOptionsControl ();
+			});
+
+			optionUserAssetsControl();
+			$('[name="allow_assets_btw_clients"]').on('change', function(){
+				optionUserAssetsControl();
 			});
 
 			// ticketClosingOptionsControl();
@@ -1311,20 +1866,15 @@ $_SESSION['s_page_admin'] = $_SERVER['PHP_SELF'];
 			}
 		}
 
-
-		// function ticketClosingOptionsControl () {
-		// 	if ($('#closing_mode_requester').is(':checked')) {
-		// 		$('#status_done').prop('disabled', false);
-		// 		$('#status_done').selectpicker('refresh');
-		// 		$('#status_done_rejected').prop('disabled', false);
-		// 		$('#status_done_rejected').selectpicker('refresh');
-		// 		$('#time_to_close_after_done').prop('disabled', false);
-		// 	} else {
-		// 		$('#status_done').prop('disabled', true).selectpicker('refresh');
-		// 		$('#status_done_rejected').prop('disabled', true).selectpicker('refresh');
-		// 		$('#time_to_close_after_done').prop('disabled', true);
-		// 	}
-		// }
+		function optionUserAssetsControl () {
+			if (!$('#allow_assets_btw_clients').is(':checked')) {
+				$('#allow_only_ops_assets_btw_clients').prop('disabled', true).prop('checked', false);
+				$('#allow_only_ops_assets_btw_clients_no').prop('disabled', true).prop('checked', true);
+			} else if (!$('#allow_assets_btw_clients').prop('disabled')) {
+				$('#allow_only_ops_assets_btw_clients').prop('disabled', false);
+				$('#allow_only_ops_assets_btw_clients_no').prop('disabled', false);
+			}
+		}
 	</script>
 </body>
 

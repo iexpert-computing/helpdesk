@@ -53,8 +53,9 @@ $imgsPath = "../../includes/imgs/";
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/Responsive-2.2.5/css/responsive.dataTables-custom.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/css/util.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <style>
 

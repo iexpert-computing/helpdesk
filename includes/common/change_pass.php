@@ -33,6 +33,9 @@ $conn = ConnectPDO::getInstance();
 
 $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 3);
 
+$configExt = getConfigValues($conn);
+
+
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -43,8 +46,9 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 3);
 	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
 	<link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-	<title>OcoMon&nbsp;<?= VERSAO; ?></title>
+	<title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 </head>
 
 <body>
@@ -60,6 +64,12 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 3);
             echo $_SESSION['flash'];
             $_SESSION['flash'] = '';
         }
+
+		$localAuth = (isset($configExt['AUTH_TYPE']) && !empty($configExt['AUTH_TYPE']) && $configExt['AUTH_TYPE'] != 'SYSTEM' ? false : true); 
+		if (!$localAuth) {
+			echo message('danger', 'Ooops!', TRANS('CANT_CHANGE_PASS_WHEN_NOT_LOCAL_AUTHENTICATION'), '', '', true);
+			exit;
+		}
 	?>
 
 	<div class="container">

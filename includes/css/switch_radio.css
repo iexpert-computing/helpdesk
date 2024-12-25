@@ -2,6 +2,7 @@
 :root {
   --color-great: #2D962D;
   --color-good: #0074D9;
+  --color-primary: #0074D9;
   --color-regular: #FF851B;
   --color-bad: #DA2D2D;
   --color-not-rated: #8d9697;
@@ -9,6 +10,7 @@
 
   --color-great-light: #8ab385;
   --color-good-light: #80b4b4;
+  --color-primary-light: #80b4b4;
   --color-regular-light: #ffa95f;
   --color-bad-light: #c49286;
 }
@@ -91,6 +93,11 @@
   background-color: var(--color-good) !important;
   font-size: 18px !important;
 }
+
+.color-primary {
+  background-color: var(--color-primary) !important;
+  font-size: 18px !important;
+}
 .color-regular {
   background-color: var(--color-regular) !important;
   font-size: 18px !important;
@@ -133,6 +140,13 @@
 
 .switch-field > .multi-switch input:not(:checked) + label.color-good {
   background-color: var(--color-good-light) !important;
+  color: white;
+  box-shadow: none;
+  font-size: 14px !important;
+}
+
+.switch-field > .multi-switch input:not(:checked) + label.color-primary {
+  background-color: var(--color-primary-light) !important;
   color: white;
   box-shadow: none;
   font-size: 14px !important;

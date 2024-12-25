@@ -43,6 +43,7 @@ $now = date("Y-m-d H:i:s");
 
 //Todas as áreas que o usuário percente
 $uareas = $_SESSION['s_uareas'];
+$uareas .= ",-1";
 
 $imgsPath = "../../includes/imgs/";
 $iconFrozen = "<span class='text-oc-teal' title='" . TRANS('HNT_TIMER_STOPPED') . "'><i class='fas fa-pause fa-lg'></i></span>";
@@ -56,22 +57,46 @@ $requestData = $_POST;
 $columns = array(
 	// datatable column index  => database column name
     0 => '',
-    1 => 'numero',
-    2 => 'problema',
-    3 => 'nickname',
+    1 => 'o.numero',
+    2 => 'p.problema',
+    3 => 'cl.nickname',
     4 => 'setor',
     5 => 'chamado_status',
     6 => 'numero',
     7 => 'pr_atendimento'
 );
 
+/* Chamado mais antigo em aberto */
+$ticketStart = getOlderTicketInProgress($conn);
+$ticketInfo = getTicketData($conn, $ticketStart, ['data_abertura']);
+$limitDateFrom = (!empty($ticketInfo['data_abertura']) ? " o.data_abertura >= '{$ticketInfo['data_abertura']}' AND " : "");
+
 // getting total number records without any search
-$sql = $QRY["ocorrencias_full_ini"] . " WHERE stat_ignored <> 1 AND s.stat_painel in (2) and ( o.sistema in (" . $uareas . ") OR o.sistema = '-1' ) and o.oco_scheduled=0 ORDER BY numero";
+// -- o.numero >= {$ticketStart} AND
+// $sql = $QRY["ocorrencias_full_ini"] . " WHERE 
+$sql = $QRY["tickets_in_queues_count"] . " AND 
+            
+            -- s.stat_ignored <> 1 AND 
+            -- s.stat_painel = 2 AND 
+            s.open_queue = 1 AND
+            o.sistema IN ({$uareas}) AND 
+            {$limitDateFrom}
+            o.oco_scheduled = 0 
+            ";
 $sqlResult = $conn->query($sql);
-$totalData = $sqlResult->rowCount();
+// $totalData = $sqlResult->rowCount();
+$totalData = $sqlResult->fetch()['total'];
 $totalFiltered = $totalData;  // when there is no search parameter then total number rows = total number filtered rows.
 
-$sql = $QRY["ocorrencias_full_ini"] . " WHERE stat_ignored <> 1 AND s.stat_painel in (2) and ( o.sistema in (" . $uareas . ") OR o.sistema = '-1' ) and o.oco_scheduled=0 ";
+// $sql = $QRY["ocorrencias_full_ini"] . " WHERE
+$sql = $QRY["tickets_in_queues"] . " AND 
+            -- s.stat_ignored <> 1 AND 
+            -- s.stat_painel = 2 AND 
+            s.open_queue = 1 AND
+            o.sistema IN ({$uareas}) AND 
+            {$limitDateFrom}
+            o.oco_scheduled = 0 
+            ";
 
 if( !empty($requestData['search']['value']) ) {   // if there is a search parameter, $requestData['search']['value'] contains search parameter
 
@@ -87,10 +112,8 @@ if( !empty($requestData['search']['value']) ) {   // if there is a search parame
 $sqlResult = $conn->query($sql);
 $totalFiltered = $sqlResult->rowCount();
 
-
 $sql.=" ORDER BY ". $columns[$requestData['order'][0]['column']]."   ".$requestData['order'][0]['dir']."  LIMIT ".$requestData['start']." ,".$requestData['length']."   ";
 
-// dump($sql);
 $sqlResult = $conn->query($sql);
 
 $data = array();
@@ -155,6 +178,7 @@ foreach ($sqlResult->fetchAll() as $row){
         $cor_font = $row['cor_fonte'];
     }
 
+    $renderTicketStatus = "<span class='btn btn-sm text-wrap' style='color: " . $row['textcolor'] . "; background-color: " . ($row['bgcolor'] ?? '#FFFFFF') . "'>" . $row['chamado_status'] . "</span>";
 
     $referenceDate = (!empty($row['oco_real_open_date']) ? $row['oco_real_open_date'] : $row['data_abertura']);
     $dataAtendimento = $row['data_atendimento']; //data da primeira resposta ao chamado
@@ -197,7 +221,7 @@ foreach ($sqlResult->fetchAll() as $row){
 
     $colOrderPrior = array();
     $colOrderPrior[] = $row['pr_atendimento'];
-    $colOrderPrior[] = "<span class='badge p-2' style='color: " . $cor_font . "; background-color: " . $COR . "'>" . $row['pr_descricao'] . "</span>";
+    $colOrderPrior[] = "<span class='btn btn-sm' style='color: " . $cor_font . "; background-color: " . $COR . "'>" . $row['pr_descricao'] . "</span>";
 
 
     /* Se for chamado recente */
@@ -251,7 +275,7 @@ foreach ($sqlResult->fetchAll() as $row){
 	$nestedData[] = $linkImg . "&nbsp;" . $problemType . $tags;
     $nestedData[] = $clientName . $row['contato'] . $contactPhone . $contactEmail;
     $nestedData[] = $departmentName . $texto;
-    $nestedData[] = "<b>" . $row['chamado_status'] . "</b>";
+    $nestedData[] = $renderTicketStatus;
     // $nestedData[] = $colTVNew;
     $nestedData[] = $colTime; /* enviando um array para ordenar pelo indice 0 */
     $nestedData[] = $colOrderPrior; /* enviando um array para ordenar pelo indice 0 */
@@ -262,8 +286,6 @@ foreach ($sqlResult->fetchAll() as $row){
 	$data[] = $nestedData;
 }
 
-/* MENSAGEM QUE SERÁ EXIBIDA EM CASO DE NENHUM REGISTRO ENCONTRADO */
-// $customMessage = message('secondary','', TRANS('OCO_NOT_PENDING_TO_USER'),'','',true);
 
 $json_data = array(
     "draw"            => intval( $requestData['draw'] ),   // for every request/draw by clientside , they send a number as a parameter, when they recieve a response/data they first check the draw number, so we are sending same number in draw. 

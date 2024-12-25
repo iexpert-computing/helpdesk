@@ -56,8 +56,16 @@ RUN set -e && \
 # Com o container executado, logar nele a primeira vez:
 #   docker compose up
 #   docker exec -it ocomon_container /bin/bash
+
 # Executar
 #   mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < /var/www/html/install/5.x/01-DB_OCOMON_5.x-FRESH_INSTALL_STRUCTURE_AND_BASIC_DATA.sql
+# Com o container executado, logar nele caso seja uma atualização:
+#   docker compose up
+#   docker exec -it ocomon_container /bin/bash
+
+# Executar
+#   mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < /var/www/html/install/6.x/02-UPDATE_FROM_5.x.sql
+
 # Excluíndo resíduos
 #   docker stop ocomon_container
 #   docker container rm ocomon_container

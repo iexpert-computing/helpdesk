@@ -18,6 +18,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 ini_set('display_errors', 1);
+// ini_set('memory_limit', '2048M');
 
 
 use PHPMailer\PHPMailer\PHPMailer;
@@ -25,12 +26,22 @@ use PHPMailer\PHPMailer\Exception;
 
 
 function isPHPOlder(){
-    if (version_compare(phpversion(), '7.4', '<' )){
+    if (version_compare(phpversion(), '8.1', '<' )){
         return true;
     }
     return false;
 }
 
+
+function isLocalhost() {
+    $whitelist = array('127.0.0.1', '::1', 'localhost');
+    
+    if (in_array($_SERVER['REMOTE_ADDR'], $whitelist)) {
+        return true;
+    } else {
+        return false;
+    }
+}
 
 
 /**
@@ -96,6 +107,31 @@ function olderThan(string $date, int $years = 1): bool
         return true;
     }
     return false;
+}
+
+
+
+function getClientIP() {
+    $ipaddress = '';
+    if (isset($_SERVER['HTTP_CLIENT_IP']))
+        $ipaddress = $_SERVER['HTTP_CLIENT_IP'];
+    else if(isset($_SERVER['HTTP_X_FORWARDED_FOR']))
+        $ipaddress = $_SERVER['HTTP_X_FORWARDED_FOR'];
+    else if(isset($_SERVER['HTTP_X_FORWARDED']))
+        $ipaddress = $_SERVER['HTTP_X_FORWARDED'];
+    else if(isset($_SERVER['HTTP_FORWARDED_FOR']))
+        $ipaddress = $_SERVER['HTTP_FORWARDED_FOR'];
+    else if(isset($_SERVER['HTTP_FORWARDED']))
+        $ipaddress = $_SERVER['HTTP_FORWARDED'];
+    else if(isset($_SERVER['REMOTE_ADDR']))
+        $ipaddress = $_SERVER['REMOTE_ADDR'];
+    else
+        $ipaddress = 'UNKNOWN';
+    
+    if (filter_var($ipaddress, FILTER_VALIDATE_IP) === false) {
+        $ipaddress = 'UNKNOWN';
+    }
+    return $ipaddress;
 }
 
 
@@ -447,7 +483,7 @@ function message($type, $strong, $message, $elementID, $returnLink = '', $fixed 
         return "
         <div class='d-flex justify-content-center '>
             <div class='d-flex justify-content-center  my-3' style=' max-width: 100%; position: fixed; top: 1%; z-index:1030 !important;'>
-                <div class='alert alert-{$type} alert-dismissible fade show w-100' role='alert' id='{$elementID}'  onClick=\"this.style.display='none'\" >
+                <div class='alert alert-{$type} border-{$type} alert-dismissible fade show w-100' role='alert' id='{$elementID}'  onClick=\"this.style.display='none'\" >
                     <i class='" . $icon[$type] . "'></i>
                     <strong>{$strong}</strong> {$message} {$goTo}
                     <button type='button' class='close' data-dismiss='alert' aria-label='Close'>
@@ -460,7 +496,7 @@ function message($type, $strong, $message, $elementID, $returnLink = '', $fixed 
         /* style=' z-index:1030 !important;' */
     return "
         <div class='d-flex justify-content-center' style=' z-index:2 !important;'>
-            <div class='alert alert-{$type} fade show w-100'  role='alert' id='{$elementID}' '>
+            <div class='alert alert-{$type} border-{$type} fade show w-100'  role='alert' id='{$elementID}' '>
                 <i class='" . $icon[$type] . "'></i>
                 <strong>{$strong}</strong> {$message} {$goTo}
                 
@@ -468,6 +504,78 @@ function message($type, $strong, $message, $elementID, $returnLink = '', $fixed 
         </div>
     ";
 }
+
+
+function alertNotice(
+    string $type, 
+    string $strong, 
+    array $cols,
+    array $values,
+    string $message, 
+    string $elementID, 
+    string $extraClasses = '', 
+    string $iconFa = '')
+{
+
+    $icon = [];
+    $size = 'fa-2x';
+    $icon['success'] = "fas fa-check-circle {$size}"; 
+    $icon['info'] = "fas fa-info-circle {$size}"; 
+    $icon['warning'] = "fas fa-exclamation-circle {$size}";
+    $icon['danger'] = "fas fa-exclamation-triangle {$size}"; 
+    $icon['secondary'] = "fas fa-info-circle {$size}"; 
+
+    if (!empty($iconFa)) {
+        $icon[$type] = $iconFa;
+    }
+
+    $values = array_slice($values, 0, count($cols));
+    $colSize = (intval(12/count($cols) <= 1 ? '' : '-' . 12/count($cols)));
+    $colClass = 'col'. $colSize;
+
+    $render = '
+        <div class="d-flex justify-content-center" style=" z-index:2 !important;">
+            <div class="alert alert-'. $type .' border-'. $type .' '. $extraClasses .' fade show w-100"  role="alert" id="'. $elementID .'" ">
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <div class="row mb-4">
+                    <div class="col-12" align="center"><strong>'.$strong.'</strong></div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-1"><i class="' . $icon[$type] . '"></i></div>
+                    <div class="col-10">
+                        <div class="row">';
+                        
+                        foreach ($cols as $key => $col) {
+
+                            $sufix = ':&nbsp;';
+                            if (empty($col)) {
+                                $sufix = '';
+                            }
+
+                            $value = (array_key_exists($key, $values) ? $values[$key] : '');
+                            $render .= '<div class="'. $colClass .'"><strong>'. $col .'</strong>'. $sufix . $value.'</div>';
+                        }
+
+            $render .= '</div>
+                        <hr>
+                        <div class="row mt-2">
+                            <div class="col-md-12">
+                                '.$message.'
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    ';
+
+    return $render;
+}
+
+
 
 
 function putComma($vetor)
@@ -718,7 +826,7 @@ function toHtml($string)
         "</script>"
     );
 
-    $string = str_replace($tags, "[script]", $string);
+    $string = str_replace($tags, "[script]", (string)$string);
     
     $transTbl = get_html_translation_table(HTML_ENTITIES);
     $transTbl = array_flip($transTbl);
@@ -829,6 +937,74 @@ function random(): string
 function random64() {
     return base64_encode(random_bytes(20));
 }
+
+
+/**
+ * asEquals
+ * Compara dois valores em strings para saber se são compatíveis
+ * Para manter a compatibilidade com versões anteriores, vários tipos de comparação
+ * são realizados
+ *
+ * @param mixed $fromUrl
+ * @param mixed $fromDB
+ * 
+ * @return bool
+ */
+function asEquals($fromUrl, $fromDB): bool 
+{
+    if ($fromUrl == $fromDB) {
+        return true;
+    } else if (str_replace(" ", "+", $fromUrl) == $fromDB) {
+        return true;
+    } else if (urlencode($fromUrl) == $fromDB) {
+        return true;
+    } else if (urldecode($fromUrl) == $fromDB) {
+        return true;
+    } else if (noHtml($fromUrl) == $fromDB) {
+        return true;
+    }
+    return false;
+}
+
+
+/**
+ * Generates an array of random values.
+ *
+ * @param int $charCount The length of each random value.
+ * @param int $elementCount The number of random values to generate.
+ * @param string $prefix The prefix to prepend to each random value. (Optional)
+ * @param string $function The function to apply to each random value. (Optional, default: 'mb_strtoupper')
+ * @return array The array of randomly generated values.
+ */
+function generateRandomArray(int $charCount, int $elementCount, string $prefix = '', string $function = 'mb_strtoupper'): array
+{
+    $randomArray = [];
+
+    while (count($randomArray) < $elementCount) {
+        // $randomValue = $function($prefix . generateRandomValue($charCount));
+        $randomValue = $function($prefix . randomChars($charCount));
+        
+        if (!in_array($randomValue, $randomArray)) {
+            $randomArray[] = $randomValue;
+        }
+    }
+
+    return $randomArray;
+}
+
+// function generateRandomValue($charCount) {
+//     $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+//     $randomValue = '';
+
+//     for ($i = 0; $i < $charCount; $i++) {
+//         $randomIndex = rand(0, strlen($characters) - 1);
+//         $randomValue .= $characters[$randomIndex];
+//     }
+
+//     return $randomValue;
+// }
+
+
 
 function transbool($bool)
 {
@@ -968,6 +1144,28 @@ function mail_send($mailConf, $to, $cc, $subject, $body, $replyto, $envVars)
 }
 
 
+/**
+ * Groups an array of associative arrays by a specified key and calculates the sum of a specified key in each group.
+ *
+ * @param array $array The array of associative arrays to group and sum.
+ * @param string $key The key to group the arrays by.
+ * @param string $sumKey The key to calculate the sum of in each group.
+ * @return array The grouped and summed array.
+ */
+function array_group_sum(array $array, string $key, string $sumKey): array
+{
+    $result = [];
+    foreach ($array as $value) {
+        if (array_key_exists($value[$key], $result)) {
+            $result[$value[$key]][$sumKey] += $value[$sumKey];
+        } else {
+            $result[$value[$key]] = $value;
+            $result[$value[$key]][$sumKey] = $value[$sumKey];
+        }
+    }
+    return array_values($result);
+}
+
 
 /**
  * arraySortByColumn
@@ -979,13 +1177,13 @@ function mail_send($mailConf, $to, $cc, $subject, $body, $replyto, $envVars)
  * 
  * @return array
  */
-function arraySortByColumn (array $array, string $column, int $dir = SORT_ASC): array
+function arraySortByColumn (array $array, string $column, int $dir = SORT_ASC, ?int $sortType = SORT_STRING): array
 {
     $sortArray = array();
     foreach ($array as $key => $row) {
         $sortArray[$key] = strtolower($row[$column]);
     }
-    array_multisort($sortArray, $dir, SORT_STRING, $array);
+    array_multisort($sortArray, $dir, $sortType, $array);
     return $array;
 }
 
@@ -1221,13 +1419,15 @@ function upload($imgFile, $config, $fileTypes = "%%IMG%", $fileAttributes = "")
         $erro = array();
         $mime = array();
         $type = explode("%", $fileTypes);
-        reIndexArray($type);
+        // reIndexArray($type);
+        $type = array_values($type);
 
         /* A serem testados de acordo com o permitido na configuração geral */
         $mime['PDF'] = "application\/pdf";
         $mime['TXT'] = "text\/plain";
         $mime['RTF'] = "application\/rtf";
         $mime['HTML'] = "text\/html";
+        $mime['WAV'] = "audio\/(x-wav|wav)";
         $mime['IMG'] = "image\/(pjpeg|jpeg|png|gif|x-ms-bmp)";
         $mime['ODF'] = "application\/vnd.oasis.opendocument.(text|spreadsheet|presentation|graphics)";
         $mime['OOO'] = "application\/vnd.sun.xml.(writer|calc|draw|impress)";
@@ -1254,6 +1454,9 @@ function upload($imgFile, $config, $fileTypes = "%%IMG%", $fileAttributes = "")
             } else
             if ($type[$i] == "HTML") {
                 $types .= "html";
+            } else
+            if ($type[$i] == "WAV") {
+                $types .= "wav";
             } else
             if ($type[$i] == "ODF") {
                 $types .= "odt, ods, odp, odg";
@@ -1319,13 +1522,14 @@ function destaca($string, $texto)
     $pattern = array_unique($pattern);
     $destaque = array();
 
-    reIndexArray($pattern);
+    // reIndexArray($pattern);
+    $pattern = array_values($pattern);
 
-    $texto2 = toHtml(strtolower($texto));
+    $texto2 = toHtml(strtolower((string)$texto));
 
     for ($i = 0; $i < count($pattern); $i++) {
         $destaque = "<mark><span class='text-dark bg-warning p-1'>" . $pattern[$i] . "</span></mark>";
-        $texto2 = str_replace(strtolower($pattern[$i]), strtolower($destaque), $texto2);
+        $texto2 = str_replace(strtolower((string)$pattern[$i]), strtolower((string)$destaque), $texto2);
     }
     return $texto2;
 }
@@ -1652,6 +1856,12 @@ function isImpar($number){
 } 
 
 
+function isValidDomain($domain) {
+    return preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/i', $domain);
+}
+
+
+
 /**
  * dbField
  *
@@ -1794,6 +2004,19 @@ function getEntryType($entryIndex){
     $types[16] = TRANS('ENTRY_SERVICE_DONE');
     $types[17] = TRANS('ROUTED_TO_OPERATOR_QUEUE');
 
+    /* Alocação de recursos */
+    $types[18] = TRANS('ENTRY_RESOURCE_ALLOCATED');
+    /* Fluxo de autorização de atendimento */
+    $types[19] = TRANS('ENTRY_REQUEST_AUTHORIZATION');
+    $types[20] = TRANS('ENTRY_AUTHORIZATION_OR_REFUSE');
+
+        /* Faixa de índices reservada em função customizações realizadas */
+    $types[30] = TRANS('TICKET_AUTO_CLOSED_DUE_INACTIVITY');
+    $types[31] = TRANS('ENTRY_REQUEST_FEEDBACK');
+    $types[32] = TRANS('ENTRY_TICKET_OPEN_TO_THIRD_PARTY');
+    $types[33] = TRANS('ENTRY_EMAIL_THREAD');
+    $types[34] = TRANS('ENTRY_COST_SET_OR_UPDATED');
+
     if (!array_key_exists($entryIndex, $types)) {
         return TRANS('ENTRY_TYPE_NOT_LABELED');
     }
@@ -1819,6 +2042,18 @@ function getOperationType($index){
     $types[7] = TRANS('OPT_OPERATION_APPROVAL');
     $types[8] = TRANS('OPT_OPERATION_CLOSURE_REJECTED');
     $types[9] = TRANS('OPT_OPERATION_SERVICE_CLOSURE');
+
+    /* Tipo customizado */
+    $types[10] = TRANS('OPT_OPERATION_REQUEST_AUTHORIZATION');
+    $types[11] = TRANS('OPT_OPERATION_AUTHORIZATION');
+    $types[12] = TRANS('OPT_OPERATION_EDIT_CHANGE_COST');
+    $types[13] = TRANS('OPT_OPERATION_AUTHORIZE_OR_REFUSE');
+
+        /* Faixa de índices reservada em função customizações realizadas */
+    $types[20] = TRANS('OPT_OPERATION_AUTO_CLOSE_DUE_INACTIVITY');
+    $types[21] = TRANS('OPT_OPERATION_REQUESTER_IS_ALIVE');
+    $types[22] = TRANS('OPT_OPERATION_REQUEST_FEEDBACK');
+    $types[23] = TRANS('OPT_OPERATION_SET_OR_UPDATE_COST');
 
     if (!array_key_exists($index, $types)) {
         return TRANS('OPT_OPERATION_NOT_LABELED');
@@ -1896,6 +2131,133 @@ function getMonthRangesUpToNow2($maxIntervalRange = 'P6M', $interval = 'P1M'): a
         $i++;
     }
     return $dates;
+}
+
+
+
+
+/**
+ * intersectionPeriod
+ * Retorna o número de segundos de intersecção entre dois periodos informados
+ * @param string $date1Start
+ * @param string $date1End
+ * @param string $date2Start
+ * @param string $date2End
+ * 
+ * @return int
+ */
+function intersectionPeriod(string $date1Start, string $date1End, string $date2Start, string $date2End): int 
+{
+    // Cria objetos DateTime para as datas e horas iniciais e finais
+    $datetimeStart1 = new DateTime($date1Start);
+    $datetimeEnd1 = new DateTime($date1End);
+    $datetimeStart2 = new DateTime($date2Start);
+    $datetimeEnd2 = new DateTime($date2End);
+
+    // Verifica se há intersecção entre os períodos
+    if ($datetimeStart1 < $datetimeEnd2 && $datetimeStart2 < $datetimeEnd1) {
+        // Calcula a intersecção em segundos
+        $intersectionStart = max($datetimeStart1, $datetimeStart2);
+        $intersectionEnd = min($datetimeEnd1, $datetimeEnd2);
+        $interval = $intersectionStart->diff($intersectionEnd);
+
+        // var_dump($interval);
+
+        return $interval->s + $interval->i * 60 + $interval->h * 3600;
+    } else {
+        // Não há intersecção
+        return 0;
+    }
+}
+
+
+/**
+ * hasIntersectionTime
+ * Recebe um array de periodos e verifica se há alguma intersecção entre os períodos
+ * Cada período é representado por um array contendo o horário inicial e o horário final.
+ * 
+ * 
+ * @param array $periods
+ * 
+ * @return bool
+ */
+function hasIntersectionTime(array $periods): bool
+{
+    /* 
+    $periodos_exemplo = [
+        ["2024-06-10 08:00", "2024-06-10 10:30"],
+        ["2024-06-10 10:31", "2024-06-10 11:00"],
+        ["2024-06-10 11:00", "2024-06-10 14:00"]
+    ];
+    */
+    
+    // Ordena os períodos pela data/hora inicial
+    usort($periods, function($a, $b) {
+        return strtotime($a[0]) - strtotime($b[0]);
+    });
+
+    // Verifica se há intersecção entre os períodos adjacentes
+    for ($i = 0; $i < count($periods) - 1; $i++) {
+        if (strtotime($periods[$i][1]) >= strtotime($periods[$i + 1][0])) {
+            return true; // Há intersecção
+        }
+    }
+
+    return false; // Não há intersecção
+}
+
+
+
+/**
+ * sumTimePeriods
+ * Retorna um array com as somas de tempo de todos os periodos informados
+ * Pode retornar em segundos ou formatado em tempo
+ * @param array $periods - Formato: [[start, end], [start, end], ...]
+ * @param string|null $output  seconds | times
+ * 
+ * @return array
+ */
+function sumTimePeriods(array $periods, ?string $output = 'times'): array
+{
+    $total = array(); // Array para armazenar as somas de tempo
+
+    foreach ($periods as $period) {
+        $start = new DateTime($period['0']);
+        $end = new DateTime($period['1']);
+
+        // Calcula a diferença entre as datas
+        $interval = $start->diff($end);
+
+        $fullDate = [];
+        $fullDate['years'] = ($interval->y > 0) ? $interval->y . 'a ' : '';
+        $fullDate['months'] = ($interval->m > 0) ? $interval->m . 'm ' : '';
+        $fullDate['days'] = ($interval->d > 0) ? $interval->d . 'd ' : '';
+        $fullDate['hours'] = ($interval->h > 0) ? $interval->h . 'h ' : '';
+        $fullDate['minutes'] = ($interval->i > 0) ? $interval->i . 'm ' : '';
+        $fullDate['seconds'] = ($interval->s > 0) ? $interval->s . 's ' : '';
+
+        /* Se a diferença de tempo for superior a um mês mas inferior a um ano, 
+        então exibo a contagem de dias em vez de meses */
+        if ($interval->m > 0 && $interval->y < 1) {
+            $fullDate['months'] = '';
+            $fullDate['days']= $interval->days . 'd ';
+        }
+        $fullDate = array_filter($fullDate);
+
+        $dateString = "";
+        foreach ($fullDate as $key => $value) {
+            $dateString.= "{$value}";
+        }
+
+        $fullSeconds = $interval->s + $interval->i * 60 + $interval->h * 3600 + $interval->d * 86400 + $interval->m * 2592000 + $interval->y * 31104000;
+
+        if ($output == 'seconds') {
+            $total[] = $fullSeconds;
+        } else {
+            $total[] = $dateString;
+        }
+    }
+    return $total;
 }
 
 
@@ -1983,4 +2345,59 @@ function convertToISO(?string $string): ?string
     }
 
     return mb_convert_encoding($string, 'ISO-8859-1', 'UTF-8');
+}
+
+
+/**
+ * Updates the specified key-value pair in a JSON string.
+ *
+ * @param string $json The JSON string to update.
+ * @param string $key The key to update in the JSON string.
+ * @param string $value The new value for the specified key.
+ * @return string The updated JSON string.
+ */
+function updateJson(string $json, string $key, string $value) {
+    $json = json_decode($json, true);
+    
+    if (empty($value)) {
+        unset($json[$key]);
+    } else {
+        $json[$key] = $value;
+    }
+    return json_encode($json);
+}
+
+
+
+
+/**
+ * Checks if an email is an auto-response email.
+ *
+ * @param array $headers The headers of the email.
+ * @param string $subject The subject of the email.
+ * @return bool True if the email is an auto-response, false otherwise.
+ */
+function isAutoResponse(array $headers, string $subject): bool
+{
+    
+    if (isset($headers['Auto-Submitted']) && $headers['Auto-Submitted'] !== 'no') {
+        return true;
+    }
+    if (isset($headers['Precedence']) && in_array($headers['Precedence'], ['bulk', 'junk', 'list'])) {
+        return true;
+    }
+    if (isset($headers['X-Auto-Response-Suppress']) && in_array($headers['X-Auto-Response-Suppress'], ['OOF', 'AutoReply'])) {
+        return true;
+    }
+    if (isset($headers['X-Autoreply']) && $headers['X-Autoreply'] == 'yes') {
+        return true;
+    }
+    if (isset($headers['X-Mailer']) && strpos($headers['X-Mailer'], 'Auto') !== false) {
+        return true;
+    }
+    if (strpos($subject, 'Re: ') !== false && (!array_key_exists('in_reply_to', $headers))) {
+        return true;
+    }
+
+    return false;
 }

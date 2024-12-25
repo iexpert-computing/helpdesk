@@ -62,8 +62,9 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 1);
     <link rel="stylesheet" type="text/css" href="../../includes/components/bootstrap/custom.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/fontawesome/css/all.min.css" />
     <link rel="stylesheet" type="text/css" href="../../includes/components/datatables/datatables.min.css" />
+	<link rel="stylesheet" type="text/css" href="../../includes/css/estilos_custom.css" />
 
-    <title>OcoMon&nbsp;<?= VERSAO; ?></title>
+    <title><?= APP_NAME; ?>&nbsp;<?= VERSAO; ?></title>
 
     <style>
         .issue-shown:before {
@@ -142,6 +143,9 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 1);
                     LEFT JOIN prob_tipo_1 as pt1 on pt1.probt1_cod = p.prob_tipo_1 
                     LEFT JOIN prob_tipo_2 as pt2 on pt2.probt2_cod = p.prob_tipo_2 
                     LEFT JOIN prob_tipo_3 as pt3 on pt3.probt3_cod = p.prob_tipo_3 
+                    LEFT JOIN prob_tipo_4 as pt4 on pt4.probt4_cod = p.prob_tipo_4 
+                    LEFT JOIN prob_tipo_5 as pt5 on pt5.probt5_cod = p.prob_tipo_5 
+                    LEFT JOIN prob_tipo_6 as pt6 on pt6.probt6_cod = p.prob_tipo_6 
                 WHERE 
                     (ai.area_id = '{$areaId}' OR ai.area_id IS NULL) AND p.prob_id = ai.prob_id
                     ";
@@ -230,6 +234,9 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 1);
             <?= TRANS('MANAGE_RELATED_ITENS'); ?>:&nbsp;<button class="btn btn-sm btn-secondary manage" data-location="cat_prob1" name="probtp1"><?= $config['conf_prob_tipo_1']; ?></button>
             <button class="btn btn-sm btn-secondary manage" data-location="cat_prob2" name="probtp2"><?= $config['conf_prob_tipo_2']; ?></button>
             <button class="btn btn-sm btn-secondary manage" data-location="cat_prob3" name="probtp3"><?= $config['conf_prob_tipo_3']; ?></button>
+            <button class="btn btn-sm btn-secondary manage" data-location="cat_prob4" name="probtp4"><?= $config['conf_prob_tipo_4']; ?></button>
+            <button class="btn btn-sm btn-secondary manage" data-location="cat_prob5" name="probtp5"><?= $config['conf_prob_tipo_5']; ?></button>
+            <button class="btn btn-sm btn-secondary manage" data-location="cat_prob6" name="probtp6"><?= $config['conf_prob_tipo_6']; ?></button>
             <br /><br />
             <?php
             if ($registros == 0) {
@@ -248,6 +255,9 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 1);
                             <td class="line tipo_1"><?= $config['conf_prob_tipo_1']; ?></td>
                             <td class="line tipo_2"><?= $config['conf_prob_tipo_2']; ?></td>
                             <td class="line tipo_3"><?= $config['conf_prob_tipo_3']; ?></td>
+                            <td class="line tipo_3"><?= $config['conf_prob_tipo_4']; ?></td>
+                            <td class="line tipo_3"><?= $config['conf_prob_tipo_5']; ?></td>
+                            <td class="line tipo_3"><?= $config['conf_prob_tipo_6']; ?></td>
                             <td class="line prob_active"><?= TRANS('ACTIVE_O'); ?></td>
                             <td class="line editar"><?= TRANS('VISIBILITY'); ?></td>
                             <td class="line editar"><?= TRANS('BT_EDIT'); ?></td>
@@ -314,6 +324,9 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 1);
                                 <td class="line"><?= ($row['probt1_desc'] == '' ? '<span class="text-danger"><i class="fas fa-ban"></i></span>' : $row['probt1_desc']); ?></td>
                                 <td class="line"><?= ($row['probt2_desc'] == '' ? '<span class="text-danger"><i class="fas fa-ban"></i></span>' : $row['probt2_desc']); ?></td>
                                 <td class="line"><?= ($row['probt3_desc'] == '' ? '<span class="text-danger"><i class="fas fa-ban"></i></span>' : $row['probt3_desc']); ?></td>
+                                <td class="line"><?= ($row['probt4_desc'] == '' ? '<span class="text-danger"><i class="fas fa-ban"></i></span>' : $row['probt4_desc']); ?></td>
+                                <td class="line"><?= ($row['probt5_desc'] == '' ? '<span class="text-danger"><i class="fas fa-ban"></i></span>' : $row['probt5_desc']); ?></td>
+                                <td class="line"><?= ($row['probt6_desc'] == '' ? '<span class="text-danger"><i class="fas fa-ban"></i></span>' : $row['probt6_desc']); ?></td>
                                 <td class="line"><?= $active; ?></td>
                                 <td class="line"><button type="button" class="btn btn-sm <?= $button_class; ?>"  data-toggle="popover" data-placement="top" data-trigger="hover" data-content="<?= $hint; ?>" onclick="<?= $exception_function; ?>('<?= $areaId; ?>', '<?= $row['prob_id']; ?>')" <?= $disable; ?>></button></td>
                                 <td class="line"><button type="button" class="btn btn-secondary btn-sm" onclick="redirect('types_of_issues_4.0.php?action=edit&cod=<?= $row['prob_id']; ?>')"><?= TRANS('BT_EDIT'); ?></button></td>
@@ -369,8 +382,11 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 1);
 
 
             loadCat1();
-            loadCat2();
-            loadCat3();
+			loadCat2();
+			loadCat3();
+			loadCat4();
+			loadCat5();
+			loadCat6();
 
             $('.manage_categories').on('click', function() {
                 loadInPopup($(this).attr('data-location'), $(this).attr('data-params'));
@@ -501,6 +517,81 @@ $auth = new AuthNew($_SESSION['s_logado'], $_SESSION['s_nivel'], 1);
                     } else
                     if ($('#cat3_selected').val() != '') {
                         $('#tipo_3').val($('#cat3_selected').val()).change();
+                    }
+                }
+            });
+        }
+
+        function loadCat4(selected_id = '') {
+            $.ajax({
+                url: './get_issue_categories.php',
+                method: 'POST',
+                data: {
+                    cat_type: 4
+                },
+                dataType: 'json',
+            }).done(function(response) {
+                $('#tipo_4').empty().append('<option value=""><?= TRANS('SEL_TYPE'); ?></option>');
+                for (var i in response) {
+
+                    var option = '<option value="' + response[i].probt4_cod + '">' + response[i].probt4_desc + '</option>';
+                    $('#tipo_4').append(option);
+
+                    if (selected_id !== '') {
+                        $('#tipo_4').val(selected_id).change();
+                    } else
+                    if ($('#cat4_selected').val() != '') {
+                        $('#tipo_4').val($('#cat4_selected').val()).change();
+                    }
+                }
+            });
+        }
+
+        function loadCat5(selected_id = '') {
+            $.ajax({
+                url: './get_issue_categories.php',
+                method: 'POST',
+                data: {
+                    cat_type: 5
+                },
+                dataType: 'json',
+            }).done(function(response) {
+                $('#tipo_5').empty().append('<option value=""><?= TRANS('SEL_TYPE'); ?></option>');
+                for (var i in response) {
+
+                    var option = '<option value="' + response[i].probt5_cod + '">' + response[i].probt5_desc + '</option>';
+                    $('#tipo_5').append(option);
+
+                    if (selected_id !== '') {
+                        $('#tipo_5').val(selected_id).change();
+                    } else
+                    if ($('#cat5_selected').val() != '') {
+                        $('#tipo_5').val($('#cat5_selected').val()).change();
+                    }
+                }
+            });
+        }
+
+        function loadCat6(selected_id = '') {
+            $.ajax({
+                url: './get_issue_categories.php',
+                method: 'POST',
+                data: {
+                    cat_type: 6
+                },
+                dataType: 'json',
+            }).done(function(response) {
+                $('#tipo_6').empty().append('<option value=""><?= TRANS('SEL_TYPE'); ?></option>');
+                for (var i in response) {
+
+                    var option = '<option value="' + response[i].probt6_cod + '">' + response[i].probt6_desc + '</option>';
+                    $('#tipo_6').append(option);
+
+                    if (selected_id !== '') {
+                        $('#tipo_6').val(selected_id).change();
+                    } else
+                    if ($('#cat6_selected').val() != '') {
+                        $('#tipo_6').val($('#cat6_selected').val()).change();
                     }
                 }
             });

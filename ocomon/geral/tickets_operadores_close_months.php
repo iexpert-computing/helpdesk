@@ -18,27 +18,6 @@ $qry_filter_areas = "";
 
 $u_areas = (!empty($filtered_areas) ? $filtered_areas : $_SESSION['s_uareas']);
 
-// $allAreasInfo = getAreas($conn, 0, 1, null);
-// $arrayAllAreas = [];
-// foreach ($allAreasInfo as $sigleArea) {
-//     $arrayAllAreas[] = $sigleArea['sis_id'];
-// }
-// $allAreas = implode(",", $arrayAllAreas);
-
-// if ($isAdmin) {
-//     $u_areas = (!empty($filtered_areas) ? $filtered_areas : $allAreas);
-
-//     if (empty($filtered_areas) && !$_SESSION['requester_areas']) {
-//         /* Padrão, não precisa filtrar por área - todas as áreas de destino */
-//         $qry_filter_areas = "";
-
-//     } else {
-//         $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$u_areas}) ";
-//     } 
-// } else {
-//     $u_areas = (!empty($filtered_areas) ? $filtered_areas : $_SESSION['s_uareas']);
-//     $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$u_areas}) ";
-// }
 
 /* Controle para limitar os resultados com base nos clientes selecionados */
 $qry_filter_clients = "";
@@ -52,7 +31,8 @@ if (empty($filtered_areas)) {
     if ($isAdmin) {
         $qry_filter_areas = "";
     } else {
-        $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$_SESSION['s_uareas']}) OR " . $aliasAreasFilter . " = '-1')";
+        // $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$_SESSION['s_uareas']}) OR " . $aliasAreasFilter . " = '-1')";
+        $qry_filter_areas = " AND " . $aliasAreasFilter . " IN ({$_SESSION['s_uareas']})";
     }
 } else {
     $qry_filter_areas = " AND (" . $aliasAreasFilter . " IN ({$filtered_areas}))";
@@ -97,7 +77,9 @@ foreach ($result->fetchAll() as $row) {
 
         if ($_SESSION['requester_areas']) {
             $sqlEach = "SELECT 
-                            count(*) AS total, ua.nome 
+                            count(*) AS total, 
+                            ua.user_id,
+                            ua.nome 
                         FROM 
                             ocorrencias o, usuarios u, usuarios ua, sistemas s 
                         WHERE 
@@ -114,7 +96,9 @@ foreach ($result->fetchAll() as $row) {
                         ";
         } else {
             $sqlEach = "SELECT 
-                            count(*) AS total, u.nome 
+                            count(*) AS total, 
+                            u.user_id,
+                            u.nome 
                         FROM 
                             ocorrencias o, usuarios u, usuarios ua, sistemas s 
                         WHERE 
@@ -139,31 +123,40 @@ foreach ($result->fetchAll() as $row) {
             foreach ($resultEach->fetchAll() as $rowEach) {
                 
                 if ($rowEach['total']){
-                    $operadores[] = $rowEach['nome'];
-                    // $totais[] = (int)$rowEach['total'];
+                    $operadores[$rowEach['user_id']] = $rowEach['nome'];
                     $meses[] = $months[$i];
-                    $operadorDados[$rowEach['nome']][] = intval($rowEach['total']);
+                    // $operadorDados[$rowEach['nome']][] = intval($rowEach['total']);
+                    $operadorDados[$rowEach['user_id']][] = intval($rowEach['total']);
                 } else {
-                    $operadores[] = $row['nome'];
-                    $operadorDados[$row['nome']][] = 0;
+                    $operadores[$row['user_id']] = $row['nome'];
+                    // $operadorDados[$row['nome']][] = 0;
+                    $operadorDados[$row['user_id']][] = 0;
                     $meses[] = $months[$i];
                 }
             }
         } else {
-            $operadores[] = $row['nome'];
-            $operadorDados[$row['nome']][] = 0;
+            $operadores[$row['user_id']] = $row['nome'];
+            // $operadorDados[$row['nome']][] = 0;
+            $operadorDados[$row['user_id']][] = 0;
             $meses[] = $months[$i];
         }
         $i++;
     }
 }
 
-
-
-
 /* Ajusto os arrays de labels para não ter repetidos */
 $meses = array_unique($meses);
-$operadores = array_unique($operadores);
+
+
+/* Trecho para remover os operadores que não tiveram registros no período */
+foreach ($operadorDados as $key => $value) {
+    if (array_sum($value) == 0) {
+        // unset($operadores[array_search($key, $operadores)]);
+        unset($operadores[$key]);
+        unset($operadorDados[$key]);
+    }
+}
+
 
 /* Separo o conteúdo para organizar o JSON */
 $data['operadores'] = $operadores;
@@ -171,9 +164,6 @@ $data['months'] = $meses;
 $data['totais'] = $operadorDados;
 $data['chart_title'] = ($_SESSION['requester_areas'] ? TRANS('TICKETS_BY_REQUESTER_LAST_MONTHS', '', 1) : TRANS('TICKETS_BY_TECHNITIAN_LAST_MONTHS', '', 1));
 
-
-// var_dump($data); exit;
-// var_dump($operadores, $totais, $meses, $operadorDados, $data); exit;
 
 echo json_encode($data);
 
