@@ -75,7 +75,8 @@ RUN set -e && \
 RUN set -e && \
     echo "Criando diretórios necessários e ajustando permissões" && \
     mkdir -p /var/www/html/api/ocomon_api/storage && \
-    chown -R www-data:www-data /var/www && \
+
+    chown -R www-data:www-data /var/www/html && \
     chmod -R 775 /var/www/html/api/ocomon_api/storage && \
     chmod -R 775 /var/www/html/includes/logs
 

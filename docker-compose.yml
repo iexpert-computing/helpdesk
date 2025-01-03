@@ -21,6 +21,9 @@ services:
       #- ./init-scripts:/docker-entrypoint-initdb.d
 
   app:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     image: ocomon6.0-custom-iexpert:latest
     #container_name: ocomon_container
     #restart: always
@@ -49,3 +52,4 @@ volumes:
 networks:
   network:
     driver: overlay
+    # driver: bridge
