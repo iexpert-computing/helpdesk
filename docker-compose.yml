@@ -1,37 +1,29 @@
-#Comando para rodar: docker compose build --progress=plain --no-cache | docker compose build --no-cache
-
 version: '3.8'
 
 services:
   db:
     image: mysql:8.0
-    #container_name: mysql8_container
-    #restart: always
     environment:
       MYSQL_ROOT_PASSWORD: D32txyU190R
       MYSQL_DATABASE: ocomon
       MYSQL_USER: user_ocomon
       MYSQL_PASSWORD: user_ocomon_D32txyU190R
-    #ports:
-      #- 3306: 3306
     networks:
       - network
     volumes:
       - db_data:/var/lib/mysql
-      #- ./init-scripts:/docker-entrypoint-initdb.d
+      - ./init-scripts:/docker-entrypoint-initdb.d
 
   app:
     # build:
     #   context: .
     #   dockerfile: Dockerfile
     image: ocomon6.0-custom-iexpert:latest
-    #container_name: ocomon_container
-    #restart: always
     ports:
       - target: 80
         published: 8001
         protocol: tcp
-        mode: host # Garante o mapeamento direto no host
+        mode: host
     networks:
       - network
     depends_on:
@@ -41,7 +33,6 @@ services:
       DB_NAME: ocomon
       DB_USER: user_ocomon
       DB_PASSWORD: user_ocomon_D32txyU190R
-      DB_ROOT_PASSWORD: D32txyU190R
     volumes:
       - app_storage:/var/www/html/api/ocomon_api/storage
 
