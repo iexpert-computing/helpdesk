@@ -15,10 +15,11 @@ services:
       #- ./init-scripts:/docker-entrypoint-initdb.d
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: ocomon6.0-custom-iexpert:latest
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    image: iexpertcomputing/helpdesk:6.0
+
     ports:
       - target: 80
         published: 8001
@@ -42,5 +43,5 @@ volumes:
 
 networks:
   network:
-    #driver: overlay
-    driver: bridge
+    driver: overlay
+    #driver: bridge
