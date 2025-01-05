@@ -12,12 +12,12 @@ services:
       - network
     volumes:
       - db_data:/var/lib/mysql
-      - ./init-scripts:/docker-entrypoint-initdb.d
+      #- ./init-scripts:/docker-entrypoint-initdb.d
 
   app:
-    # build:
-    #   context: .
-    #   dockerfile: Dockerfile
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: ocomon6.0-custom-iexpert:latest
     ports:
       - target: 80
@@ -42,5 +42,5 @@ volumes:
 
 networks:
   network:
-    driver: overlay
-    # driver: bridge
+    #driver: overlay
+    driver: bridge
