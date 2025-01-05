@@ -477,11 +477,11 @@
     $TRANS["FILL_LOCATION"] = "O departamento deve ser preenchido!";
     $TRANS["MSG_ALERT_PERIOD"] = "O período deve ser informado!";
     $TRANS["COL_OBS"] = "Obs";
-    $TRANS["MENU_TTL_MOD_ADMIN"] = "OcoMon - Módulo de Administração";
-    $TRANS["MENU_TTL_MOD_INV"] = "OcoMon - Módulo de Inventário";
-    $TRANS["MENU_TTL_MOD_OCCO"] = "OcoMon - Módulo de Ocorrências";
-    $TRANS["PRINT_TO_TREATING"] = "OcoMon - Impressão para atendimento";
-    $TRANS["TTL_OCOMON"] = "OcoMon - Sistema Completo para Gestão de demandas de Suporte Técnico e Controle de ativos";
+    $TRANS["MENU_TTL_MOD_ADMIN"] = "Helpdesk - Módulo de Administração";
+    $TRANS["MENU_TTL_MOD_INV"] = "Helpdesk - Módulo de Inventário";
+    $TRANS["MENU_TTL_MOD_OCCO"] = "Helpdesk - Módulo de Ocorrências";
+    $TRANS["PRINT_TO_TREATING"] = "Helpdesk - Impressão para atendimento";
+    $TRANS["TTL_OCOMON"] = "Helpdesk - Sistema Completo para Gestão de demandas de Suporte Técnico e Controle de ativos";
     $TRANS["TICKET_SCHEDULED_SUCCESS"] = "Ocorrência agendada com sucesso!";
     $TRANS["TICKET_SCHEDULED_IN_EDIT"] = "Ocorrência agendada na edição";
     $TRANS["TICKET_GOTTEN_IN"] = "Ocorrência em atendimento por você";
@@ -654,7 +654,7 @@
     $TRANS["OPT_PASS_TO_AUTH"] = "Senha para autenticação";
     $TRANS["YES"] = "Sim";
     $TRANS["OCOMON_ABSTRACT"] = "Sistema Completo para Gestão de demandas de Suporte Técnico e Controle de Ativos";
-    $TRANS["OPT_SITE"] = "Site para acesso ao OcoMon";
+    $TRANS["OPT_SITE"] = "Site para acesso ao Helpdesk";
     $TRANS["HELP_SITE"] = "A URL para que os usuários acessem o sistema";
     $TRANS["STATE"] = "Situação";
     $TRANS["TTL_SIT_GENERAL_EQUIP"] = "Situação geral dos ativos";
@@ -832,8 +832,8 @@
     $TRANS["SMART_IN_SLA"] = "Dentro do SLA";
     $TRANS["SMART_OUT_SLA"] = "Fora do SLA";
     $TRANS["SMART_IN_SLA_TOLERANCE"] = "Dentro da tolerância excedente";
-    $TRANS["SMART_CUSTOM_REPORT_TITLE"] = "OcoMon - Relatório customizado";
-    $TRANS["SMART_CUSTOM_REPORT_FILE_NAME"] = "OcoMon-Relatorio-customizado";
+    $TRANS["SMART_CUSTOM_REPORT_TITLE"] = "Helpdesk - Relatório customizado";
+    $TRANS["SMART_CUSTOM_REPORT_FILE_NAME"] = "Helpdesk-Relatorio-customizado";
     $TRANS["SMART_BUTTON_PRINT"] = "Imprimir";
     $TRANS["SMART_BUTTON_COPY"] = "Copiar";
     $TRANS["SMART_BUTTON_MANAGE_COLLUMNS"] = "Gerenciar colunas";
@@ -948,8 +948,8 @@
     $TRANS['FIELD_ASSET_TAG'] = "Campo: ETIQUETA";  
     $TRANS["CONTACT_EMAIL_PLACEHOLDER"] = "Informe o endereço de email para contato";
     $TRANS["SUGGESTION"] = "Sugestão";
-    $TRANS["ERROR_PHP_VERSION"] = "A versão mínima do PHP deve ser a 7.4. Será necessário atualizar o PHP para poder utilizar o OcoMon";
-    $TRANS["ERROR_SQL_MODE"] = "Para que as consultas funcionem adequadamente, essa versão do OcoMon precisa que a diretiva \"ONLY_FULL_GROUP_BY\" seja removida do SQL_MODE do MySql";
+    $TRANS["ERROR_PHP_VERSION"] = "A versão mínima do PHP deve ser a 7.4. Será necessário atualizar o PHP para poder utilizar o Helpdesk";
+    $TRANS["ERROR_SQL_MODE"] = "Para que as consultas funcionem adequadamente, essa versão do Helpdesk precisa que a diretiva \"ONLY_FULL_GROUP_BY\" seja removida do SQL_MODE do MySql";
     $TRANS['EQUIPMENTS_MODELS'] = "Modelos de Ativos";  
     $TRANS['IN_EQUIPMENT'] = "Vinculado a algum ativo";  
     $TRANS['AT_LEAST_5_CHARS'] = "Pelo menos 5 caracteres";  
@@ -1258,7 +1258,7 @@
     $TRANS["ALL_O"] = "Todos";
     $TRANS["ALL_A"] = "Todas";
     $TRANS["UPDATE_RELATION_AREAS_ISSUES"] = "Atualização necessária sobre os Tipos de solicitações";
-    $TRANS["MSG_UPDT_TYPES_OF_ISSUES"] = "Tipos de solicitações com nomenclaturas repetidas deverão ser atualizados <small>(permitidos até a versão 3.3)</small>.<hr>Esse procedimento é necessário para compatibilizar versões anteriores do OcoMon com o novo sistema de tipos de solicitações por área de atendimento.";
+    $TRANS["MSG_UPDT_TYPES_OF_ISSUES"] = "Tipos de solicitações com nomenclaturas repetidas deverão ser atualizados <small>(permitidos até a versão 3.3)</small>.<hr>Esse procedimento é necessário para compatibilizar versões anteriores do Helpdesk com o novo sistema de tipos de solicitações por área de atendimento.";
     $TRANS["GREAT"] = "Ótimo";
     $TRANS["THERES_NO_TYPES_OF_ISSUES_TO_UPDATE"] = "Não foram encontrados registros de tipos de solicitações repetidos. Voce precisa apenas confirmar esse processo de atualização para compatibilizar a versão.";
     $TRANS["THERES_TYPES_OF_ISSUES_TO_UPDATE"] = "Foram encontrados registros de tipos de solicitações com nomenclaturas repetidas. Você pode renomeá-los para evitar a perda de indicadores específicos (para os casos de chamados com tipos de solicitações idênticos na nomenclatura mas com diferentes categorias e/ou diferentes SLAs).<hr>Caso você opte por não renomeá-los, eles serão agrupados em seu menor ID e todas as ocorrências relacionadas (bem como o seu histórico de modificações) serão atualizadas.<hr>A recomendação é <strong>REVISAR</strong> as nomenclaturas.";
@@ -1308,7 +1308,7 @@
     $TRANS["LANG_ES_ES"] = "Español";
     $TRANS["HELPER_SMTP_SECURE"] = "Mecanismo de criptografia (SSL/TSL ou vazio para não utilizar)";
     $TRANS["SUCCESS_MAIL_SETTINGS"] = "Configurações de Email bem sucedidas";
-    $TRANS["SUCCESS_MAIL_SETTINGS_BODY"] = "O recebimento deste email indica que suas configurações para envio de email foram bem sucedidas.<br/><br/>Aproveite todas as possibilidades do OcoMon!";
+    $TRANS["SUCCESS_MAIL_SETTINGS_BODY"] = "O recebimento deste email indica que suas configurações para envio de email foram bem sucedidas.<br/><br/>Aproveite todas as possibilidades do Helpdesk!";
     $TRANS["TEST_MAIL_SETTINGS"] = "Testar as configurações";
     $TRANS["TEST_EMAIL_NOT_SENT"] = "Algum problema ocorreu ao tentar enviar o email de teste";
     $TRANS["TEST_MAIL_SENT_TO"] = "Foi enviado um email de teste para";
@@ -1379,7 +1379,7 @@
     $TRANS["MASK_MAIL_REGEX"] = "expressão para formatar endereço de email";
     
     $TRANS["PHP_MODULE_IMAP_TO"] = "Necessário para a abertura de chamados por email";
-    $TRANS["ALERT_BF_SET_TO_LDAP"] = "Antes de confirmar essa configuração, certifique-se de que seu usuário local (base do OcoMon) de administração também exista na base LDAP. Caso contrário você poderá ficar sem o acesso a esse painel de administração";
+    $TRANS["ALERT_BF_SET_TO_LDAP"] = "Antes de confirmar essa configuração, certifique-se de que seu usuário local (base do Helpdesk) de administração também exista na base LDAP. Caso contrário você poderá ficar sem o acesso a esse painel de administração";
     $TRANS["ALERT_BF_SET_MAIL_QUEUE"] = "Antes de confirmar essa configuração, certifique-se de que realizou a configuração da periodicidade de envio dos emails no seu agendador de tarefas (vide documentação)";
     
     $TRANS["TECHNICIAN_SIGNATURE"] = "Assinatura do Técnico";
@@ -2119,7 +2119,7 @@
     $TRANS["AUTH_LOCAL_BASE"] = "Base local";
     $TRANS["AUTH_LDAP_BASE"] = "Base LDAP";
     $TRANS["AUTH_OIDC_BASE"] = "SSO via OIDC";
-    $TRANS["ALERT_BF_SET_TO_OIDC"] = "Antes de confirmar essa configuração, certifique-se de que seu usuário local (base do OcoMon) de administração também exista na base conectada via OIDC. Caso contrário você poderá ficar sem o acesso a esse painel de administração";
+    $TRANS["ALERT_BF_SET_TO_OIDC"] = "Antes de confirmar essa configuração, certifique-se de que seu usuário local (base do Helpdesk) de administração também exista na base conectada via OIDC. Caso contrário você poderá ficar sem o acesso a esse painel de administração";
     $TRANS["OIDC_CONNECTION_TEST"] = "Teste de conexão OIDC";
     $TRANS["OIDC_TYPE_USERNAME_AND_PASS"] = "Informe um usuário válido e senha para teste de conexão";
     $TRANS["ERR_LOGON_OIDC"] = "Não foi possível obter informações da base de origem via OIDC a partir das informações fornecidas";
@@ -2382,7 +2382,7 @@
     $TRANS["HELPER_CLIENT_SECRET"] = "O Client secret aparece apenas no momento da sua criação na plataforma MS Entra/Azure. Caso não tenha salvo, será necessário criar um novo segredo para a aplicação e então informar aqui.";
     $TRANS["TENANT_ID"] = "Tenant ID";
     $TRANS["HELPER_TENANT_ID"] = "É o ID do diretório locatário e está disponivel no console de desenvolvimento da sua plataforma MS Entra/Azure.";
-    $TRANS["HELPER_CREDENTIALS_OAUTH_IMAP"] = "É necessário adicionar e configurar uma aplicação para o OcoMon no console de desenvolvimento da sua plataforma MS Entra/Azure";
+    $TRANS["HELPER_CREDENTIALS_OAUTH_IMAP"] = "É necessário adicionar e configurar uma aplicação para o Helpdesk no console de desenvolvimento da sua plataforma MS Entra/Azure";
     $TRANS["OFFICE_365"] = "Office 365";
     $TRANS["HELPER_OFFICE_365"] = "Caso a conexão seja para uma conta do Office 365, marque essa opção e realize os procedimentos para a obtenção do token de acesso OAuth";
     $TRANS["GET_ACCESS_TOKEN"] = "Obter token de acesso";
@@ -2391,7 +2391,7 @@
     $TRANS["MSG_CREDENTIALS_AND_TOKEN_ALREADY_EXISTS"] = "Já existem credenciais e um token de acesso emitido para conexão com o Office 365. Você pode testar a conexão na tela anterior ou prosseguir para obter novo token.";
     $TRANS["UNECESSARY_TO_OAUTH"] = "Desnecessário para OAuth";
     $TRANS["REDIRECT_URL"] = "URL de redirecionamento";
-    $TRANS["HELPER_REDIRECT_URL"] = "Essa URL precisa ter sido informada no console de desenvolvimento da sua plataforma MS Entra/Azure. Tenha certeza de que a configuração do OcoMon para \"".$TRANS["OPT_SITE"]."\" esteja correta";
+    $TRANS["HELPER_REDIRECT_URL"] = "Essa URL precisa ter sido informada no console de desenvolvimento da sua plataforma MS Entra/Azure. Tenha certeza de que a configuração do Helpdesk para \"".$TRANS["OPT_SITE"]."\" esteja correta";
     $TRANS["ERROR_ON_SAVE_CONFIG"] = "Ocorreu algum erro na tentativa de salvar as informações. Tente novamente em instantes.";
     $TRANS["SUCCESS_ON_RETRIEVE_TOKEN"] = "Token de acesso obtido com sucesso!<hr>Você pode fechar essa janela e prosseguir com as configurações.";
     $TRANS["EMPTY_RESULT_TRY_AGAIN"] = "Nenhum retorno obtido na tentativa de acesso ao servidor. Tente novamente em instantes.";
